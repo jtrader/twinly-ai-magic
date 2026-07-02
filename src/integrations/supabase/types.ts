@@ -469,6 +469,7 @@ export type Database = {
           onboarding_completed_at: string | null
           payout_status: Database["public"]["Enums"]["payout_status"]
           stage_name: string
+          style_notes: Json
           updated_at: string
           user_id: string
           verification_status: Database["public"]["Enums"]["verification_status"]
@@ -485,6 +486,7 @@ export type Database = {
           onboarding_completed_at?: string | null
           payout_status?: Database["public"]["Enums"]["payout_status"]
           stage_name: string
+          style_notes?: Json
           updated_at?: string
           user_id: string
           verification_status?: Database["public"]["Enums"]["verification_status"]
@@ -501,6 +503,7 @@ export type Database = {
           onboarding_completed_at?: string | null
           payout_status?: Database["public"]["Enums"]["payout_status"]
           stage_name?: string
+          style_notes?: Json
           updated_at?: string
           user_id?: string
           verification_status?: Database["public"]["Enums"]["verification_status"]
@@ -519,6 +522,7 @@ export type Database = {
         Row: {
           allowed_uses: Json
           creator_id: string
+          forbidden_uses: Json
           image_ok: boolean
           likeness_ok: boolean
           revoked_at: string | null
@@ -530,6 +534,7 @@ export type Database = {
         Insert: {
           allowed_uses?: Json
           creator_id: string
+          forbidden_uses?: Json
           image_ok?: boolean
           likeness_ok?: boolean
           revoked_at?: string | null
@@ -541,6 +546,7 @@ export type Database = {
         Update: {
           allowed_uses?: Json
           creator_id?: string
+          forbidden_uses?: Json
           image_ok?: boolean
           likeness_ok?: boolean
           revoked_at?: string | null
@@ -927,6 +933,53 @@ export type Database = {
           },
         ]
       }
+      twin_reference_assets: {
+        Row: {
+          created_at: string
+          creator_id: string
+          id: string
+          kind: Database["public"]["Enums"]["twin_ref_kind"]
+          mime_type: string | null
+          notes: string | null
+          slot_label: string | null
+          sort_order: number
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          id?: string
+          kind: Database["public"]["Enums"]["twin_ref_kind"]
+          mime_type?: string | null
+          notes?: string | null
+          slot_label?: string | null
+          sort_order?: number
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["twin_ref_kind"]
+          mime_type?: string | null
+          notes?: string | null
+          slot_label?: string | null
+          sort_order?: number
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "twin_reference_assets_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1007,6 +1060,7 @@ export type Database = {
       sender_type: "fan" | "ai" | "creator" | "system"
       sub_status: "active" | "canceled" | "paused"
       sub_tier: "free" | "base" | "plus" | "naughty" | "wicked" | "vip"
+      twin_ref_kind: "identity_ref" | "voice_ref" | "style_ref"
       twin_status: "none" | "pending" | "approved" | "revoked"
       tx_kind: "sub" | "ppv" | "tip" | "credits"
       tx_status: "stub" | "succeeded" | "failed"
@@ -1150,6 +1204,7 @@ export const Constants = {
       sender_type: ["fan", "ai", "creator", "system"],
       sub_status: ["active", "canceled", "paused"],
       sub_tier: ["free", "base", "plus", "naughty", "wicked", "vip"],
+      twin_ref_kind: ["identity_ref", "voice_ref", "style_ref"],
       twin_status: ["none", "pending", "approved", "revoked"],
       tx_kind: ["sub", "ppv", "tip", "credits"],
       tx_status: ["stub", "succeeded", "failed"],
