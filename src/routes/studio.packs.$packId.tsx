@@ -406,11 +406,53 @@ type UploadRow = {
   file: File;
   title: string;
   isSynthetic: boolean;
-  status: "pending" | "uploading" | "uploaded" | "failed";
+  status: "pending" | "uploading" | "uploaded" | "failed" | "invalid";
   error?: string;
   storagePath?: string;
   assetType: AssetType;
+  progress: number;
+  tagsInput: string;
 };
+
+const MAX_BYTES = 500 * 1024 * 1024; // 500 MB per file
+const ACCEPTED = ["image/", "video/", "audio/", "text/", "application/pdf"];
+
+function validateFile(f: File): string | null {
+  if (f.size <= 0) return "Empty file";
+  if (f.size > MAX_BYTES) return `Too large (${(f.size/1024/1024).toFixed(1)} MB > 500 MB)`;
+  const t = f.type || "";
+  if (t && !ACCEPTED.some((p) => t.startsWith(p))) return `Unsupported type: ${t}`;
+  return null;
+}
+
+function parseTags(input: string): string[] {
+  return input.split(/[,\s]+/g).map((t) => t.trim().toLowerCase().replace(/^#/, "")).filter(Boolean);
+}
+
+async function uploadWithProgress(
+  path: string,
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<void> {
+  // Use signed upload URL so we can drive XHR progress
+  const { data: signed, error: sErr } = await supabase.storage
+    .from("content-assets").createSignedUploadUrl(path);
+  if (sErr || !signed) throw sErr ?? new Error("Could not sign upload");
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", signed.signedUrl);
+    if (file.type) xhr.setRequestHeader("Content-Type", file.type);
+    xhr.setRequestHeader("x-upsert", "false");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300)
+      ? (onProgress(100), resolve())
+      : reject(new Error(`Upload failed (${xhr.status})`));
+    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.send(file);
+  });
+}
 
 function BulkUploadDialog({ open, onOpenChange, creatorId, packId, onDone }: {
   open: boolean; onOpenChange: (o: boolean) => void; creatorId: string; packId: string; onDone: () => void;
@@ -418,21 +460,28 @@ function BulkUploadDialog({ open, onOpenChange, creatorId, packId, onDone }: {
   const [rows, setRows] = useState<UploadRow[]>([]);
   const [sharedCategory, setSharedCategory] = useState("");
   const [sharedSynthetic, setSharedSynthetic] = useState(false);
+  const [sharedTags, setSharedTags] = useState("");
   const [busy, setBusy] = useState(false);
   const uploadFn = useServerFn(bulkUploadToPack);
+  const rowsRef = useRef<UploadRow[]>([]);
+  useEffect(() => { rowsRef.current = rows; }, [rows]);
 
-  useEffect(() => { if (open) { setRows([]); setSharedCategory(""); setSharedSynthetic(false); setBusy(false); } }, [open]);
+  useEffect(() => { if (open) { setRows([]); setSharedCategory(""); setSharedSynthetic(false); setSharedTags(""); setBusy(false); } }, [open]);
 
   function addFiles(files: FileList | null) {
     if (!files) return;
     const next: UploadRow[] = [];
     for (const f of Array.from(files).slice(0, 50 - rows.length)) {
+      const err = validateFile(f);
       next.push({
         file: f,
         title: f.name.replace(/\.[^/.]+$/, ""),
         isSynthetic: sharedSynthetic,
-        status: "pending",
+        status: err ? "invalid" : "pending",
+        error: err ?? undefined,
         assetType: detectAssetType(f),
+        progress: 0,
+        tagsInput: "",
       });
     }
     setRows((prev) => [...prev, ...next]);
@@ -442,34 +491,44 @@ function BulkUploadDialog({ open, onOpenChange, creatorId, packId, onDone }: {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
 
-  async function submit() {
-    if (rows.length === 0) { toast.error("Add files first."); return; }
+  async function uploadOne(i: number) {
+    const r = rowsRef.current[i];
+    if (!r || r.status === "invalid") return;
+    updateRow(i, { status: "uploading", error: undefined, progress: 0 });
+    try {
+      const ext = r.file.name.includes(".") ? r.file.name.slice(r.file.name.lastIndexOf(".")) : "";
+      const key = `${creatorId}/${crypto.randomUUID()}${ext}`;
+      await uploadWithProgress(key, r.file, (pct) => updateRow(i, { progress: pct }));
+      updateRow(i, { status: "uploaded", storagePath: key, progress: 100 });
+    } catch (err: any) {
+      updateRow(i, { status: "failed", error: err?.message ?? "Upload failed" });
+    }
+  }
+
+  async function retryFailed() {
+    const idxs = rowsRef.current.map((r, i) => (r.status === "failed" ? i : -1)).filter((i) => i >= 0);
+    if (!idxs.length) { toast("Nothing to retry"); return; }
     setBusy(true);
     try {
-      const queue = rows.map((_, i) => i);
-      const worker = async () => {
-        while (queue.length) {
-          const i = queue.shift()!;
-          const r = rows[i];
-          updateRow(i, { status: "uploading", error: undefined });
-          try {
-            const ext = r.file.name.includes(".") ? r.file.name.slice(r.file.name.lastIndexOf(".")) : "";
-            const key = `${creatorId}/${crypto.randomUUID()}${ext}`;
-            const { error: upErr } = await supabase.storage
-              .from("content-assets")
-              .upload(key, r.file, { cacheControl: "3600", upsert: false, contentType: r.file.type || undefined });
-            if (upErr) throw upErr;
-            r.storagePath = key; r.status = "uploaded";
-            updateRow(i, { status: "uploaded", storagePath: key });
-          } catch (err: any) {
-            updateRow(i, { status: "failed", error: err?.message ?? "Upload failed" });
-          }
-        }
-      };
+      const queue = [...idxs];
+      const worker = async () => { while (queue.length) await uploadOne(queue.shift()!); };
+      await Promise.all([worker(), worker(), worker(), worker()]);
+    } finally { setBusy(false); }
+  }
+
+  async function submit() {
+    const eligible = rows.filter((r) => r.status !== "invalid" && r.status !== "uploaded");
+    if (rows.length === 0) { toast.error("Add files first."); return; }
+    if (rows.every((r) => r.status === "invalid")) { toast.error("All files failed validation."); return; }
+    setBusy(true);
+    try {
+      const queue = eligible.map((r) => rows.indexOf(r));
+      const worker = async () => { while (queue.length) await uploadOne(queue.shift()!); };
       await Promise.all([worker(), worker(), worker(), worker()]);
 
-      const good = rows.filter((r) => r.status === "uploaded" && r.storagePath);
+      const good = rowsRef.current.filter((r) => r.status === "uploaded" && r.storagePath);
       if (!good.length) throw new Error("No files uploaded successfully.");
+      const sharedTagList = parseTags(sharedTags);
 
       const res = await uploadFn({ data: {
         packId,
@@ -479,11 +538,13 @@ function BulkUploadDialog({ open, onOpenChange, creatorId, packId, onDone }: {
           storagePath: r.storagePath!,
           category: sharedCategory.trim() || undefined,
           isSynthetic: r.isSynthetic,
+          tags: Array.from(new Set([...sharedTagList, ...parseTags(r.tagsInput)])),
         })),
       }});
       toast.success(`Added ${res.count} asset${res.count === 1 ? "" : "s"} to pack`);
-      onOpenChange(false);
       onDone();
+      const anyFailed = rowsRef.current.some((r) => r.status === "failed" || r.status === "invalid");
+      if (!anyFailed) onOpenChange(false);
     } catch (err: any) {
       toast.error(err?.message ?? "Import failed");
     } finally { setBusy(false); }
@@ -491,29 +552,33 @@ function BulkUploadDialog({ open, onOpenChange, creatorId, packId, onDone }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Bulk upload to pack</DialogTitle>
-          <DialogDescription>Drop up to 50 files. They'll be added to this pack.</DialogDescription>
+          <DialogDescription>Drop up to 50 files, max 500 MB each. Progress shows per file — retry any that fail.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface/40 p-6 text-center hover:border-brand/50">
             <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
             <span className="text-sm">Click to add files</span>
-            <span className="text-xs text-muted-foreground">image, video, audio, or text — up to 50 total</span>
+            <span className="text-xs text-muted-foreground">image, video, audio, PDF, or text — up to 50 total, ≤500 MB each</span>
             <input type="file" multiple accept="image/*,video/*,audio/*,.txt,.md,.pdf" className="hidden"
               onChange={(e) => { addFiles(e.target.files); e.currentTarget.value = ""; }} />
           </label>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <Label>Shared category</Label>
               <Input value={sharedCategory} onChange={(e) => setSharedCategory(e.target.value)} placeholder="e.g. dec-2026" />
             </div>
+            <div>
+              <Label className="flex items-center gap-1"><Tag className="h-3 w-3" />Shared tags</Label>
+              <Input value={sharedTags} onChange={(e) => setSharedTags(e.target.value)} placeholder="christmas, cozy, vip" />
+            </div>
             <div className="flex items-end justify-between gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2">
               <div>
                 <div className="text-sm font-medium">Mark all synthetic</div>
-                <div className="text-xs text-muted-foreground">Adds AI disclosure to every file.</div>
+                <div className="text-xs text-muted-foreground">Adds AI disclosure.</div>
               </div>
               <Switch checked={sharedSynthetic} onCheckedChange={(v) => {
                 setSharedSynthetic(v);
@@ -523,44 +588,60 @@ function BulkUploadDialog({ open, onOpenChange, creatorId, packId, onDone }: {
           </div>
 
           {rows.length > 0 && (
-            <div className="max-h-72 overflow-auto rounded-lg border border-border/60">
-              <table className="w-full text-xs">
-                <thead className="bg-surface-elevated/70 text-left uppercase tracking-widest text-[10px] text-muted-foreground">
-                  <tr>
-                    <th className="px-2 py-2">Title</th><th className="px-2 py-2">Type</th>
-                    <th className="px-2 py-2">Size</th><th className="px-2 py-2">Status</th><th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r, i) => (
-                    <tr key={i} className="border-t border-border/40">
-                      <td className="px-2 py-1">
-                        <Input value={r.title} onChange={(e) => updateRow(i, { title: e.target.value })} className="h-7 text-xs" />
-                      </td>
-                      <td className="px-2 py-1">{r.assetType}</td>
-                      <td className="px-2 py-1 text-muted-foreground">{(r.file.size/1024/1024).toFixed(1)} MB</td>
-                      <td className="px-2 py-1">
-                        {r.status === "pending" && <span className="text-muted-foreground">queued</span>}
-                        {r.status === "uploading" && <span className="text-brand-glow">uploading…</span>}
-                        {r.status === "uploaded" && <span className="text-emerald-400">uploaded</span>}
-                        {r.status === "failed" && <span className="text-destructive" title={r.error}>failed</span>}
-                      </td>
-                      <td className="px-2 py-1 text-right">
-                        <button type="button" onClick={() => setRows((p) => p.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive">
-                          <X className="h-3.5 w-3.5" />
+            <div className="max-h-[22rem] space-y-2 overflow-auto rounded-lg border border-border/60 p-2">
+              {rows.map((r, i) => (
+                <div key={i} className={"rounded-lg border p-2 text-xs " +
+                  (r.status === "invalid" || r.status === "failed"
+                    ? "border-rose-400/40 bg-rose-400/5"
+                    : r.status === "uploaded" ? "border-emerald-400/30 bg-emerald-400/5"
+                    : "border-border/60 bg-surface/60")}>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded bg-background/60 px-1.5 py-0.5 text-[10px] uppercase tracking-widest text-muted-foreground">{r.assetType}</span>
+                    <Input value={r.title} onChange={(e) => updateRow(i, { title: e.target.value })} className="h-7 flex-1 text-xs" disabled={r.status === "invalid"} />
+                    <span className="whitespace-nowrap text-muted-foreground">{(r.file.size/1024/1024).toFixed(1)} MB</span>
+                    <button type="button" onClick={() => setRows((p) => p.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive" title="Remove">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Input value={r.tagsInput} onChange={(e) => updateRow(i, { tagsInput: e.target.value })}
+                      placeholder="Tags (comma-sep)" className="h-7 flex-1 text-xs" disabled={r.status === "invalid"} />
+                    <div className="min-w-[80px] text-right">
+                      {r.status === "pending" && <span className="text-muted-foreground">queued</span>}
+                      {r.status === "uploading" && <span className="text-brand-glow">{r.progress}%</span>}
+                      {r.status === "uploaded" && <span className="text-emerald-400">uploaded</span>}
+                      {r.status === "failed" && (
+                        <button type="button" onClick={() => uploadOne(i)} className="inline-flex items-center gap-1 text-destructive hover:text-rose-300">
+                          <RotateCw className="h-3 w-3" />retry
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      )}
+                      {r.status === "invalid" && <span className="text-destructive">invalid</span>}
+                    </div>
+                  </div>
+                  {(r.status === "uploading" || r.status === "uploaded") && (
+                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-background/60">
+                      <div className="h-full bg-brand transition-[width] duration-200" style={{ width: `${r.progress}%` }} />
+                    </div>
+                  )}
+                  {r.error && (
+                    <div className="mt-1 flex items-start gap-1 text-[11px] text-destructive">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /><span>{r.error}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
 
         <DialogFooter>
+          {rows.some((r) => r.status === "failed") && (
+            <Button variant="outline" onClick={retryFailed} disabled={busy}>
+              <RotateCw className="mr-2 h-4 w-4" />Retry failed
+            </Button>
+          )}
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={submit} disabled={busy || rows.length === 0}>
+          <Button onClick={submit} disabled={busy || rows.length === 0 || rows.every((r) => r.status === "invalid")}>
             {busy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Importing…</> : `Import ${rows.length || ""} file${rows.length === 1 ? "" : "s"}`}
           </Button>
         </DialogFooter>
