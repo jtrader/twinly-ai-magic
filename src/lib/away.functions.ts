@@ -28,7 +28,13 @@ export const updateAwaySettings = createServerFn({ method: "POST" })
   .validator((d: Partial<AwaySettings>) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const patch: Record<string, unknown> = {};
+    const patch: {
+      away_mode?: boolean;
+      away_started_at?: string | null;
+      away_message?: string;
+      away_auto_reply_enabled?: boolean;
+      away_allow_ai_personas?: boolean;
+    } = {};
     if (typeof data.away_mode === "boolean") {
       patch.away_mode = data.away_mode;
       patch.away_started_at = data.away_mode ? new Date().toISOString() : null;
