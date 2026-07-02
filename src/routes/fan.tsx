@@ -33,10 +33,10 @@ function FanDashboard() {
       const [{ data: s }, { data: c }, { data: p }] = await Promise.all([
         supabase.from("subscriptions")
           .select("id, status, tier, current_period_end, creator_id, creators:creator_id(handle, stage_name)")
-          .eq("fan_user_id", user.id).order("created_at", { ascending: false }).limit(20),
+          .eq("fan_id", user.id).order("created_at", { ascending: false }).limit(20),
         supabase.from("conversations")
-          .select("id, updated_at, persona_id, creator_id, personas:persona_id(display_name, kind), creators:creator_id(handle, stage_name)")
-          .eq("fan_user_id", user.id).order("updated_at", { ascending: false }).limit(10),
+          .select("id, last_message_at, persona_id, creator_id, personas:persona_id(display_name, kind, slug), creators:creator_id(handle, stage_name)")
+          .eq("fan_id", user.id).order("last_message_at", { ascending: false }).limit(10),
         supabase.from("profiles").select("age_verified_at").eq("id", user.id).maybeSingle(),
       ]);
       setSubs(s ?? []);
@@ -106,7 +106,7 @@ function FanDashboard() {
                     {c.personas?.display_name} <span className="ml-1 text-xs text-muted-foreground">· @{c.creators?.handle}</span>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {c.personas?.kind === "ai" ? "AI persona" : "Real Me"} · {new Date(c.updated_at).toLocaleString()}
+                    {c.personas?.kind === "ai" ? "AI persona" : "Real Me"} · {c.last_message_at ? new Date(c.last_message_at).toLocaleString() : "—"}
                   </div>
                 </div>
                 {c.creators?.handle && c.personas && (
