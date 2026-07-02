@@ -42,8 +42,11 @@ function AppHome() {
           <Tile title="Content vault" desc="Upload assets and control which personas can use them." to="/studio/content" cta="Manage vault" />
         )}
         {isCreator && !creator && <Tile title="Complete creator onboarding" desc="Set a handle, stage name, and consent to launch." to="/onboarding" cta="Start onboarding" />}
-        {isAgency && <Tile title="Agency dashboard" desc="Managed creators & permissions." cta="Coming soon" disabled />}
-        {isAdmin && <Tile title="Admin console" desc="Verifications, moderation, users." cta="Coming soon" disabled />}
+        {isCreator && creator && (
+          <Tile title="Creator studio" desc="Dashboard with personas, vault, verification, and payouts." to="/studio" cta="Open studio" />
+        )}
+        {isAgency && <Tile title="Agency dashboard" desc="Managed creators & permissions." to="/agency" cta="Open dashboard" />}
+        {isAdmin && <Tile title="Admin console" desc="Verifications, moderation queue, audit log." to="/admin" cta="Open console" />}
       </div>
       <div className="mt-6 flex justify-end">
         <Button variant="ghost" onClick={async () => { await supabase.auth.signOut(); navigate({ to: "/" }); }}>Sign out</Button>
