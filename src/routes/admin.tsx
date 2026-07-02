@@ -197,6 +197,40 @@ function AdminPage() {
         </div>
       )}
 
+      {tab === "twin" && (
+        <div className="space-y-2">
+          {pendingTwin.map((r) => {
+            const isAudio = (r.mime_type ?? "").startsWith("audio/");
+            const url = twinPreviews[r.id];
+            return (
+              <div key={r.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+                <div className="size-20 overflow-hidden rounded-lg bg-surface-elevated/60">
+                  {isAudio ? (
+                    url ? <audio controls src={url} className="mt-10 w-full" /> : null
+                  ) : url ? (
+                    <img src={url} alt="" className="h-full w-full object-cover" />
+                  ) : null}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold">
+                    {r.slot_label || "Untitled"} <span className="ml-1 text-[10px] uppercase text-muted-foreground">{r.kind.replace("_ref", "")}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {r.creator ? `@${r.creator.handle}` : "unknown"} · submitted {r.submitted_at ? new Date(r.submitted_at).toLocaleString() : "—"}
+                  </div>
+                  {r.notes && <div className="mt-1 line-clamp-2 text-xs">{r.notes}</div>}
+                </div>
+                <div className="inline-flex gap-1">
+                  <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => decideTwin(r.id, "approved")}>Approve</Button>
+                  <Button size="sm" variant="ghost" disabled={busy === r.id} onClick={() => decideTwin(r.id, "rejected")}>Reject</Button>
+                </div>
+              </div>
+            );
+          })}
+          {pendingTwin.length === 0 && <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">No twin references awaiting review.</div>}
+        </div>
+      )}
+
       {tab === "verifications" && (
         <div className="overflow-hidden rounded-2xl border border-border bg-surface">
           <table className="w-full text-sm">
