@@ -213,3 +213,12 @@ function ChatPage() {
     </AppShell>
   );
 }
+
+function AvailabilityPill({ away }: { away: boolean }) {
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${away ? "border-amber-400/40 bg-amber-400/10 text-amber-300" : "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"}`}>
+      {away ? <Moon className="size-3" /> : <span className="size-2 rounded-full bg-emerald-400" />}
+      {away ? "Away" : "Online"}
+    </span>
+  );
+}
