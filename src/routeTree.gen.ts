@@ -21,12 +21,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
 import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
+import { Route as StudioPacksRouteImport } from './routes/studio.packs'
 import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
+import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$packId'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -89,6 +91,11 @@ const StudioPayoutsRoute = StudioPayoutsRouteImport.update({
   path: '/studio/payouts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioPacksRoute = StudioPacksRouteImport.update({
+  id: '/studio/packs',
+  path: '/studio/packs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioInboxRoute = StudioInboxRouteImport.update({
   id: '/studio/inbox',
   path: '/studio/inbox',
@@ -119,6 +126,11 @@ const CreatorsHandleRoute = CreatorsHandleRouteImport.update({
   path: '/creators/$handle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioPacksPackIdRoute = StudioPacksPackIdRouteImport.update({
+  id: '/$packId',
+  path: '/$packId',
+  getParentRoute: () => StudioPacksRoute,
+} as any)
 const ChatHandlePersonaRoute = ChatHandlePersonaRouteImport.update({
   id: '/chat/$handle/$persona',
   path: '/chat/$handle/$persona',
@@ -141,10 +153,12 @@ export interface FileRoutesByFullPath {
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/inbox': typeof StudioInboxRoute
+  '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
+  '/studio/packs/$packId': typeof StudioPacksPackIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -162,10 +176,12 @@ export interface FileRoutesByTo {
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/inbox': typeof StudioInboxRoute
+  '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
+  '/studio/packs/$packId': typeof StudioPacksPackIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -184,10 +200,12 @@ export interface FileRoutesById {
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/inbox': typeof StudioInboxRoute
+  '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
+  '/studio/packs/$packId': typeof StudioPacksPackIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -207,10 +225,12 @@ export interface FileRouteTypes {
     | '/legal/terms'
     | '/studio/content'
     | '/studio/inbox'
+    | '/studio/packs'
     | '/studio/payouts'
     | '/studio/personas'
     | '/studio/'
     | '/chat/$handle/$persona'
+    | '/studio/packs/$packId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -228,10 +248,12 @@ export interface FileRouteTypes {
     | '/legal/terms'
     | '/studio/content'
     | '/studio/inbox'
+    | '/studio/packs'
     | '/studio/payouts'
     | '/studio/personas'
     | '/studio'
     | '/chat/$handle/$persona'
+    | '/studio/packs/$packId'
   id:
     | '__root__'
     | '/'
@@ -249,10 +271,12 @@ export interface FileRouteTypes {
     | '/legal/terms'
     | '/studio/content'
     | '/studio/inbox'
+    | '/studio/packs'
     | '/studio/payouts'
     | '/studio/personas'
     | '/studio/'
     | '/chat/$handle/$persona'
+    | '/studio/packs/$packId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -271,6 +295,7 @@ export interface RootRouteChildren {
   LegalTermsRoute: typeof LegalTermsRoute
   StudioContentRoute: typeof StudioContentRoute
   StudioInboxRoute: typeof StudioInboxRoute
+  StudioPacksRoute: typeof StudioPacksRouteWithChildren
   StudioPayoutsRoute: typeof StudioPayoutsRoute
   StudioPersonasRoute: typeof StudioPersonasRoute
   StudioIndexRoute: typeof StudioIndexRoute
@@ -363,6 +388,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioPayoutsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/packs': {
+      id: '/studio/packs'
+      path: '/studio/packs'
+      fullPath: '/studio/packs'
+      preLoaderRoute: typeof StudioPacksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/inbox': {
       id: '/studio/inbox'
       path: '/studio/inbox'
@@ -405,6 +437,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreatorsHandleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/packs/$packId': {
+      id: '/studio/packs/$packId'
+      path: '/$packId'
+      fullPath: '/studio/packs/$packId'
+      preLoaderRoute: typeof StudioPacksPackIdRouteImport
+      parentRoute: typeof StudioPacksRoute
+    }
     '/chat/$handle/$persona': {
       id: '/chat/$handle/$persona'
       path: '/chat/$handle/$persona'
@@ -414,6 +453,18 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface StudioPacksRouteChildren {
+  StudioPacksPackIdRoute: typeof StudioPacksPackIdRoute
+}
+
+const StudioPacksRouteChildren: StudioPacksRouteChildren = {
+  StudioPacksPackIdRoute: StudioPacksPackIdRoute,
+}
+
+const StudioPacksRouteWithChildren = StudioPacksRoute._addFileChildren(
+  StudioPacksRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -431,6 +482,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalTermsRoute: LegalTermsRoute,
   StudioContentRoute: StudioContentRoute,
   StudioInboxRoute: StudioInboxRoute,
+  StudioPacksRoute: StudioPacksRouteWithChildren,
   StudioPayoutsRoute: StudioPayoutsRoute,
   StudioPersonasRoute: StudioPersonasRoute,
   StudioIndexRoute: StudioIndexRoute,

@@ -8,6 +8,7 @@ import { useSession, useUserRoles } from "@/lib/session";
 import { adminOverview, adminListVerifications, adminSetVerification, adminRecentAudit } from "@/lib/admin.functions";
 import { adminListModeration, adminResolveModeration } from "@/lib/moderation.functions";
 import { adminListPendingAssets, adminSetAssetApproval } from "@/lib/admin.functions";
+import { adminListPendingPacks, adminSetPackApproval } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -25,12 +26,13 @@ function AdminPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
-  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "audit">("overview");
+  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "audit">("overview");
   const [stats, setStats] = useState<any>(null);
   const [creators, setCreators] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
   const [pendingAssets, setPendingAssets] = useState<any[]>([]);
+  const [pendingPacks, setPendingPacks] = useState<any[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
 
   const overview = useServerFn(adminOverview);
@@ -41,6 +43,8 @@ function AdminPage() {
   const listAudit = useServerFn(adminRecentAudit);
   const listPending = useServerFn(adminListPendingAssets);
   const setApproval = useServerFn(adminSetAssetApproval);
+  const listPendingPacks_ = useServerFn(adminListPendingPacks);
+  const setPackApproval = useServerFn(adminSetPackApproval);
 
   useEffect(() => {
     if (!user || !roles.includes("admin")) return;
@@ -51,6 +55,7 @@ function AdminPage() {
         if (tab === "moderation") setEvents((await listMod({ data: {} })).events);
         if (tab === "audit") setAudit((await listAudit({})).events);
         if (tab === "synthetic") setPendingAssets((await listPending({})).assets);
+        if (tab === "packs") setPendingPacks((await listPendingPacks_({})).packs);
       } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
     })();
   }, [tab, user, roles.join(",")]);
@@ -99,6 +104,17 @@ function AdminPage() {
     finally { setBusy(null); }
   }
 
+  async function decidePack(id: string, status: "approved" | "rejected") {
+    setBusy(id);
+    try {
+      const note = status === "rejected" ? (window.prompt("Optional reviewer note visible to creator:", "") ?? undefined) : undefined;
+      await setPackApproval({ data: { packId: id, status, note: note || undefined } });
+      setPendingPacks((prev) => prev.filter((p) => p.id !== id));
+      toast.success(status);
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(null); }
+  }
+
   return (
     <AppShell>
       <div className="mb-4">
@@ -107,7 +123,7 @@ function AdminPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-2">
-        {(["overview","verifications","moderation","synthetic","audit"] as const).map((t) => (
+        {(["overview","verifications","moderation","synthetic","packs","audit"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -156,6 +172,28 @@ function AdminPage() {
             </div>
           ))}
           {pendingAssets.length === 0 && <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">No synthetic assets awaiting review.</div>}
+        </div>
+      )}
+
+      {tab === "packs" && (
+        <div className="space-y-2">
+          {pendingPacks.map((p) => (
+            <div key={p.id} className="rounded-2xl border border-border bg-surface p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold">{p.name} <span className="ml-2 rounded-full border border-border bg-background/40 px-2 py-0.5 text-[10px] uppercase text-muted-foreground">{p.pack_type}</span></div>
+                  <div className="text-xs text-muted-foreground">
+                    {p.item_count} item{p.item_count === 1 ? "" : "s"} · {p.creator ? `@${p.creator.handle}` : "unknown"} · {new Date(p.created_at).toLocaleString()}
+                  </div>
+                </div>
+                <div className="inline-flex gap-1">
+                  <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => decidePack(p.id, "approved")}>Approve</Button>
+                  <Button size="sm" variant="ghost" disabled={busy === p.id} onClick={() => decidePack(p.id, "rejected")}>Reject</Button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {pendingPacks.length === 0 && <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">No packs awaiting review.</div>}
         </div>
       )}
 

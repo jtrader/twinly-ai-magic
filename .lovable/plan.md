@@ -1,96 +1,86 @@
-# Phase 0.5 — Hardening
+# MVP 1 — Content Pack Ingestion
 
-Sensible defaults applied to the six open questions:
+Creators upload images / video / audio into **named packs**. No AI generation — this is pure ingest, organise, approve.
 
-1. **Consent model** — Split: `digital_twin_consent` = current state (one active row per creator), `consent_records` = append-only history of every signature/revocation event.
-2. **Agency scope** — Creator-only for digital-twin consent. Agencies can manage personas/content but cannot sign consent on behalf of a creator. New helper `is_creator_owner()` used for consent gates.
-3. **Moderator role** — Defer to Phase 3. Keep enum extensible (already `app_role`).
-4. **NSFW handling** — Two-layer gate: 18+ age gate (required for all fan surfaces) + explicit-content toggle on fan profile required to view personas flagged `is_explicit`. Add `is_explicit` boolean to `personas`.
-5. **Real Me replies** — Path (a) for MVP: creator replies manually from inbox. No AI drafting yet. `sendPersonaMessage` for `real_me` continues to store fan message with no synthetic reply.
-6. **Legal copy** — Ship "public beta" placeholders with a visible banner ("Draft — pre-launch") on each legal page. Real copy comes later.
+## Concept
 
-## Scope
+A **Pack** is a named bundle of assets a creator curates (e.g. "Naughty Pack", "Christmas 2026"). Packs are independent of personas but can be attached to one or more personas later (a pack attached to Nice AI becomes that persona's library).
 
-Infrastructure and safety plumbing only. No new user-facing product surfaces (those come in Phase 1+). Existing functionality preserved.
+Seeded pack types: `nice`, `naughty`, `wicked`, `seasonal`, `custom`. Creators can create unlimited packs of any type.
 
-## Database changes (single migration)
+## Schema (one migration)
 
-**Constraints & integrity**
-- `UNIQUE` on `creators.handle`, `personas(creator_id, slug)`, `profiles.display_name` left free.
-- Case-insensitive handle: enforce via `CHECK (handle = lower(handle))` + citext-free lowercase trigger.
-- `NOT NULL` audit on `personas.kind`, `personas.disclosure_label`, `content_assets.is_synthetic`.
-- Add `personas.is_explicit BOOLEAN NOT NULL DEFAULT false`.
-- Add `profiles.date_of_birth DATE` (nullable) + `profiles.age_verified_at TIMESTAMPTZ` for server-side age gate.
-- Add `profiles.explicit_content_opt_in BOOLEAN NOT NULL DEFAULT false`.
+**`content_packs`**
+- `id`, `creator_id → creators`, `name` (1–80), `slug` (lowercase, unique per creator)
+- `pack_type` enum: `nice | naughty | wicked | seasonal | custom`
+- `description`, `cover_asset_id` (nullable → content_assets)
+- `status` enum: `draft | in_review | approved | archived` (default `draft`)
+- `starts_at`, `ends_at` (nullable — for seasonal packs)
+- `sort_order`, `created_at`, `updated_at`
+- Unique: `(creator_id, slug)`
 
-**Append-only audit log**
-- `audit_logs(id, actor_user_id, action TEXT, subject_type TEXT, subject_id UUID, metadata JSONB, created_at)`.
-- RLS: insert via SECURITY DEFINER helper `log_audit(...)`; SELECT restricted to admins.
-- Trigger prevents UPDATE/DELETE.
+**`content_pack_items`** — assets in a pack
+- `pack_id`, `asset_id`, `position`, `added_at`
+- PK `(pack_id, asset_id)`
 
-**Consent split**
-- Keep `digital_twin_consent` as current-state (add `UNIQUE(creator_id)`).
-- Keep `consent_records` as history; add trigger on `digital_twin_consent` insert/update that appends to `consent_records`.
-- New helper `is_creator_owner(_creator_id UUID)` — checks `creators.user_id = auth.uid()` only (no agency, no admin escalation for consent).
-- Update `digital_twin_consent` RLS to use `is_creator_owner` for INSERT/UPDATE.
+**`content_pack_personas`** — attach a pack to persona(s)
+- `pack_id`, `persona_id`, `permission_type` (`included | ppv | restricted`), `attached_at`
+- PK `(pack_id, persona_id)`
+- On attach: fan-out into existing `persona_content_permissions` for each asset (kept in sync via trigger or server fn).
 
-**Public profile view**
-- `profiles_public` VIEW exposing only `id, display_name, avatar_url` (no email, no dob). `GRANT SELECT` to `anon, authenticated`.
-- Public reads (creator profile page) switch to this view where profile joins are needed.
+RLS: creator-scoped via `can_manage_creator(creator_id)`; admins full read. GRANTs to `authenticated` + `service_role`. `updated_at` trigger. All mutations log to `audit_logs`.
 
-**Age gate server-side**
-- New server function `assertAdult()` used by fan-scoped server functions (chat, discover explicit). Reads `profiles.age_verified_at`; returns 403 if null.
-- Client `AgeGateDialog` writes DOB → server fn `verifyAge({ dob })` which validates ≥18 and sets `age_verified_at`. Persist localStorage flag as UX cache only.
+Seeded on new creator (extend `seed_default_personas` trigger or add sibling): 3 empty packs — Nice Pack, Naughty Pack, Wicked Pack — mirroring the seeded personas.
 
-**Rate limiting scaffold**
-- `rate_limits(user_id, bucket, window_start, count, PRIMARY KEY(user_id, bucket, window_start))`.
-- Helper `check_rate_limit(_bucket TEXT, _limit INT, _window_seconds INT)` SECURITY DEFINER. No enforcement wired yet beyond `sendPersonaMessage` (30 msgs / 5 min per user).
+## Server functions (`src/lib/content-packs.functions.ts`)
 
-**Moderation trigger scaffold**
-- `moderation_events` gains `severity` enum (`low|medium|high|critical`) and `auto_flagged BOOLEAN`.
-- Simple keyword deny-list function `screen_message(text)` returns severity. `sendPersonaMessage` calls it; high/critical blocks reply and inserts `moderation_events`. Keyword list stored as constant in the function (editable later).
+- `listPacks()` — packs + counts + attached personas
+- `createPack({ name, packType, description?, startsAt?, endsAt? })`
+- `updatePack(id, patch)` incl. cover asset, dates, status
+- `deletePack(id)` (soft → archived if it has items)
+- `bulkUploadToPack({ packId, files[] })` — reuses existing `bulkCreateAssets`, then inserts pack_items in one go
+- `addAssetsToPack(packId, assetIds[])` / `removeAssetsFromPack(packId, assetIds[])`
+- `reorderPackItems(packId, orderedAssetIds[])`
+- `attachPackToPersona(packId, personaId, permissionType)` / `detachPackFromPersona(...)` — fan-out to `persona_content_permissions`
+- `submitPackForReview(packId)` → `in_review` (uses existing rate limiter)
+- Admin: `adminListPendingPacks()`, `adminSetPackApproval(packId, 'approved' | 'rejected', note?)` — reuses admin.functions pattern
 
-## Storage buckets
+## UI
 
-Create private buckets (no public read):
-- `content-assets` — creator vault media.
-- `verification-evidence` — ID/selfie/proof for creator verification.
-- `consent-signatures` — signed consent PDFs/screenshots.
+**`/studio/packs`** — new hub route
+- Grid of pack cards with cover, type badge, item count, status pill, attached-personas chips
+- "New pack" dialog (name, type, optional season dates)
+- Filters: type, status
+- Tile added to `/studio` dashboard ("Content packs")
 
-RLS on `storage.objects`:
-- `content-assets`: manager can CRUD own creator's files (path prefix `creator_id/…`).
-- `verification-evidence` & `consent-signatures`: creator-owner insert only; SELECT restricted to admins + owner.
+**`/studio/packs/$packId`** — pack detail
+- Header: name, type, status, submit-for-review button, attach-to-persona multi-select
+- **Bulk upload dropzone** (reuses `BulkUploadDialog` flow but scoped to this pack)
+- Grid of assets in the pack with drag-to-reorder, remove-from-pack, "set as cover"
+- "Add from vault" dialog — picks existing `content_assets` to add
+- Audit tab (reuses `AuditDialog` pattern scoped to pack)
 
-## Code changes
+**`/studio/content`** — existing vault gets a "Packs" column showing which packs an asset belongs to.
 
-**New files**
-- `src/lib/audit.server.ts` — thin wrapper calling `log_audit` via admin client.
-- `src/lib/age-gate.functions.ts` — `verifyAge`, `assertAdult`.
-- `src/lib/rate-limit.server.ts` — `checkRateLimit` helper.
-- `src/lib/moderation.server.ts` — `screenMessage` + `recordModerationEvent`.
+**Admin `/admin`** — new "Packs" tab: pending packs list with Approve / Reject + note (mirrors synthetic assets tab).
 
-**Modified files**
-- `src/lib/chat.functions.ts` — call `assertAdult`, `checkRateLimit('chat', 30, 300)`, `screenMessage` before AI call; log to `audit_logs`.
-- `src/components/twinly/AgeGateDialog.tsx` — collect DOB, call `verifyAge` server fn, then set localStorage.
-- `src/routes/legal.terms.tsx`, `legal.privacy.tsx`, `legal.ai-disclosure.tsx` — add visible "Draft — pre-launch" banner (placeholder copy stays).
-- `src/routes/creators.$handle.tsx` — swap profile join to `profiles_public`.
+## Approval flow
 
-**Untouched**
-- Landing, auth, discover, chat UI shell, persona architecture, existing SEO, root layout.
+`draft` → creator clicks Submit → `in_review` → admin approves → `approved` (visible to attached personas' fans) or `rejected` (creator revises). Status independent of individual asset approval; a pack surfaces the strictest of its items + its own status.
 
-## Files summary
+## Out of scope (later MVPs)
 
-Created (~5) · Modified (~5) · One DB migration · Three storage buckets.
+- AI generation into packs
+- Fan-facing pack browsing UI (this MVP is creator-side ingest only; existing persona content permissions already gate fan access)
+- Pricing per pack (assets keep their own `price_cents`)
+- Pack templates / cloning
 
-## What still comes later (not this phase)
+## Deliverables checklist
 
-- Persona Studio, Content Vault UI, Consent signing UI, Verification submission UI → Phase 1
-- Explicit content opt-in UI, moderation review console → Phase 2/3
-- Real legal copy, PWA install prompts, service worker → Phase 6
-
-## Deliverables at end of phase
-
-- Migration applied, buckets created, RLS verified.
-- Chat flow enforces age gate + rate limit + keyword moderation server-side.
-- Audit log receives events for: age verification, consent state change, moderation flag, chat message send.
-- Type-check passes; no UI regressions on existing routes.
+1. Migration: `content_packs`, `content_pack_items`, `content_pack_personas` + enums + RLS + GRANTs + trigger for seeding 3 default packs on new creator.
+2. `src/lib/content-packs.functions.ts` with the fns above.
+3. `src/routes/studio.packs.tsx` (hub) + `src/routes/studio.packs.$packId.tsx` (detail).
+4. Update `src/routes/studio.index.tsx` — add "Content packs" tile.
+5. Update `src/routes/studio.content.tsx` — show pack chips per asset.
+6. Update `src/routes/admin.tsx` — add "Packs" moderation tab.
+7. Extend `src/lib/admin.functions.ts` with pack approval fns.

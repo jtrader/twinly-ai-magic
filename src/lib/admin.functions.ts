@@ -109,3 +109,51 @@ export const adminSetAssetApproval = createServerFn({ method: "POST" })
     await logAudit(context.userId, "admin.asset_approval_set", { type: "asset", id: data.assetId }, { status: data.status });
     return { ok: true };
   });
+
+// ================= Content Packs =================
+export const adminListPendingPacks = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("content_packs")
+      .select("id, name, slug, pack_type, status, created_at, creator_id")
+      .eq("status", "in_review")
+      .order("created_at", { ascending: false }).limit(100);
+    if (error) throw error;
+    const creatorIds = Array.from(new Set((data ?? []).map((p: any) => p.creator_id)));
+    const { data: creators } = creatorIds.length
+      ? await supabaseAdmin.from("creators").select("id, handle, stage_name").in("id", creatorIds)
+      : { data: [] as any[] };
+    const byId = new Map((creators ?? []).map((c: any) => [c.id, c]));
+    const packIds = (data ?? []).map((p: any) => p.id);
+    const { data: itemCounts } = packIds.length
+      ? await supabaseAdmin.from("content_pack_items").select("pack_id").in("pack_id", packIds)
+      : { data: [] as any[] };
+    const counts = new Map<string, number>();
+    for (const it of itemCounts ?? []) counts.set(it.pack_id, (counts.get(it.pack_id) ?? 0) + 1);
+    return {
+      packs: (data ?? []).map((p: any) => ({
+        ...p,
+        creator: byId.get(p.creator_id) ?? null,
+        item_count: counts.get(p.id) ?? 0,
+      })),
+    };
+  });
+
+export const adminSetPackApproval = createServerFn({ method: "POST" })
+  .validator((d: { packId: string; status: "approved" | "rejected"; note?: string }) => d)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { logAudit } = await import("@/lib/audit.server");
+    const { error } = await supabaseAdmin
+      .from("content_packs")
+      .update({ status: data.status, review_note: data.note ?? null })
+      .eq("id", data.packId);
+    if (error) throw error;
+    await logAudit(context.userId, "admin.pack_approval_set", { type: "pack", id: data.packId }, { status: data.status, note: data.note ?? null });
+    return { ok: true };
+  });
