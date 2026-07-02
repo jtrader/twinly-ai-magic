@@ -37,9 +37,9 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
 
     await supabase.from("messages").insert({
       conversation_id: conversationId,
-      sender: "fan",
-      author_id: userId,
-      content: data.content,
+      sender_type: "fan",
+      body: data.content,
+      persona_id: persona.id,
     });
 
     let assistantText: string | null = null;
@@ -54,10 +54,10 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
 
       await supabase.from("messages").insert({
         conversation_id: conversationId,
-        sender: "ai",
-        content: assistantText,
-        is_synthetic: true,
-        persona_snapshot: { display_name: persona.display_name, disclosure_label: persona.disclosure_label },
+        sender_type: "ai",
+        body: assistantText,
+        ai_generated: true,
+        persona_id: persona.id,
       });
     }
 
