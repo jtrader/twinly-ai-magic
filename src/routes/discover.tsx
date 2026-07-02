@@ -8,8 +8,8 @@ const listCreators = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await supabaseAdmin
     .from("creators")
-    .select("id, handle, display_name, tagline, verification_status")
-    .eq("is_public", true)
+    .select("id, handle, stage_name, bio, verification_status")
+    .not("onboarding_completed_at", "is", null)
     .order("created_at", { ascending: false })
     .limit(50);
   return data ?? [];
@@ -39,7 +39,7 @@ function Discover() {
             <Link key={c.id} to="/creators/$handle" params={{ handle: c.handle }}
               className="group rounded-2xl border border-border bg-surface p-5 transition hover:border-brand/40 hover:bg-surface-elevated">
               <div className="flex items-center justify-between">
-                <div className="font-display text-lg font-semibold">{c.display_name}</div>
+                <div className="font-display text-lg font-semibold">{c.stage_name}</div>
                 {c.verification_status === "verified" && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-brand-glow">
                     <ShieldCheck className="size-3" /> Verified
@@ -47,7 +47,7 @@ function Discover() {
                 )}
               </div>
               <div className="text-xs text-muted-foreground">@{c.handle}</div>
-              {c.tagline && <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{c.tagline}</p>}
+              {c.bio && <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{c.bio}</p>}
               <div className="mt-4 flex gap-2">
                 <PersonaBadge kind="real_me" />
                 <PersonaBadge kind="ai" />
