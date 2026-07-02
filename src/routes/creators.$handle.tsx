@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/twinly/AppShell";
 import { PersonaCard } from "@/components/twinly/PersonaCard";
 import { AiDisclosureBanner } from "@/components/twinly/AiDisclosureBanner";
+import { ReportDialog } from "@/components/twinly/ReportDialog";
 import { ShieldCheck } from "lucide-react";
 
 const loadCreator = createServerFn({ method: "GET" })
@@ -47,13 +48,16 @@ function CreatorProfile() {
   return (
     <AppShell>
       <div className="mb-6 flex flex-col gap-2">
-        <div className="flex items-center gap-3">
-          <h1 className="font-display text-3xl font-bold">{creator.stage_name}</h1>
-          {creator.verification_status === "verified" && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-brand-glow">
-              <ShieldCheck className="size-3" /> Verified
-            </span>
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h1 className="font-display text-3xl font-bold">{creator.stage_name}</h1>
+            {creator.verification_status === "verified" && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-brand-glow">
+                <ShieldCheck className="size-3" /> Verified
+              </span>
+            )}
+          </div>
+          <ReportDialog targetType="creator" targetId={creator.id} label="Report creator" variant="outline" />
         </div>
         <div className="text-sm text-muted-foreground">@{creator.handle}</div>
         {creator.bio && <p className="text-sm text-muted-foreground">{creator.bio}</p>}

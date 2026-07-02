@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { AiDisclosureBanner } from "@/components/twinly/AiDisclosureBanner";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
+import { ReportDialog } from "@/components/twinly/ReportDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -89,7 +90,10 @@ function ChatPage() {
             <h1 className="font-display text-2xl font-bold">{persona.display_name}</h1>
             <div className="text-xs text-muted-foreground">@{creator.handle}</div>
           </div>
-          <PersonaBadge kind={persona.kind as any} />
+          <div className="flex items-center gap-2">
+            <PersonaBadge kind={persona.kind as any} />
+            <ReportDialog targetType="persona" targetId={persona.id} label="Report" />
+          </div>
         </div>
         <AiDisclosureBanner kind={persona.kind as any} label={persona.disclosure_label} className="mb-4" />
 

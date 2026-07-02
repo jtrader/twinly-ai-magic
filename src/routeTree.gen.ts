@@ -13,8 +13,11 @@ import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as AgencyRouteImport } from './routes/agency'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
@@ -43,6 +46,16 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgencyRoute = AgencyRouteImport.update({
+  id: '/agency',
+  path: '/agency',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
@@ -51,6 +64,11 @@ const AccountRoute = AccountRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioIndexRoute = StudioIndexRouteImport.update({
+  id: '/studio/',
+  path: '/studio/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioPersonasRoute = StudioPersonasRouteImport.update({
@@ -92,6 +110,8 @@ const ChatHandlePersonaRoute = ChatHandlePersonaRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
+  '/agency': typeof AgencyRoute
   '/app': typeof AppRoute
   '/auth': typeof AuthRoute
   '/discover': typeof DiscoverRoute
@@ -102,11 +122,14 @@ export interface FileRoutesByFullPath {
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
+  '/agency': typeof AgencyRoute
   '/app': typeof AppRoute
   '/auth': typeof AuthRoute
   '/discover': typeof DiscoverRoute
@@ -117,12 +140,15 @@ export interface FileRoutesByTo {
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
+  '/agency': typeof AgencyRoute
   '/app': typeof AppRoute
   '/auth': typeof AuthRoute
   '/discover': typeof DiscoverRoute
@@ -133,6 +159,7 @@ export interface FileRoutesById {
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
 export interface FileRouteTypes {
@@ -140,6 +167,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/account'
+    | '/admin'
+    | '/agency'
     | '/app'
     | '/auth'
     | '/discover'
@@ -150,11 +179,14 @@ export interface FileRouteTypes {
     | '/legal/terms'
     | '/studio/content'
     | '/studio/personas'
+    | '/studio/'
     | '/chat/$handle/$persona'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/account'
+    | '/admin'
+    | '/agency'
     | '/app'
     | '/auth'
     | '/discover'
@@ -165,11 +197,14 @@ export interface FileRouteTypes {
     | '/legal/terms'
     | '/studio/content'
     | '/studio/personas'
+    | '/studio'
     | '/chat/$handle/$persona'
   id:
     | '__root__'
     | '/'
     | '/account'
+    | '/admin'
+    | '/agency'
     | '/app'
     | '/auth'
     | '/discover'
@@ -180,12 +215,15 @@ export interface FileRouteTypes {
     | '/legal/terms'
     | '/studio/content'
     | '/studio/personas'
+    | '/studio/'
     | '/chat/$handle/$persona'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
+  AdminRoute: typeof AdminRoute
+  AgencyRoute: typeof AgencyRoute
   AppRoute: typeof AppRoute
   AuthRoute: typeof AuthRoute
   DiscoverRoute: typeof DiscoverRoute
@@ -196,6 +234,7 @@ export interface RootRouteChildren {
   LegalTermsRoute: typeof LegalTermsRoute
   StudioContentRoute: typeof StudioContentRoute
   StudioPersonasRoute: typeof StudioPersonasRoute
+  StudioIndexRoute: typeof StudioIndexRoute
   ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
 }
 
@@ -229,6 +268,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agency': {
+      id: '/agency'
+      path: '/agency'
+      fullPath: '/agency'
+      preLoaderRoute: typeof AgencyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/account': {
       id: '/account'
       path: '/account'
@@ -241,6 +294,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/': {
+      id: '/studio/'
+      path: '/studio'
+      fullPath: '/studio/'
+      preLoaderRoute: typeof StudioIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/studio/personas': {
@@ -298,6 +358,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
+  AdminRoute: AdminRoute,
+  AgencyRoute: AgencyRoute,
   AppRoute: AppRoute,
   AuthRoute: AuthRoute,
   DiscoverRoute: DiscoverRoute,
@@ -308,6 +370,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalTermsRoute: LegalTermsRoute,
   StudioContentRoute: StudioContentRoute,
   StudioPersonasRoute: StudioPersonasRoute,
+  StudioIndexRoute: StudioIndexRoute,
   ChatHandlePersonaRoute: ChatHandlePersonaRoute,
 }
 export const routeTree = rootRouteImport
