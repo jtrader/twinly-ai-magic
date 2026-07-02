@@ -175,6 +175,7 @@ export type Database = {
       }
       content_assets: {
         Row: {
+          ai_disclosure_required: boolean
           ai_generated_label: boolean
           approval_status: Database["public"]["Enums"]["approval_status"]
           asset_type: Database["public"]["Enums"]["asset_type"]
@@ -184,15 +185,20 @@ export type Database = {
           creator_id: string
           external_url: string | null
           id: string
+          internal_label: Database["public"]["Enums"]["asset_internal_label"]
           is_synthetic: boolean
           moderation_status: Database["public"]["Enums"]["moderation_status"]
           price_cents: number
+          source_type: Database["public"]["Enums"]["asset_source_type"]
           storage_path: string | null
           tags: string[]
           title: string
           updated_at: string
+          usage_rights: string | null
+          visibility: Database["public"]["Enums"]["asset_visibility"]
         }
         Insert: {
+          ai_disclosure_required?: boolean
           ai_generated_label?: boolean
           approval_status?: Database["public"]["Enums"]["approval_status"]
           asset_type: Database["public"]["Enums"]["asset_type"]
@@ -202,15 +208,20 @@ export type Database = {
           creator_id: string
           external_url?: string | null
           id?: string
+          internal_label?: Database["public"]["Enums"]["asset_internal_label"]
           is_synthetic?: boolean
           moderation_status?: Database["public"]["Enums"]["moderation_status"]
           price_cents?: number
+          source_type?: Database["public"]["Enums"]["asset_source_type"]
           storage_path?: string | null
           tags?: string[]
           title: string
           updated_at?: string
+          usage_rights?: string | null
+          visibility?: Database["public"]["Enums"]["asset_visibility"]
         }
         Update: {
+          ai_disclosure_required?: boolean
           ai_generated_label?: boolean
           approval_status?: Database["public"]["Enums"]["approval_status"]
           asset_type?: Database["public"]["Enums"]["asset_type"]
@@ -220,13 +231,17 @@ export type Database = {
           creator_id?: string
           external_url?: string | null
           id?: string
+          internal_label?: Database["public"]["Enums"]["asset_internal_label"]
           is_synthetic?: boolean
           moderation_status?: Database["public"]["Enums"]["moderation_status"]
           price_cents?: number
+          source_type?: Database["public"]["Enums"]["asset_source_type"]
           storage_path?: string | null
           tags?: string[]
           title?: string
           updated_at?: string
+          usage_rights?: string | null
+          visibility?: Database["public"]["Enums"]["asset_visibility"]
         }
         Relationships: [
           {
@@ -573,6 +588,88 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: true
             referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      generation_requests: {
+        Row: {
+          created_at: string
+          creator_id: string
+          disclosure_label: string | null
+          id: string
+          output_type: Database["public"]["Enums"]["generation_output_type"]
+          pack_id: string | null
+          persona_id: string | null
+          produced_asset_ids: string[]
+          prompt_notes: string
+          quantity: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_note: string | null
+          status: Database["public"]["Enums"]["generation_request_status"]
+          style_preset: string | null
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          disclosure_label?: string | null
+          id?: string
+          output_type: Database["public"]["Enums"]["generation_output_type"]
+          pack_id?: string | null
+          persona_id?: string | null
+          produced_asset_ids?: string[]
+          prompt_notes?: string
+          quantity?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          status?: Database["public"]["Enums"]["generation_request_status"]
+          style_preset?: string | null
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          disclosure_label?: string | null
+          id?: string
+          output_type?: Database["public"]["Enums"]["generation_output_type"]
+          pack_id?: string | null
+          persona_id?: string | null
+          produced_asset_ids?: string[]
+          prompt_notes?: string
+          quantity?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          status?: Database["public"]["Enums"]["generation_request_status"]
+          style_preset?: string | null
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generation_requests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generation_requests_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "content_packs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generation_requests_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
             referencedColumns: ["id"]
           },
         ]
@@ -1090,8 +1187,32 @@ export type Database = {
     Enums: {
       app_role: "fan" | "creator" | "agency" | "admin"
       approval_status: "pending" | "approved" | "rejected"
+      asset_internal_label:
+        | "real_upload"
+        | "ai_draft"
+        | "approved_synthetic"
+        | "restricted"
+        | "do_not_use"
+      asset_source_type: "real_upload" | "ai_generated" | "edited" | "synthetic"
       asset_type: "image" | "video" | "audio" | "text"
+      asset_visibility: "private" | "subscribers" | "vip" | "ppv" | "public"
       consent_status: "n_a" | "on_file" | "missing"
+      generation_output_type:
+        | "image"
+        | "audio"
+        | "video"
+        | "talking_head"
+        | "promo_banner"
+      generation_request_status:
+        | "draft"
+        | "queued"
+        | "generating"
+        | "generated"
+        | "needs_review"
+        | "approved"
+        | "rejected"
+        | "published"
+        | "failed"
       moderation_status: "clean" | "flagged" | "removed"
       payout_status: "none" | "pending" | "active"
       permission_type: "included" | "ppv" | "restricted"
@@ -1234,8 +1355,35 @@ export const Constants = {
     Enums: {
       app_role: ["fan", "creator", "agency", "admin"],
       approval_status: ["pending", "approved", "rejected"],
+      asset_internal_label: [
+        "real_upload",
+        "ai_draft",
+        "approved_synthetic",
+        "restricted",
+        "do_not_use",
+      ],
+      asset_source_type: ["real_upload", "ai_generated", "edited", "synthetic"],
       asset_type: ["image", "video", "audio", "text"],
+      asset_visibility: ["private", "subscribers", "vip", "ppv", "public"],
       consent_status: ["n_a", "on_file", "missing"],
+      generation_output_type: [
+        "image",
+        "audio",
+        "video",
+        "talking_head",
+        "promo_banner",
+      ],
+      generation_request_status: [
+        "draft",
+        "queued",
+        "generating",
+        "generated",
+        "needs_review",
+        "approved",
+        "rejected",
+        "published",
+        "failed",
+      ],
       moderation_status: ["clean", "flagged", "removed"],
       payout_status: ["none", "pending", "active"],
       permission_type: ["included", "ppv", "restricted"],
