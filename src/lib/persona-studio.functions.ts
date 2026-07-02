@@ -108,6 +108,8 @@ export const updatePersona = createServerFn({ method: "POST" })
       sample_phrasings?: string;
       voice_ref_url?: string;
     };
+    twinLinkMode?: "all" | "selected" | "none";
+    linkedTwinRefIds?: string[];
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -120,6 +122,8 @@ export const updatePersona = createServerFn({ method: "POST" })
       is_explicit?: boolean;
       price_cents?: number;
       training_notes?: Record<string, string>;
+      twin_link_mode?: "all" | "selected" | "none";
+      linked_twin_ref_ids?: string[];
     } = {};
     if (data.displayName !== undefined) {
       const v = data.displayName.trim();
@@ -150,6 +154,10 @@ export const updatePersona = createServerFn({ method: "POST" })
         if (typeof v === "string" && v.trim()) clean[k] = v.trim().slice(0, 4000);
       }
       patch.training_notes = clean;
+    }
+    if (data.twinLinkMode !== undefined) patch.twin_link_mode = data.twinLinkMode;
+    if (data.linkedTwinRefIds !== undefined) {
+      patch.linked_twin_ref_ids = Array.from(new Set(data.linkedTwinRefIds));
     }
 
     if (Object.keys(patch).length === 0) return { ok: true };
