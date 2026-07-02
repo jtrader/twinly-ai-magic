@@ -35,7 +35,7 @@ function AppHome() {
         {isCreator && creator && (
           <Tile title="Your creator profile" desc={`@${creator.handle} — manage personas, vault, and disclosures.`} to="/creators/$handle" params={{ handle: creator.handle }} cta="Open" />
         )}
-        {isCreator && !creator && <Tile title="Complete creator onboarding" desc="Set a handle, stage name, and consent to launch." cta="Coming soon" disabled />}
+        {isCreator && !creator && <Tile title="Complete creator onboarding" desc="Set a handle, stage name, and consent to launch." to="/onboarding" cta="Start onboarding" />}
         {isAgency && <Tile title="Agency dashboard" desc="Managed creators & permissions." cta="Coming soon" disabled />}
         {isAdmin && <Tile title="Admin console" desc="Verifications, moderation, users." cta="Coming soon" disabled />}
       </div>
