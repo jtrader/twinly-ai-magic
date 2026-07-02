@@ -26,7 +26,7 @@ export const listGenerationRequests = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(200);
     if (data.status) q = q.eq("status", data.status);
-    const { data: rows, error } = await q;
+    const { data: rows, error } = await (q as any);
     if (error) throw error;
     return { requests: rows ?? [] };
   });
@@ -77,7 +77,7 @@ export const updateRequestStatus = createServerFn({ method: "POST" })
   .validator((d: { id: string; action: "submit" | "cancel" | "mark_generated" | "needs_review" | "approve" | "reject"; note?: string }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const patch: Record<string, unknown> = {};
+    const patch: any = {};
     switch (data.action) {
       case "submit": patch.status = "queued"; patch.submitted_at = new Date().toISOString(); break;
       case "cancel": patch.status = "rejected"; patch.reviewed_at = new Date().toISOString(); patch.reviewed_by = userId; patch.reviewer_note = data.note ?? "Cancelled by creator"; break;
@@ -116,17 +116,17 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
       audio: "audio",
       video: "video", talking_head: "video",
     };
-    const rows = Array.from({ length: req.quantity }, (_, i) => ({
+    const rows: any[] = Array.from({ length: req.quantity }, (_, i) => ({
       creator_id: creator.id,
       title: `AI ${req.output_type.replace("_", " ")} · draft ${i + 1}`,
       asset_type: kindMap[req.output_type] ?? "image",
       is_synthetic: true,
       ai_generated_label: true,
       ai_disclosure_required: true,
-      approval_status: "approved" as const,
-      source_type: "ai_generated" as const,
-      internal_label: "approved_synthetic" as const,
-      visibility: "private" as const,
+      approval_status: "approved",
+      source_type: "ai_generated",
+      internal_label: "approved_synthetic",
+      visibility: "private",
       category: `ai_${req.output_type}`,
     }));
     const { data: inserted, error } = await supabase
@@ -136,12 +136,12 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
 
     // link to pack if provided
     if (req.pack_id && ids.length) {
-      const items = ids.map((asset_id: string, idx: number) => ({ pack_id: req.pack_id, asset_id, position: idx }));
+      const items: any[] = ids.map((asset_id: string, idx: number) => ({ pack_id: req.pack_id, asset_id, position: idx }));
       await supabase.from("content_pack_items").upsert(items, { onConflict: "pack_id,asset_id", ignoreDuplicates: true });
     }
     // link to persona if provided
     if (req.persona_id && ids.length) {
-      const perms = ids.map((asset_id: string) => ({ persona_id: req.persona_id, asset_id, permission_type: "included" as const }));
+      const perms: any[] = ids.map((asset_id: string) => ({ persona_id: req.persona_id, asset_id, permission_type: "included" }));
       await supabase.from("persona_content_permissions").upsert(perms, { onConflict: "persona_id,asset_id" });
     }
 
