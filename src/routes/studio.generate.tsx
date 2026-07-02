@@ -272,14 +272,15 @@ async function parseImageSSE(
   body: ReadableStream<Uint8Array>,
   onFrame: (b64: string | null, isFinal: boolean, error: string | null) => void,
 ) {
-  const reader = body.pipeThrough(new TextDecoderStream()).getReader();
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
   let buf = "";
   let sawCompleted = false;
   try {
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
-      buf += value;
+      buf += decoder.decode(value, { stream: true });
       // Split complete SSE events on blank line
       let idx;
       while ((idx = buf.indexOf("\n\n")) !== -1) {

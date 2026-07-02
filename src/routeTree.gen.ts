@@ -24,6 +24,7 @@ import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
 import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
 import { Route as StudioPacksRouteImport } from './routes/studio.packs'
 import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
+import { Route as StudioGenerateRouteImport } from './routes/studio.generate'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
@@ -108,6 +109,11 @@ const StudioInboxRoute = StudioInboxRouteImport.update({
   path: '/studio/inbox',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioGenerateRoute = StudioGenerateRouteImport.update({
+  id: '/studio/generate',
+  path: '/studio/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioContentRoute = StudioContentRouteImport.update({
   id: '/studio/content',
   path: '/studio/content',
@@ -165,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByTo {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
@@ -216,6 +224,7 @@ export interface FileRoutesById {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
@@ -243,6 +252,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
     | '/studio/payouts'
@@ -268,6 +278,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
     | '/studio/payouts'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
     | '/studio/payouts'
@@ -319,6 +331,7 @@ export interface RootRouteChildren {
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
   StudioContentRoute: typeof StudioContentRoute
+  StudioGenerateRoute: typeof StudioGenerateRoute
   StudioInboxRoute: typeof StudioInboxRoute
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
   StudioPayoutsRoute: typeof StudioPayoutsRoute
@@ -435,6 +448,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioInboxRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/generate': {
+      id: '/studio/generate'
+      path: '/studio/generate'
+      fullPath: '/studio/generate'
+      preLoaderRoute: typeof StudioGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/content': {
       id: '/studio/content'
       path: '/studio/content'
@@ -522,6 +542,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
   StudioContentRoute: StudioContentRoute,
+  StudioGenerateRoute: StudioGenerateRoute,
   StudioInboxRoute: StudioInboxRoute,
   StudioPacksRoute: StudioPacksRouteWithChildren,
   StudioPayoutsRoute: StudioPayoutsRoute,
