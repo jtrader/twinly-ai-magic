@@ -245,11 +245,11 @@ function Footer() {
 
 function JoinBanner() {
   return (
-    <section className="mx-auto max-w-6xl px-4 pb-4">
+    <section className="mx-auto max-w-6xl px-4 pb-12 pt-2 md:pb-16">
       <div className="relative overflow-hidden rounded-3xl border border-brand/40 bg-gradient-to-br from-brand/20 via-surface to-background p-6 md:p-10">
         <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand/30 blur-3xl" aria-hidden="true" />
         <div className="absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-brand-glow/20 blur-3xl" aria-hidden="true" />
-        <div className="relative flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="relative flex flex-col items-stretch gap-6 md:flex-row md:items-center md:justify-between">
           <div className="max-w-xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-brand/40 bg-background/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-brand-glow backdrop-blur">
               <Sparkles className="h-3 w-3" /> Free to join · 18+
@@ -261,14 +261,14 @@ function JoinBanner() {
               Sign up in seconds. Follow verified creators, chat with their Real Me, and unlock disclosed AI personas.
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row md:flex-col md:items-end">
+          <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto md:flex-col md:items-end">
             <Link to="/auth">
-              <Button size="lg" className="w-full sm:w-auto">
+              <Button size="lg" className="w-full sm:w-auto md:w-full">
                 Join Twinly.life <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
             <Link to="/discover">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto md:w-full">
                 Browse creators
               </Button>
             </Link>
