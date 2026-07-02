@@ -19,6 +19,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
+import { Route as StudioTwinRouteImport } from './routes/studio.twin'
 import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
 import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
 import { Route as StudioPacksRouteImport } from './routes/studio.packs'
@@ -79,6 +80,11 @@ const IndexRoute = IndexRouteImport.update({
 const StudioIndexRoute = StudioIndexRouteImport.update({
   id: '/studio/',
   path: '/studio/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioTwinRoute = StudioTwinRouteImport.update({
+  id: '/studio/twin',
+  path: '/studio/twin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioPersonasRoute = StudioPersonasRouteImport.update({
@@ -156,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio/twin': typeof StudioTwinRoute
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio/twin': typeof StudioTwinRoute
   '/studio': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio/twin': typeof StudioTwinRoute
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
@@ -228,6 +237,7 @@ export interface FileRouteTypes {
     | '/studio/packs'
     | '/studio/payouts'
     | '/studio/personas'
+    | '/studio/twin'
     | '/studio/'
     | '/chat/$handle/$persona'
     | '/studio/packs/$packId'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/studio/packs'
     | '/studio/payouts'
     | '/studio/personas'
+    | '/studio/twin'
     | '/studio'
     | '/chat/$handle/$persona'
     | '/studio/packs/$packId'
@@ -274,6 +285,7 @@ export interface FileRouteTypes {
     | '/studio/packs'
     | '/studio/payouts'
     | '/studio/personas'
+    | '/studio/twin'
     | '/studio/'
     | '/chat/$handle/$persona'
     | '/studio/packs/$packId'
@@ -298,6 +310,7 @@ export interface RootRouteChildren {
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
   StudioPayoutsRoute: typeof StudioPayoutsRoute
   StudioPersonasRoute: typeof StudioPersonasRoute
+  StudioTwinRoute: typeof StudioTwinRoute
   StudioIndexRoute: typeof StudioIndexRoute
   ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
 }
@@ -372,6 +385,13 @@ declare module '@tanstack/react-router' {
       path: '/studio'
       fullPath: '/studio/'
       preLoaderRoute: typeof StudioIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/twin': {
+      id: '/studio/twin'
+      path: '/studio/twin'
+      fullPath: '/studio/twin'
+      preLoaderRoute: typeof StudioTwinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/studio/personas': {
@@ -485,6 +505,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioPacksRoute: StudioPacksRouteWithChildren,
   StudioPayoutsRoute: StudioPayoutsRoute,
   StudioPersonasRoute: StudioPersonasRoute,
+  StudioTwinRoute: StudioTwinRoute,
   StudioIndexRoute: StudioIndexRoute,
   ChatHandlePersonaRoute: ChatHandlePersonaRoute,
 }
