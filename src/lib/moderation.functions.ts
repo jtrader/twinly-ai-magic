@@ -22,7 +22,33 @@ export const reportSubject = createServerFn({ method: "POST" })
       autoFlagged: false,
     });
     await logAudit(context.userId, "moderation.report", { type: data.targetType, id: data.targetId }, { category: data.category });
-    return { ok: true };
+    // Return the newly created report row (RLS allows reporter to read own).
+    const { data: row } = await context.supabase
+      .from("moderation_events")
+      .select("id, created_at, category, severity, status, target_type, target_id, notes, resolution")
+      .eq("reporter_id", context.userId)
+      .eq("target_type", data.targetType)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return { ok: true, report: row };
+  });
+
+export const listMyReports = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { targetType?: string; targetId?: string } = {}) => d)
+  .handler(async ({ data, context }) => {
+    let q = context.supabase
+      .from("moderation_events")
+      .select("id, created_at, category, severity, status, target_type, target_id, notes, resolution")
+      .eq("reporter_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (data.targetType) q = q.eq("target_type", data.targetType);
+    if (data.targetId) q = q.eq("target_id", data.targetId);
+    const { data: rows, error } = await q;
+    if (error) throw error;
+    return { reports: rows ?? [] };
   });
 
 async function requireAdmin(context: { userId: string; supabase: any }) {

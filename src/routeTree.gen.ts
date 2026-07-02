@@ -19,6 +19,7 @@ import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
+import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
 import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
@@ -77,6 +78,11 @@ const StudioPersonasRoute = StudioPersonasRouteImport.update({
   path: '/studio/personas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioPayoutsRoute = StudioPayoutsRouteImport.update({
+  id: '/studio/payouts',
+  path: '/studio/payouts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioInboxRoute = StudioInboxRouteImport.update({
   id: '/studio/inbox',
   path: '/studio/inbox',
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/inbox': typeof StudioInboxRoute
+  '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
@@ -147,6 +154,7 @@ export interface FileRoutesByTo {
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/inbox': typeof StudioInboxRoute
+  '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/inbox': typeof StudioInboxRoute
+  '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/legal/terms'
     | '/studio/content'
     | '/studio/inbox'
+    | '/studio/payouts'
     | '/studio/personas'
     | '/studio/'
     | '/chat/$handle/$persona'
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/legal/terms'
     | '/studio/content'
     | '/studio/inbox'
+    | '/studio/payouts'
     | '/studio/personas'
     | '/studio'
     | '/chat/$handle/$persona'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/legal/terms'
     | '/studio/content'
     | '/studio/inbox'
+    | '/studio/payouts'
     | '/studio/personas'
     | '/studio/'
     | '/chat/$handle/$persona'
@@ -246,6 +258,7 @@ export interface RootRouteChildren {
   LegalTermsRoute: typeof LegalTermsRoute
   StudioContentRoute: typeof StudioContentRoute
   StudioInboxRoute: typeof StudioInboxRoute
+  StudioPayoutsRoute: typeof StudioPayoutsRoute
   StudioPersonasRoute: typeof StudioPersonasRoute
   StudioIndexRoute: typeof StudioIndexRoute
   ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
@@ -323,6 +336,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioPersonasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/payouts': {
+      id: '/studio/payouts'
+      path: '/studio/payouts'
+      fullPath: '/studio/payouts'
+      preLoaderRoute: typeof StudioPayoutsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/inbox': {
       id: '/studio/inbox'
       path: '/studio/inbox'
@@ -390,6 +410,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalTermsRoute: LegalTermsRoute,
   StudioContentRoute: StudioContentRoute,
   StudioInboxRoute: StudioInboxRoute,
+  StudioPayoutsRoute: StudioPayoutsRoute,
   StudioPersonasRoute: StudioPersonasRoute,
   StudioIndexRoute: StudioIndexRoute,
   ChatHandlePersonaRoute: ChatHandlePersonaRoute,
