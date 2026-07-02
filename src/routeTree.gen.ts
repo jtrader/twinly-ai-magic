@@ -33,6 +33,7 @@ import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$packId'
 import { Route as CreatorsHandlePersonaRouteImport } from './routes/creators.$handle.$persona'
@@ -160,6 +161,11 @@ const CreatorsHandleRoute = CreatorsHandleRouteImport.update({
   path: '/creators/$handle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AuthRoute,
+} as any)
 const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
   id: '/api/generate-image',
   path: '/api/generate-image',
@@ -197,11 +203,12 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/agency': typeof AgencyRoute
   '/app': typeof AppRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -229,11 +236,12 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/agency': typeof AgencyRoute
   '/app': typeof AppRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -262,11 +270,12 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/agency': typeof AgencyRoute
   '/app': typeof AppRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -301,6 +310,7 @@ export interface FileRouteTypes {
     | '/fan'
     | '/onboarding'
     | '/api/generate-image'
+    | '/auth/callback'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -333,6 +343,7 @@ export interface FileRouteTypes {
     | '/fan'
     | '/onboarding'
     | '/api/generate-image'
+    | '/auth/callback'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -365,6 +376,7 @@ export interface FileRouteTypes {
     | '/fan'
     | '/onboarding'
     | '/api/generate-image'
+    | '/auth/callback'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -393,7 +405,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AgencyRoute: typeof AgencyRoute
   AppRoute: typeof AppRoute
-  AuthRoute: typeof AuthRoute
+  AuthRoute: typeof AuthRouteWithChildren
   DiscoverRoute: typeof DiscoverRoute
   FanRoute: typeof FanRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -588,6 +600,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreatorsHandleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/api/generate-image': {
       id: '/api/generate-image'
       path: '/api/generate-image'
@@ -633,6 +652,16 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthRouteChildren {
+  AuthCallbackRoute: typeof AuthCallbackRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthCallbackRoute: AuthCallbackRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 interface CreatorsHandleRouteChildren {
   CreatorsHandlePersonaRoute: typeof CreatorsHandlePersonaRoute
 }
@@ -663,7 +692,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AgencyRoute: AgencyRoute,
   AppRoute: AppRoute,
-  AuthRoute: AuthRoute,
+  AuthRoute: AuthRouteWithChildren,
   DiscoverRoute: DiscoverRoute,
   FanRoute: FanRoute,
   OnboardingRoute: OnboardingRoute,
