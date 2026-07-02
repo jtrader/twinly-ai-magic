@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
-import { Wand2, ImageIcon, Mic, Video, Save, Loader2, RefreshCw, X, AlertTriangle } from "lucide-react";
+import { Wand2, ImageIcon, Mic, Video, Save, Loader2, RefreshCw, X, AlertTriangle, Clock, CheckCircle2, ShieldCheck } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import {
 import { useSession } from "@/lib/session";
 import {
   listGenerateTargets, saveGeneratedImage, generateVoiceNote, queueTalkingHead,
+  listTalkingHeadJobs,
 } from "@/lib/ai-generate.functions";
 
 export const Route = createFileRoute("/studio/generate")({
