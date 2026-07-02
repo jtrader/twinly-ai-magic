@@ -567,6 +567,7 @@ export type Database = {
           starts_at: string | null
           system_prompt: string | null
           tone_rules: Json
+          training_notes: Json
           updated_at: string
           visibility: Database["public"]["Enums"]["visibility"]
         }
@@ -589,6 +590,7 @@ export type Database = {
           starts_at?: string | null
           system_prompt?: string | null
           tone_rules?: Json
+          training_notes?: Json
           updated_at?: string
           visibility?: Database["public"]["Enums"]["visibility"]
         }
@@ -611,6 +613,7 @@ export type Database = {
           starts_at?: string | null
           system_prompt?: string | null
           tone_rules?: Json
+          training_notes?: Json
           updated_at?: string
           visibility?: Database["public"]["Enums"]["visibility"]
         }
