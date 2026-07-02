@@ -16,6 +16,7 @@ import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
+import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 
 const DiscoverRoute = DiscoverRouteImport.update({
   id: '/discover',
@@ -52,6 +53,11 @@ const CreatorsHandleRoute = CreatorsHandleRouteImport.update({
   path: '/creators/$handle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatHandlePersonaRoute = ChatHandlePersonaRouteImport.update({
+  id: '/chat/$handle/$persona',
+  path: '/chat/$handle/$persona',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/chat/$handle/$persona'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/chat/$handle/$persona'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/chat/$handle/$persona'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
+  ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -172,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreatorsHandleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/chat/$handle/$persona': {
+      id: '/chat/$handle/$persona'
+      path: '/chat/$handle/$persona'
+      fullPath: '/chat/$handle/$persona'
+      preLoaderRoute: typeof ChatHandlePersonaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
+  ChatHandlePersonaRoute: ChatHandlePersonaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
