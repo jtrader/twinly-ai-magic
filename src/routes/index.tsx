@@ -242,3 +242,60 @@ function Footer() {
     </footer>
   );
 }
+
+function JoinBanner() {
+  return (
+    <section className="mx-auto max-w-6xl px-4 pb-4">
+      <div className="relative overflow-hidden rounded-3xl border border-brand/40 bg-gradient-to-br from-brand/20 via-surface to-background p-6 md:p-10">
+        <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand/30 blur-3xl" aria-hidden="true" />
+        <div className="absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-brand-glow/20 blur-3xl" aria-hidden="true" />
+        <div className="relative flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-brand/40 bg-background/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-brand-glow backdrop-blur">
+              <Sparkles className="h-3 w-3" /> Free to join · 18+
+            </div>
+            <h2 className="mt-4 font-display text-2xl font-bold tracking-tight md:text-4xl">
+              Meet your favourite creators — and their AI twins.
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground md:text-base">
+              Sign up in seconds. Follow verified creators, chat with their Real Me, and unlock disclosed AI personas.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row md:flex-col md:items-end">
+            <Link to="/auth">
+              <Button size="lg" className="w-full sm:w-auto">
+                Join Twinly.life <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+            <Link to="/discover">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                Browse creators
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FinalCta() {
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-16">
+      <div className="rounded-3xl border border-border bg-surface p-8 text-center md:p-14">
+        <Heart className="mx-auto h-8 w-8 text-brand-glow" aria-hidden="true" />
+        <h2 className="mt-4 font-display text-3xl font-bold tracking-tight md:text-5xl">
+          Ready when you are.
+        </h2>
+        <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground md:text-base">
+          Whether you want to <span className="text-foreground">discover creators</span> or <span className="text-foreground">launch your own AI twin</span>, Twinly.life is built for you.
+        </p>
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Link to="/auth"><Button size="lg" className="w-full sm:w-auto">Create free account</Button></Link>
+          <Link to="/auth"><Button size="lg" variant="outline" className="w-full sm:w-auto">Apply as a creator</Button></Link>
+        </div>
+        <p className="mt-5 text-xs text-muted-foreground">No credit card required · Cancel anytime · 18+</p>
+      </div>
+    </section>
+  );
+}
