@@ -65,7 +65,7 @@ export const listMyPersonas = createServerFn({ method: "GET" })
     if (!creator) return { creator: null, personas: [] };
     const { data: personas } = await supabase
       .from("personas")
-      .select("id, slug, display_name, kind, description, disclosure_label, visibility, sort_order")
+      .select("id, slug, display_name, kind, description, disclosure_label, visibility, sort_order, twin_link_mode, linked_twin_ref_ids, training_notes, system_prompt, is_explicit, is_default_seed")
       .eq("creator_id", creator.id)
       .order("sort_order", { ascending: true });
     return { creator, personas: personas ?? [] };
