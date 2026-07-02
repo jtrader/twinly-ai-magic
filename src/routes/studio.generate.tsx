@@ -489,6 +489,10 @@ function VoiceTab({ personaId, packId }: { personaId: string; packId: string }) 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<GenError | null>(null);
   const lastAttempt = useLastAttempt<{ script: string; title: string; voice: string }>();
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioReloadKey, setAudioReloadKey] = useState(0);
+  const [duration, setDuration] = useState<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const scriptTrim = script.trim();
   const scriptError =
@@ -509,6 +513,7 @@ function VoiceTab({ personaId, packId }: { personaId: string; packId: string }) 
         packId: packId || undefined,
       }});
       setPreviewUrl(res.previewUrl ?? null);
+      setDuration(null); setIsPlaying(false); setAudioReloadKey((k) => k + 1);
       toast.success("Voice note saved — pending your approval.");
     } catch (e: any) {
       setError(classifyError(e, "voice"));
@@ -557,15 +562,62 @@ function VoiceTab({ personaId, packId }: { personaId: string; packId: string }) 
         </Button>
       </div>
       {error && <ErrorCard error={error} onRetry={lastAttempt.current ? retry : undefined} onDismiss={() => setError(null)} />}
-      {previewUrl && (
-        <div className="rounded-2xl border border-border bg-surface-elevated p-3">
-          <div className="mb-2 flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px] uppercase">AI-generated</Badge>
-            <span className="text-xs text-muted-foreground">Preview (signed URL, 1h)</span>
+      {previewUrl && (() => {
+        const voiceLabel = VOICES.find((v) => v.id === voice)?.label ?? voice;
+        const durLabel = duration != null && Number.isFinite(duration)
+          ? `${Math.floor(duration / 60)}:${String(Math.round(duration % 60)).padStart(2, "0")}`
+          : "—";
+        const playbackSrc = previewUrl + (previewUrl.includes("?") ? "&" : "?") + "r=" + audioReloadKey;
+        const downloadName = `${slugify(title || "voice-note")}-${voice}-${timestampStamp()}.mp3`;
+        return (
+          <div className="rounded-2xl border border-border bg-surface-elevated p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px] uppercase">AI-generated</Badge>
+                <span className="text-xs text-muted-foreground">{voiceLabel} · {durLabel}</span>
+              </div>
+              <span className="text-[10px] text-muted-foreground">Signed URL (1h) — Reload if playback fails.</span>
+            </div>
+            <audio
+              key={audioReloadKey}
+              ref={audioRef}
+              controls
+              src={playbackSrc}
+              className="w-full"
+              onLoadedMetadata={(e) => setDuration((e.currentTarget as HTMLAudioElement).duration)}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => setIsPlaying(false)}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-1">
+              <Button size="sm" variant="ghost" onClick={() => {
+                const a = audioRef.current; if (!a) return;
+                if (a.paused) a.play().catch(() => {}); else a.pause();
+              }}>
+                {isPlaying ? <><Pause className="mr-1 size-3.5" /> Pause</> : <><Play className="mr-1 size-3.5" /> Play</>}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => {
+                const a = audioRef.current; if (!a) return;
+                a.currentTime = 0; a.play().catch(() => {});
+              }}>
+                <RotateCcw className="mr-1 size-3.5" /> Restart
+              </Button>
+              <Button size="sm" variant="ghost" disabled={busy || !lastAttempt.current} onClick={retry} title="Re-generate with the same script and voice">
+                <RefreshCw className="mr-1 size-3.5" /> Re-generate
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setAudioReloadKey((k) => k + 1)} title="Reload the player (re-fetch signed URL)">
+                <RotateCcw className="mr-1 size-3.5" /> Reload
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => window.open(previewUrl, "_blank", "noopener")} title="Open in a new tab">
+                <ExternalLink className="mr-1 size-3.5" /> Open
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => triggerDownload(previewUrl, downloadName)} title="Download MP3">
+                <Download className="mr-1 size-3.5" /> Download
+              </Button>
+            </div>
           </div>
-          <audio controls src={previewUrl} className="w-full" />
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
