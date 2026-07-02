@@ -19,7 +19,7 @@ function AuthPage() {
     const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
     const redirectTarget = sanitizeRedirect(params?.get("redirect") ?? null);
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: redirectTarget });
+      if (data.session) navigate({ to: redirectTarget as any });
     });
   }, [navigate]);
 
