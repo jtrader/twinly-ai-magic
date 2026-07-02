@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
-import { Wand2, ImageIcon, Mic, Video, Save, Loader2, RefreshCw, X, AlertTriangle, Clock, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Wand2, ImageIcon, Mic, Video, Save, Loader2, RefreshCw, X, AlertTriangle, Clock, CheckCircle2, ShieldCheck, Download, ExternalLink, Copy, Square, Play, Pause, RotateCcw } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,26 @@ const VOICES = [
   { id: "sage", label: "Sage — smooth" },
 ];
 const VOICE_IDS = new Set(VOICES.map((v) => v.id));
+
+/* ----------------- Preview helpers ----------------- */
+
+function slugify(s: string) {
+  return (s || "generation").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 48) || "generation";
+}
+function timestampStamp() {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+function triggerDownload(url: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
 
 /* ----------------- Shared error model ----------------- */
 
