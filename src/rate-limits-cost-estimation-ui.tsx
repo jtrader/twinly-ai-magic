@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import {
   Budget,
   GenerationEstimateRequest,
@@ -45,10 +46,9 @@ export function RateLimitsCostEstimationPanel({
 
   const currency = estimate.cost?.currency ?? budget?.currency ?? "USD";
   const remainingBudget = estimate.budget?.remainingAfterRequest;
-  const safeGenerationsNow = Math.max(
-    0,
-    Math.min(...estimate.rateLimits.map((limit) => limit.limit - limit.used)),
-  );
+  const safeGenerationsNow = estimate.rateLimits.length === 0
+    ? 0
+    : Math.max(0, Math.min(...estimate.rateLimits.map((limit) => limit.limit - limit.used)));
 
   const updateRequest = (patch: Partial<GenerationEstimateRequest>) => {
     onRequestChange?.({
@@ -244,7 +244,7 @@ function statusStyle(status: "ok" | "warning" | "blocked") {
   return styles.okStatus;
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   panel: {
     border: "1px solid #d7dde8",
     borderRadius: 16,
