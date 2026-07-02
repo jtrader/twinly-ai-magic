@@ -5,8 +5,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { lovable } from "@/integrations/lovable/index";
+
+const POST_AUTH_REDIRECT_KEY = "twinly:postAuthRedirect";
+const CREATOR_PERSONA_SETUP_PATH = "/secure/personas";
+
+function isCreatorRole(role: "fan" | "creator" | "agency") {
+  return role === "creator" || role === "agency";
+}
+
+function postAuthPathForRole(role: "fan" | "creator" | "agency") {
+  return isCreatorRole(role) ? CREATOR_PERSONA_SETUP_PATH : "/app";
+}
+
+function rememberPostAuthRedirect(path: string) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(POST_AUTH_REDIRECT_KEY, path);
+}
 
 export function RoleSignupForm() {
   const [mode, setMode] = useState<"signup" | "signin">("signup");
@@ -15,38 +31,43 @@ export function RoleSignupForm() {
   const [role, setRole] = useState<"fan" | "creator" | "agency">("fan");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const postAuthPath = postAuthPathForRole(role);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    rememberPostAuthRedirect(postAuthPath);
     try {
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
-          email, password,
-          options: { emailRedirectTo: window.location.origin + "/app" },
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin + "/auth/callback" },
         });
         if (error) throw error;
         // upgrade role if not fan (trigger seeded 'fan')
         if (role !== "fan" && data.user) {
           await supabase.from("user_roles").insert({ user_id: data.user.id, role });
         }
-        toast.success("Welcome to Twinly.life");
+        toast.success(isCreatorRole(role) ? "Welcome — let's create your AI personas" : "Welcome to Twinly.life");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-      navigate({ to: "/app" });
+      navigate({ to: postAuthPath });
     } catch (err: any) {
       toast.error(err.message ?? "Sign-in failed");
     } finally { setLoading(false); }
   }
 
   async function google() {
+    rememberPostAuthRedirect(postAuthPath);
     const res = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/auth/callback" });
     if (res.error) toast.error(res.error.message);
   }
 
   async function apple() {
+    rememberPostAuthRedirect(postAuthPath);
     const res = await lovable.auth.signInWithOAuth("apple", { redirect_uri: window.location.origin + "/auth/callback" });
     if (res.error) toast.error(res.error.message);
   }
@@ -59,6 +80,7 @@ export function RoleSignupForm() {
 
   async function microsoft() {
     try {
+      rememberPostAuthRedirect(postAuthPath);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "azure",
         options: {
@@ -106,8 +128,19 @@ export function RoleSignupForm() {
             </RadioGroup>
           </div>
         )}
+        {isCreatorRole(role) && (
+          <div className="rounded-xl border border-brand/30 bg-brand/10 p-3 text-xs text-muted-foreground">
+            <p className="font-semibold text-foreground">AI persona setup is integrated after secure login.</p>
+            <p className="mt-1">
+              Continue as a {role} and you will be routed to the protected persona setup hub for default personas, custom persona creation, training inputs, and content-pack setup.
+            </p>
+            <Link to={CREATOR_PERSONA_SETUP_PATH} className="mt-2 inline-block text-brand-glow underline underline-offset-4">
+              Preview secure persona setup
+            </Link>
+          </div>
+        )}
         <Button type="submit" disabled={loading} className="w-full">
-          {loading ? "..." : mode === "signup" ? "Create account" : "Sign in"}
+          {loading ? "..." : mode === "signup" ? isCreatorRole(role) ? "Create account & build personas" : "Create account" : "Sign in"}
         </Button>
       </form>
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
