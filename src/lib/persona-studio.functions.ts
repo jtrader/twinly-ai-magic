@@ -110,6 +110,8 @@ export const updatePersona = createServerFn({ method: "POST" })
     };
     twinLinkMode?: "all" | "selected" | "none";
     linkedTwinRefIds?: string[];
+    heygenAvatarId?: string | null;
+    heygenVoiceId?: string | null;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -124,6 +126,8 @@ export const updatePersona = createServerFn({ method: "POST" })
       training_notes?: Record<string, string>;
       twin_link_mode?: "all" | "selected" | "none";
       linked_twin_ref_ids?: string[];
+      heygen_avatar_id?: string | null;
+      heygen_voice_id?: string | null;
     } = {};
     if (data.displayName !== undefined) {
       const v = data.displayName.trim();
@@ -158,6 +162,14 @@ export const updatePersona = createServerFn({ method: "POST" })
     if (data.twinLinkMode !== undefined) patch.twin_link_mode = data.twinLinkMode;
     if (data.linkedTwinRefIds !== undefined) {
       patch.linked_twin_ref_ids = Array.from(new Set(data.linkedTwinRefIds));
+    }
+    if (data.heygenAvatarId !== undefined) {
+      const v = (data.heygenAvatarId ?? "").trim();
+      patch.heygen_avatar_id = v ? v.slice(0, 120) : null;
+    }
+    if (data.heygenVoiceId !== undefined) {
+      const v = (data.heygenVoiceId ?? "").trim();
+      patch.heygen_voice_id = v ? v.slice(0, 120) : null;
     }
 
     if (Object.keys(patch).length === 0) return { ok: true };

@@ -34,6 +34,7 @@ import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$packId'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
+import { Route as ApiPublicHooksHeygenRouteImport } from './routes/api/public/hooks/heygen'
 
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
@@ -160,6 +161,11 @@ const ChatHandlePersonaRoute = ChatHandlePersonaRouteImport.update({
   path: '/chat/$handle/$persona',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksHeygenRoute = ApiPublicHooksHeygenRouteImport.update({
+  id: '/api/public/hooks/heygen',
+  path: '/api/public/hooks/heygen',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -214,6 +221,7 @@ export interface FileRoutesByTo {
   '/studio': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -242,6 +250,7 @@ export interface FileRoutesById {
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -271,6 +280,7 @@ export interface FileRouteTypes {
     | '/studio/'
     | '/chat/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/api/public/hooks/heygen'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/studio'
     | '/chat/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/api/public/hooks/heygen'
   id:
     | '__root__'
     | '/'
@@ -325,6 +336,7 @@ export interface FileRouteTypes {
     | '/studio/'
     | '/chat/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/api/public/hooks/heygen'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -352,6 +364,7 @@ export interface RootRouteChildren {
   StudioTwinRoute: typeof StudioTwinRoute
   StudioIndexRoute: typeof StudioIndexRoute
   ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
+  ApiPublicHooksHeygenRoute: typeof ApiPublicHooksHeygenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -531,6 +544,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatHandlePersonaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/heygen': {
+      id: '/api/public/hooks/heygen'
+      path: '/api/public/hooks/heygen'
+      fullPath: '/api/public/hooks/heygen'
+      preLoaderRoute: typeof ApiPublicHooksHeygenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -571,6 +591,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioTwinRoute: StudioTwinRoute,
   StudioIndexRoute: StudioIndexRoute,
   ChatHandlePersonaRoute: ChatHandlePersonaRoute,
+  ApiPublicHooksHeygenRoute: ApiPublicHooksHeygenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

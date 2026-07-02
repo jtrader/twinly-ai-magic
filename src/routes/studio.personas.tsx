@@ -351,6 +351,8 @@ function EditPersonaDialog({
   // Twin linking
   const [twinLinkMode, setTwinLinkMode] = useState<"all" | "selected" | "none">("all");
   const [linkedRefIds, setLinkedRefIds] = useState<string[]>([]);
+  const [heygenAvatarId, setHeygenAvatarId] = useState("");
+  const [heygenVoiceId, setHeygenVoiceId] = useState("");
   const [twinRefs, setTwinRefs] = useState<any[] | null>(null);
   const loadTwin = useServerFn(getTwinProfile);
 
@@ -403,6 +405,8 @@ function EditPersonaDialog({
       setVoiceRefUrl(tn.voice_ref_url ?? "");
       setTwinLinkMode(((persona as any).twin_link_mode as any) ?? "all");
       setLinkedRefIds(((persona as any).linked_twin_ref_ids as string[] | null) ?? []);
+      setHeygenAvatarId(((persona as any).heygen_avatar_id as string | null) ?? "");
+      setHeygenVoiceId(((persona as any).heygen_voice_id as string | null) ?? "");
       setTwinRefs(null);
       setTab("basics");
     }
@@ -461,6 +465,8 @@ function EditPersonaDialog({
         },
         twinLinkMode,
         linkedTwinRefIds: twinLinkMode === "selected" ? linkedRefIds : [],
+        heygenAvatarId,
+        heygenVoiceId,
       }});
       toast.success("Persona saved");
       onSaved();
@@ -688,6 +694,22 @@ function EditPersonaDialog({
               </div>
             )
           )}
+          <div className="rounded-lg border border-border bg-surface p-3 text-xs">
+            <div className="mb-1 font-semibold">HeyGen render IDs (talking-head)</div>
+            <p className="mb-2 text-muted-foreground">
+              Paste the avatar and (optional) voice IDs from your HeyGen account. Used when this persona queues a talking-head clip. Leave blank to fall back to workspace defaults.
+            </p>
+            <div className="grid gap-2 md:grid-cols-2">
+              <div>
+                <Label className="text-[11px]">Avatar ID</Label>
+                <Input className="mt-1" value={heygenAvatarId} onChange={(e) => setHeygenAvatarId(e.target.value)} placeholder="e.g. Daisy_sitting_sofa_side_public" maxLength={120} />
+              </div>
+              <div>
+                <Label className="text-[11px]">Voice ID (optional)</Label>
+                <Input className="mt-1" value={heygenVoiceId} onChange={(e) => setHeygenVoiceId(e.target.value)} placeholder="Leave blank to use our TTS voice selection" maxLength={120} />
+              </div>
+            </div>
+          </div>
         </div>
         )}
         <DialogFooter>
