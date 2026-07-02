@@ -8,6 +8,33 @@ async function requireAdmin(context: { userId: string; supabase: any }) {
 
 const DEMO_TAG = "demo-seed";
 
+const SAMPLE_IMAGES: Record<string, string[]> = {
+  aurora: [
+    "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200",
+    "https://images.unsplash.com/photo-1520975916090-3105956dac38?w=1200",
+    "https://images.unsplash.com/photo-1520975922284-9d3ffb2c1c69?w=1200",
+    "https://images.unsplash.com/photo-1519638399535-1b036603ac77?w=1200",
+    "https://images.unsplash.com/photo-1499415479124-43c32433a620?w=1200",
+    "https://images.unsplash.com/photo-1533105079780-92b9be482077?w=1200",
+  ],
+  kaiwolf: [
+    "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1200",
+    "https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?w=1200",
+    "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=1200",
+    "https://images.unsplash.com/photo-1517649763962-0c623066013b?w=1200",
+    "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=1200",
+    "https://images.unsplash.com/photo-1500835556837-99ac94a94552?w=1200",
+  ],
+  lunamarie: [
+    "https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=1200",
+    "https://images.unsplash.com/photo-1508921912186-1d1a45ebb3c1?w=1200",
+    "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=1200",
+    "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=1200",
+    "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?w=1200",
+    "https://images.unsplash.com/photo-1444927714506-8492d94b5ba0?w=1200",
+  ],
+};
+
 type DemoSpec = {
   handle: string;
   stage_name: string;
@@ -182,6 +209,68 @@ export const adminSeedDemoCreators = createServerFn({ method: "POST" })
           tags: [DEMO_TAG],
         }).eq("creator_id", creatorId!);
 
+        // Seed sample assets + link into the first (Nice) pack
+        const { data: existingSampleAssets } = await supabaseAdmin
+          .from("content_assets")
+          .select("id")
+          .eq("creator_id", creatorId!)
+          .contains("tags", [DEMO_TAG]);
+
+        if (!existingSampleAssets || existingSampleAssets.length === 0) {
+          const urls = SAMPLE_IMAGES[spec.handle] ?? SAMPLE_IMAGES.aurora;
+          const rows = urls.map((url, i) => {
+            const isSynthetic = i >= 4; // last 2 = synthetic samples
+            const status =
+              i < 4 ? "approved" : i === 4 ? "pending" : "rejected";
+            return {
+              creator_id: creatorId!,
+              asset_type: "image" as const,
+              external_url: url,
+              title: `${spec.stage_name} — Sample ${i + 1}${isSynthetic ? " (AI)" : ""}`,
+              is_synthetic: isSynthetic,
+              ai_generated_label: isSynthetic,
+              ai_disclosure_required: isSynthetic,
+              source_type: (isSynthetic ? "synthetic" : "real") as any,
+              visibility: "public" as any,
+              approval_status: status as any,
+              consent_status: "granted" as any,
+              moderation_status: "clear" as any,
+              price_cents: 0,
+              tags: [DEMO_TAG],
+            };
+          });
+          const { data: inserted } = await supabaseAdmin
+            .from("content_assets")
+            .insert(rows)
+            .select("id, approval_status");
+
+          // Attach approved assets to the "Nice" pack
+          const { data: nicePack } = await supabaseAdmin
+            .from("content_packs")
+            .select("id")
+            .eq("creator_id", creatorId!)
+            .eq("pack_type", "nice")
+            .maybeSingle();
+          if (nicePack && inserted) {
+            const items = inserted
+              .filter((a) => a.approval_status === "approved")
+              .map((a, idx) => ({ pack_id: nicePack.id, asset_id: a.id, position: idx }));
+            if (items.length) {
+              await supabaseAdmin.from("content_pack_items").insert(items);
+            }
+          }
+
+          // One pending generation request for the review queue demo
+          await supabaseAdmin.from("generation_requests").insert({
+            creator_id: creatorId!,
+            output_type: "image" as any,
+            prompt_notes: `Demo request for ${spec.stage_name}: dreamy portrait, soft light.`,
+            quantity: 2,
+            status: "queued" as any,
+            submitted_at: new Date().toISOString(),
+          });
+        }
+
         results.push({ handle: spec.handle, status: existing ? "existed" : "created", email });
       } catch (e: any) {
         results.push({ handle: spec.handle, status: "error", error: e?.message ?? String(e) });
@@ -208,6 +297,10 @@ export const adminImpersonateCreator = createServerFn({ method: "POST" })
     const email = userRes?.user?.email;
     if (!email) throw new Error("Target user has no email");
 
+    // Look up admin's own email for the return link
+    const { data: adminUserRes } = await supabaseAdmin.auth.admin.getUserById(context.userId);
+    const adminEmail = adminUserRes?.user?.email;
+
     // Determine redirect origin from request headers
     const { getRequest } = await import("@tanstack/react-start/server");
     const req = getRequest();
@@ -221,6 +314,22 @@ export const adminImpersonateCreator = createServerFn({ method: "POST" })
     });
     if (linkErr || !link?.properties?.action_link) throw new Error(linkErr?.message ?? "Failed to mint link");
 
+    // Mint a return-to-admin magic link so the operator can bounce back after impersonating
+    let returnUrl: string | null = null;
+    if (adminEmail) {
+      const { data: retLink } = await supabaseAdmin.auth.admin.generateLink({
+        type: "magiclink",
+        email: adminEmail,
+        options: { redirectTo: `${origin}/admin` },
+      });
+      returnUrl = retLink?.properties?.action_link ?? null;
+    }
+
     await logAudit(context.userId, "admin.impersonate", { type: "creator", id: creator.id }, { handle: creator.handle });
-    return { url: link.properties.action_link, creator: { handle: creator.handle, stage_name: creator.stage_name } };
+    return {
+      url: link.properties.action_link,
+      returnUrl,
+      adminEmail: adminEmail ?? null,
+      creator: { handle: creator.handle, stage_name: creator.stage_name },
+    };
   });
