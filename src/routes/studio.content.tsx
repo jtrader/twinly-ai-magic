@@ -28,7 +28,7 @@ import { useSession } from "@/lib/session";
 import {
   listVault, createAsset, updateAsset, deleteAsset,
   setAssetPersonaPermission, removeAssetFromPersona, getAssetSignedUrl,
-  bulkCreateAssets, listAssetAudit,
+  bulkCreateAssets, listAssetAudit, submitAssetForReview,
 } from "@/lib/content-vault.functions";
 
 export const Route = createFileRoute("/studio/content")({ component: ContentVaultPage });
@@ -625,6 +625,8 @@ function EditDialog({
   const [isSynthetic, setIsSynthetic] = useState(false);
   const [busy, setBusy] = useState(false);
   const update = useServerFn(updateAsset);
+  const submitReview = useServerFn(submitAssetForReview);
+  const status = asset?.approval_status ?? "draft";
 
   useEffect(() => {
     if (asset) {
@@ -662,6 +664,43 @@ function EditDialog({
           <DialogTitle>Edit asset</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
+          {asset && (
+            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+              <div>
+                <div className="text-sm font-medium">Review status</div>
+                <div className="text-xs text-muted-foreground">
+                  {status === "approved" ? "Approved by admin — cleared for fan-facing use."
+                    : status === "pending" ? "Awaiting admin review."
+                    : status === "rejected" ? "Rejected — see moderation notes."
+                    : "Draft — not yet submitted."}
+                </div>
+              </div>
+              <Badge
+                variant="outline"
+                className={
+                  status === "approved" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                  : status === "pending" ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
+                  : status === "rejected" ? "border-rose-400/30 bg-rose-400/10 text-rose-300"
+                  : ""
+                }
+              >{status}</Badge>
+            </div>
+          )}
+          {asset && isSynthetic && status !== "approved" && status !== "pending" && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await submitReview({ data: { assetId: asset.id } });
+                  toast.success("Submitted for review");
+                  onSaved();
+                  onClose();
+                } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+              }}
+            >Submit for review</Button>
+          )}
           <div>
             <Label htmlFor="e-title">Title</Label>
             <Input id="e-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
