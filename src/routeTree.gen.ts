@@ -16,6 +16,7 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
+import { Route as StudioContentRouteImport } from './routes/studio.content'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
@@ -57,6 +58,11 @@ const StudioPersonasRoute = StudioPersonasRouteImport.update({
   path: '/studio/personas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioContentRoute = StudioContentRouteImport.update({
+  id: '/studio/content',
+  path: '/studio/content',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LegalTermsRoute = LegalTermsRouteImport.update({
   id: '/legal/terms',
   path: '/legal/terms',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/studio/content': typeof StudioContentRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/studio/content': typeof StudioContentRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/studio/content': typeof StudioContentRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/studio/content'
     | '/studio/personas'
     | '/chat/$handle/$persona'
   fileRoutesByTo: FileRoutesByTo
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/studio/content'
     | '/studio/personas'
     | '/chat/$handle/$persona'
   id:
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/studio/content'
     | '/studio/personas'
     | '/chat/$handle/$persona'
   fileRoutesById: FileRoutesById
@@ -182,6 +194,7 @@ export interface RootRouteChildren {
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
+  StudioContentRoute: typeof StudioContentRoute
   StudioPersonasRoute: typeof StudioPersonasRoute
   ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
 }
@@ -237,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioPersonasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/content': {
+      id: '/studio/content'
+      path: '/studio/content'
+      fullPath: '/studio/content'
+      preLoaderRoute: typeof StudioContentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/legal/terms': {
       id: '/legal/terms'
       path: '/legal/terms'
@@ -286,6 +306,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
+  StudioContentRoute: StudioContentRoute,
   StudioPersonasRoute: StudioPersonasRoute,
   ChatHandlePersonaRoute: ChatHandlePersonaRoute,
 }
