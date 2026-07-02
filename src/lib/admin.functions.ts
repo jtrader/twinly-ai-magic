@@ -80,7 +80,7 @@ export const adminListPendingAssets = createServerFn({ method: "GET" })
     const { data, error } = await supabaseAdmin
       .from("content_assets")
       .select("id, title, asset_type, is_synthetic, ai_generated_label, approval_status, created_at, creator_id")
-      .in("approval_status", ["pending_review"])
+      .eq("approval_status", "pending")
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) throw error;
@@ -95,7 +95,7 @@ export const adminListPendingAssets = createServerFn({ method: "GET" })
   });
 
 export const adminSetAssetApproval = createServerFn({ method: "POST" })
-  .validator((d: { assetId: string; status: "approved" | "rejected" | "pending_review" | "draft" }) => d)
+  .validator((d: { assetId: string; status: "approved" | "rejected" | "pending" }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
