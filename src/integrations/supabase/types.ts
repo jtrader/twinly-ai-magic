@@ -245,13 +245,6 @@ export type Database = {
             referencedRelation: "personas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "conversations_persona_id_fkey"
-            columns: ["persona_id"]
-            isOneToOne: false
-            referencedRelation: "personas_public"
-            referencedColumns: ["id"]
-          },
         ]
       }
       creator_voice_profiles: {
@@ -444,13 +437,6 @@ export type Database = {
             referencedRelation: "personas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "messages_persona_id_fkey"
-            columns: ["persona_id"]
-            isOneToOne: false
-            referencedRelation: "personas_public"
-            referencedColumns: ["id"]
-          },
         ]
       }
       moderation_events: {
@@ -524,13 +510,6 @@ export type Database = {
             columns: ["persona_id"]
             isOneToOne: false
             referencedRelation: "personas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "persona_content_permissions_persona_id_fkey"
-            columns: ["persona_id"]
-            isOneToOne: false
-            referencedRelation: "personas_public"
             referencedColumns: ["id"]
           },
         ]
@@ -739,13 +718,6 @@ export type Database = {
             referencedRelation: "personas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "transactions_persona_id_fkey"
-            columns: ["persona_id"]
-            isOneToOne: false
-            referencedRelation: "personas_public"
-            referencedColumns: ["id"]
-          },
         ]
       }
       user_roles: {
@@ -771,68 +743,7 @@ export type Database = {
       }
     }
     Views: {
-      personas_public: {
-        Row: {
-          created_at: string | null
-          creator_id: string | null
-          description: string | null
-          disclosure_label: string | null
-          display_name: string | null
-          ends_at: string | null
-          id: string | null
-          is_default_seed: boolean | null
-          kind: Database["public"]["Enums"]["persona_kind"] | null
-          price_cents: number | null
-          slug: string | null
-          sort_order: number | null
-          starts_at: string | null
-          updated_at: string | null
-          visibility: Database["public"]["Enums"]["visibility"] | null
-        }
-        Insert: {
-          created_at?: string | null
-          creator_id?: string | null
-          description?: string | null
-          disclosure_label?: string | null
-          display_name?: string | null
-          ends_at?: string | null
-          id?: string | null
-          is_default_seed?: boolean | null
-          kind?: Database["public"]["Enums"]["persona_kind"] | null
-          price_cents?: number | null
-          slug?: string | null
-          sort_order?: number | null
-          starts_at?: string | null
-          updated_at?: string | null
-          visibility?: Database["public"]["Enums"]["visibility"] | null
-        }
-        Update: {
-          created_at?: string | null
-          creator_id?: string | null
-          description?: string | null
-          disclosure_label?: string | null
-          display_name?: string | null
-          ends_at?: string | null
-          id?: string | null
-          is_default_seed?: boolean | null
-          kind?: Database["public"]["Enums"]["persona_kind"] | null
-          price_cents?: number | null
-          slug?: string | null
-          sort_order?: number | null
-          starts_at?: string | null
-          updated_at?: string | null
-          visibility?: Database["public"]["Enums"]["visibility"] | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "personas_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: false
-            referencedRelation: "creators"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       can_manage_creator: { Args: { _creator_id: string }; Returns: boolean }
