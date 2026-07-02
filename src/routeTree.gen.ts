@@ -25,6 +25,7 @@ import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
 import { Route as StudioPacksRouteImport } from './routes/studio.packs'
 import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
 import { Route as StudioGenerateRouteImport } from './routes/studio.generate'
+import { Route as StudioCreateRouteImport } from './routes/studio.create'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
@@ -114,6 +115,11 @@ const StudioGenerateRoute = StudioGenerateRouteImport.update({
   path: '/studio/generate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioCreateRoute = StudioCreateRouteImport.update({
+  id: '/studio/create',
+  path: '/studio/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioContentRoute = StudioContentRouteImport.update({
   id: '/studio/content',
   path: '/studio/content',
@@ -171,6 +177,7 @@ export interface FileRoutesByFullPath {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/create': typeof StudioCreateRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -197,6 +204,7 @@ export interface FileRoutesByTo {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/create': typeof StudioCreateRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -224,6 +232,7 @@ export interface FileRoutesById {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/create': typeof StudioCreateRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -252,6 +261,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/create'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/create'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -304,6 +315,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/create'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -331,6 +343,7 @@ export interface RootRouteChildren {
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
   StudioContentRoute: typeof StudioContentRoute
+  StudioCreateRoute: typeof StudioCreateRoute
   StudioGenerateRoute: typeof StudioGenerateRoute
   StudioInboxRoute: typeof StudioInboxRoute
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
@@ -455,6 +468,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioGenerateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/create': {
+      id: '/studio/create'
+      path: '/studio/create'
+      fullPath: '/studio/create'
+      preLoaderRoute: typeof StudioCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/content': {
       id: '/studio/content'
       path: '/studio/content'
@@ -542,6 +562,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
   StudioContentRoute: StudioContentRoute,
+  StudioCreateRoute: StudioCreateRoute,
   StudioGenerateRoute: StudioGenerateRoute,
   StudioInboxRoute: StudioInboxRoute,
   StudioPacksRoute: StudioPacksRouteWithChildren,
