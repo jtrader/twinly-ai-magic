@@ -186,6 +186,32 @@ export const loadConversation = createServerFn({ method: "GET" })
     return { convo, messages: messages ?? [] };
   });
 
+/** Get-or-create the conversation for a fan+persona; used to bootstrap voice uploads. */
+export const ensurePersonaConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { creatorHandle: string; personaSlug: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await assertAdult(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: creator } = await supabaseAdmin
+      .from("creators").select("id").eq("handle", data.creatorHandle).maybeSingle();
+    if (!creator) throw new Error("Creator not found");
+    const { data: persona } = await supabaseAdmin
+      .from("personas").select("id").eq("creator_id", creator.id).eq("slug", data.personaSlug).maybeSingle();
+    if (!persona) throw new Error("Persona not found");
+    const { data: existing } = await supabase
+      .from("conversations").select("id")
+      .eq("fan_id", userId).eq("persona_id", persona.id).maybeSingle();
+    if (existing) return { conversationId: existing.id };
+    const { data: convo, error } = await supabase
+      .from("conversations")
+      .insert({ fan_id: userId, creator_id: creator.id, persona_id: persona.id })
+      .select("id").single();
+    if (error) throw error;
+    return { conversationId: convo.id };
+  });
+
 /** Ensure the current user participates in a conversation. Returns the convo row. */
 async function requireConversationAccess(supabase: any, userId: string, conversationId: string) {
   const { data: convo, error } = await supabase
