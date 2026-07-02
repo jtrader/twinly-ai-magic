@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   ArrowLeft, Upload, Trash2, ShieldCheck, ShieldAlert, User, Mic, Palette,
-  Sparkles, X, Loader2, Image as ImageIcon,
+  Sparkles, X, Loader2, Image as ImageIcon, RotateCcw, Send, History, Archive,
 } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { useSession } from "@/lib/session";
 import {
   getTwinProfile, addTwinReference, updateTwinReference, removeTwinReference,
   upsertTwinConsent, revokeTwinConsent, upsertStyleNotes, getTwinRefSignedUrl,
+  restoreTwinReference, hardDeleteTwinReference, submitTwinReferencesForReview,
 } from "@/lib/twin.functions";
 
 export const Route = createFileRoute("/studio/twin")({
@@ -120,6 +121,7 @@ function TwinProfilePage() {
       </nav>
 
       <div className="grid gap-6">
+        <SummaryCard data={data} />
         <ReferencesSection
           id="identity" title="Identity references" icon={<User className="size-4" />}
           hint="Upload 5+ clear photos: face front, 3/4 profile, side, body, expressions. Used to anchor likeness."
@@ -155,6 +157,7 @@ function TwinProfilePage() {
         <ConsentSection data={data} onChanged={refresh} />
         <AllowedUsesSection data={data} onChanged={refresh} />
         <ForbiddenUsesSection data={data} onChanged={refresh} />
+        <VersionHistorySection archived={(data as any).archivedRefs ?? []} onChanged={refresh} />
 
         <div className="rounded-2xl border border-brand/20 bg-brand/5 p-4 text-sm">
           <div className="flex items-center gap-2 font-semibold text-brand-glow">
@@ -235,7 +238,7 @@ function ReferencesSection({
 }
 
 function RefCard({ r, onChanged }: {
-  r: { id: string; kind?: Kind; storage_path: string; mime_type: string | null; slot_label: string | null; notes: string | null };
+  r: { id: string; kind?: Kind; storage_path: string; mime_type: string | null; slot_label: string | null; notes: string | null; review_status?: string; review_note?: string | null };
   onChanged: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -267,6 +270,7 @@ function RefCard({ r, onChanged }: {
 
   return (
     <div className="rounded-xl border border-border/60 bg-background/40 p-3">
+      {r.review_status && <div className="mb-2"><ReviewPill status={r.review_status} note={r.review_note} /></div>}
       <div className="mb-2 aspect-square overflow-hidden rounded-lg bg-surface-elevated/60">
         {isAudio ? (
           url ? <audio controls src={url} className="mt-24 w-full" /> :
@@ -282,22 +286,200 @@ function RefCard({ r, onChanged }: {
       <div className="mt-2 flex justify-between">
         <Button size="sm" variant="ghost" onClick={save}>Save</Button>
         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setConfirmOpen(true)}>
-          <Trash2 className="size-3.5" />
+          <Archive className="size-3.5" />
         </Button>
       </div>
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove reference?</AlertDialogTitle>
-            <AlertDialogDescription>The file will be deleted from storage. This cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>Archive reference?</AlertDialogTitle>
+            <AlertDialogDescription>The file moves to Version history. You can restore or permanently delete it later.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={remove}>Remove</AlertDialogAction>
+            <AlertDialogAction onClick={remove}>Archive</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/* ---------- Summary & versioning ---------- */
+
+function ReviewPill({ status, note }: { status: string; note?: string | null }) {
+  const map: Record<string, string> = {
+    draft: "border-border bg-surface text-muted-foreground",
+    pending: "border-amber-400/30 bg-amber-400/10 text-amber-300",
+    approved: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
+    rejected: "border-rose-400/30 bg-rose-400/10 text-rose-300",
+  };
+  return (
+    <span title={note ?? undefined}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${map[status] ?? map.draft}`}>
+      {status}
+    </span>
+  );
+}
+
+function SummaryCard({ data }: { data: any }) {
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const sign = useServerFn(getTwinRefSignedUrl);
+  const submit = useServerFn(submitTwinReferencesForReview);
+  const [submitting, setSubmitting] = useState(false);
+  const firstIdentity = (data.refs as any[]).find((r) => r.kind === "identity_ref" && !r.deleted_at);
+  const identityCount = (data.refs as any[]).filter((r) => r.kind === "identity_ref").length;
+  const voiceCount = (data.refs as any[]).filter((r) => r.kind === "voice_ref").length;
+  const styleCount = (data.refs as any[]).filter((r) => r.kind === "style_ref").length;
+  const counts = (data.refs as any[]).reduce((a, r) => { a[r.review_status ?? "draft"] = (a[r.review_status ?? "draft"] ?? 0) + 1; return a; }, {} as Record<string, number>);
+  const c = data.consent ?? {};
+
+  useEffect(() => {
+    let alive = true;
+    if (!firstIdentity) { setAvatarUrl(null); return; }
+    (async () => {
+      try { const { url } = await sign({ data: { storagePath: firstIdentity.storage_path } }); if (alive) setAvatarUrl(url); }
+      catch { /* ignore */ }
+    })();
+    return () => { alive = false; };
+  }, [firstIdentity?.id, sign]);
+
+  async function submitAll() {
+    setSubmitting(true);
+    try {
+      const { submitted } = await submit({ data: {} });
+      toast.success(submitted ? `Submitted ${submitted} reference${submitted === 1 ? "" : "s"} for review` : "Nothing to submit");
+    } catch (err: any) { toast.error(err?.message ?? "Failed"); }
+    finally { setSubmitting(false); }
+  }
+
+  const consentChips: Array<[string, boolean]> = [
+    ["Likeness", !!c.likeness_ok], ["Voice", !!c.voice_ok], ["AI image", !!c.image_ok], ["AI video", !!c.video_ok],
+  ];
+  const revoked = !!c.revoked_at;
+
+  return (
+    <section className="rounded-2xl border border-brand/20 bg-gradient-to-br from-brand/5 to-transparent p-5">
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="size-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-elevated/60">
+          {avatarUrl
+            ? <img src={avatarUrl} alt="Avatar preview" className="h-full w-full object-cover" />
+            : <div className="grid h-full place-items-center text-muted-foreground"><User className="size-8" /></div>}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-display text-lg font-semibold">Twin summary</div>
+            {revoked && <ReviewPill status="rejected" note="Consent revoked" />}
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+            <SumCell icon={<User className="size-3.5" />} label="Identity" value={identityCount} />
+            <SumCell icon={<Mic className="size-3.5" />} label="Voice" value={voiceCount} />
+            <SumCell icon={<Palette className="size-3.5" />} label="Style" value={styleCount} />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+            {consentChips.map(([label, on]) => (
+              <span key={label} className={`inline-flex items-center rounded-full border px-2 py-0.5 ${on && !revoked ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" : "border-border bg-surface text-muted-foreground"}`}>
+                {label}: {on && !revoked ? "on" : "off"}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <span>Review:</span>
+            {(["approved", "pending", "rejected", "draft"] as const).map((k) => (
+              <span key={k} className="inline-flex items-center gap-1">
+                <ReviewPill status={k} /> {counts[k] ?? 0}
+              </span>
+            ))}
+          </div>
+        </div>
+        <Button size="sm" onClick={submitAll} disabled={submitting}>
+          {submitting ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : <Send className="mr-2 size-3.5" />}
+          Submit for review
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function SumCell({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-background/40 p-2">
+      <div className="flex items-center gap-1.5 text-muted-foreground">{icon}<span>{label}</span></div>
+      <div className="mt-0.5 font-display text-lg font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function VersionHistorySection({ archived, onChanged }: { archived: any[]; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const restore = useServerFn(restoreTwinReference);
+  const hardDel = useServerFn(hardDeleteTwinReference);
+  const sign = useServerFn(getTwinRefSignedUrl);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const entries: Array<[string, string]> = [];
+      for (const a of archived.slice(0, 30)) {
+        try { const { url } = await sign({ data: { storagePath: a.storage_path } }); entries.push([a.id, url]); }
+        catch { /* ignore */ }
+      }
+      if (alive) setUrls(Object.fromEntries(entries));
+    })();
+    return () => { alive = false; };
+  }, [archived.map((a) => a.id).join(","), sign]);
+
+  return (
+    <section id="history" className="rounded-2xl border border-border bg-surface p-5">
+      <button className="flex w-full items-center justify-between" onClick={() => setOpen((v) => !v)}>
+        <div className="flex items-center gap-2 font-display text-lg font-semibold">
+          <History className="size-4" /> Version history
+          <Badge variant="outline" className="text-xs">{archived.length}</Badge>
+        </div>
+        <span className="text-xs text-muted-foreground">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        archived.length === 0 ? (
+          <p className="mt-3 text-xs text-muted-foreground">No archived uploads yet. Archived references appear here so you can revert.</p>
+        ) : (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {archived.map((a) => {
+              const isAudio = (a.mime_type ?? "").startsWith("audio/");
+              return (
+                <div key={a.id} className="rounded-xl border border-border/60 bg-background/40 p-3">
+                  <div className="mb-2 flex items-center justify-between text-[10px] uppercase text-muted-foreground">
+                    <span>{a.kind.replace("_ref", "")}</span>
+                    <span>archived</span>
+                  </div>
+                  <div className="mb-2 aspect-square overflow-hidden rounded-lg bg-surface-elevated/60 opacity-70">
+                    {isAudio ? (
+                      urls[a.id] ? <audio controls src={urls[a.id]} className="mt-24 w-full" /> :
+                        <div className="grid h-full place-items-center text-muted-foreground"><Mic className="size-6" /></div>
+                    ) : urls[a.id] ? (
+                      <img src={urls[a.id]} alt={a.slot_label ?? ""} className="h-full w-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="grid h-full place-items-center text-muted-foreground"><ImageIcon className="size-6" /></div>
+                    )}
+                  </div>
+                  {a.slot_label && <div className="truncate text-xs">{a.slot_label}</div>}
+                  <div className="mt-2 flex justify-between gap-1">
+                    <Button size="sm" variant="outline"
+                      onClick={async () => { try { await restore({ data: { id: a.id } }); toast.success("Restored"); onChanged(); } catch (e: any) { toast.error(e?.message ?? "Failed"); } }}>
+                      <RotateCcw className="mr-1 size-3.5" /> Restore
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-destructive"
+                      onClick={async () => { if (!confirm("Permanently delete this reference?")) return; try { await hardDel({ data: { id: a.id } }); toast.success("Deleted"); onChanged(); } catch (e: any) { toast.error(e?.message ?? "Failed"); } }}>
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+    </section>
   );
 }
 

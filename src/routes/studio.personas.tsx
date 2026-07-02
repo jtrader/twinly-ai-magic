@@ -29,6 +29,7 @@ import {
 import {
   listPacks, attachPackToPersona, detachPackFromPersona,
 } from "@/lib/content-packs.functions";
+import { getTwinProfile } from "@/lib/twin.functions";
 
 export const Route = createFileRoute("/studio/personas")({ component: PersonaStudioPage });
 
@@ -345,7 +346,21 @@ function EditPersonaDialog({
   const [donts, setDonts] = useState("");
   const [samplePhrasings, setSamplePhrasings] = useState("");
   const [voiceRefUrl, setVoiceRefUrl] = useState("");
-  const [tab, setTab] = useState<"basics" | "training" | "packs">("basics");
+  const [tab, setTab] = useState<"basics" | "training" | "packs" | "twin">("basics");
+
+  // Twin linking
+  const [twinLinkMode, setTwinLinkMode] = useState<"all" | "selected" | "none">("all");
+  const [linkedRefIds, setLinkedRefIds] = useState<string[]>([]);
+  const [twinRefs, setTwinRefs] = useState<any[] | null>(null);
+  const loadTwin = useServerFn(getTwinProfile);
+
+  useEffect(() => {
+    if (!persona || tab !== "twin" || twinRefs) return;
+    (async () => {
+      try { const r = await loadTwin(); setTwinRefs(r.refs as any[]); }
+      catch (e: any) { toast.error(e?.message ?? "Failed to load twin refs"); }
+    })();
+  }, [persona, tab, twinRefs, loadTwin]);
 
   // Packs state
   const loadPacks = useServerFn(listPacks);
@@ -386,6 +401,9 @@ function EditPersonaDialog({
       setDonts(tn.donts ?? "");
       setSamplePhrasings(tn.sample_phrasings ?? "");
       setVoiceRefUrl(tn.voice_ref_url ?? "");
+      setTwinLinkMode(((persona as any).twin_link_mode as any) ?? "all");
+      setLinkedRefIds(((persona as any).linked_twin_ref_ids as string[] | null) ?? []);
+      setTwinRefs(null);
       setTab("basics");
     }
   }, [persona]);
@@ -441,6 +459,8 @@ function EditPersonaDialog({
           sample_phrasings: samplePhrasings,
           voice_ref_url: voiceRefUrl,
         },
+        twinLinkMode,
+        linkedTwinRefIds: twinLinkMode === "selected" ? linkedRefIds : [],
       }});
       toast.success("Persona saved");
       onSaved();
@@ -459,13 +479,13 @@ function EditPersonaDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="mb-3 flex gap-1 border-b border-border">
-          {(["basics", "training", "packs"] as const).map((t) => (
+          {(["basics", "training", "packs", "twin"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={"px-3 py-1.5 text-xs font-semibold uppercase tracking-widest " + (tab === t ? "border-b-2 border-brand text-foreground" : "text-muted-foreground")}
-            >{t === "basics" ? "Basics" : t === "training" ? "Training" : "Packs"}</button>
+            >{t === "basics" ? "Basics" : t === "training" ? "Training" : t === "packs" ? "Packs" : "Twin"}</button>
           ))}
         </div>
         {tab === "basics" && (
@@ -600,6 +620,73 @@ function EditPersonaDialog({
                 );
               })}
             </div>
+          )}
+        </div>
+        )}
+        {tab === "twin" && (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Choose which identity, voice, and style references from your <Link to="/studio/twin" className="text-brand-glow hover:underline">Digital Twin Profile</Link> this persona uses.
+          </p>
+          <div className="rounded-lg border border-border bg-surface p-3 text-xs">
+            <div className="mb-2 font-semibold">Reference scope</div>
+            <div className="space-y-2">
+              {([
+                { v: "all", label: "Use all approved twin references", hint: "Broadest — inherits every approved identity, voice, and style ref." },
+                { v: "selected", label: "Use only selected references", hint: "Pick specific refs below. Great for a tightly styled persona." },
+                { v: "none", label: "Do not use twin references", hint: "The persona won't draw from your digital twin." },
+              ] as const).map((opt) => (
+                <label key={opt.v} className="flex cursor-pointer items-start gap-2 rounded-md border border-border/60 bg-background/40 p-2">
+                  <input type="radio" name="twin-mode" className="mt-1" checked={twinLinkMode === opt.v}
+                    onChange={() => setTwinLinkMode(opt.v)} />
+                  <div>
+                    <div className="text-sm font-medium">{opt.label}</div>
+                    <div className="text-xs text-muted-foreground">{opt.hint}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+          {twinLinkMode === "selected" && (
+            twinRefs === null ? (
+              <div className="text-sm text-muted-foreground">Loading references…</div>
+            ) : twinRefs.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No twin references yet.{" "}
+                <Link to="/studio/twin" className="text-brand-glow hover:underline">Upload some</Link>
+              </div>
+            ) : (
+              <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                {(["identity_ref", "voice_ref", "style_ref"] as const).map((k) => {
+                  const group = twinRefs.filter((r: any) => r.kind === k);
+                  if (!group.length) return null;
+                  return (
+                    <div key={k}>
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                        {k === "identity_ref" ? "Identity" : k === "voice_ref" ? "Voice" : "Style"}
+                      </div>
+                      <div className="space-y-1">
+                        {group.map((r: any) => {
+                          const on = linkedRefIds.includes(r.id);
+                          const approved = r.review_status === "approved";
+                          return (
+                            <label key={r.id} className="flex cursor-pointer items-center justify-between gap-2 rounded-md border border-border/60 bg-background/40 px-2 py-1.5 text-xs">
+                              <div className="min-w-0 flex-1 truncate">
+                                <span className="font-medium">{r.slot_label || "Untitled"}</span>{" "}
+                                <span className={`ml-1 rounded-full border px-1.5 py-0.5 text-[9px] uppercase ${approved ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" : "border-border bg-surface text-muted-foreground"}`}>
+                                  {r.review_status ?? "draft"}
+                                </span>
+                              </div>
+                              <Switch checked={on} onCheckedChange={(v) => setLinkedRefIds((s) => v ? [...s, r.id] : s.filter((i) => i !== r.id))} />
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
           )}
         </div>
         )}

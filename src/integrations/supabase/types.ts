@@ -717,6 +717,7 @@ export type Database = {
           is_default_seed: boolean
           is_explicit: boolean
           kind: Database["public"]["Enums"]["persona_kind"]
+          linked_twin_ref_ids: string[]
           price_cents: number
           slug: string
           sort_order: number
@@ -724,6 +725,7 @@ export type Database = {
           system_prompt: string | null
           tone_rules: Json
           training_notes: Json
+          twin_link_mode: string
           updated_at: string
           visibility: Database["public"]["Enums"]["visibility"]
         }
@@ -740,6 +742,7 @@ export type Database = {
           is_default_seed?: boolean
           is_explicit?: boolean
           kind: Database["public"]["Enums"]["persona_kind"]
+          linked_twin_ref_ids?: string[]
           price_cents?: number
           slug: string
           sort_order?: number
@@ -747,6 +750,7 @@ export type Database = {
           system_prompt?: string | null
           tone_rules?: Json
           training_notes?: Json
+          twin_link_mode?: string
           updated_at?: string
           visibility?: Database["public"]["Enums"]["visibility"]
         }
@@ -763,6 +767,7 @@ export type Database = {
           is_default_seed?: boolean
           is_explicit?: boolean
           kind?: Database["public"]["Enums"]["persona_kind"]
+          linked_twin_ref_ids?: string[]
           price_cents?: number
           slug?: string
           sort_order?: number
@@ -770,6 +775,7 @@ export type Database = {
           system_prompt?: string | null
           tone_rules?: Json
           training_notes?: Json
+          twin_link_mode?: string
           updated_at?: string
           visibility?: Database["public"]["Enums"]["visibility"]
         }
@@ -949,37 +955,58 @@ export type Database = {
         Row: {
           created_at: string
           creator_id: string
+          deleted_at: string | null
           id: string
           kind: Database["public"]["Enums"]["twin_ref_kind"]
           mime_type: string | null
           notes: string | null
+          replaces_id: string | null
+          review_note: string | null
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           slot_label: string | null
           sort_order: number
           storage_path: string
+          submitted_at: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           creator_id: string
+          deleted_at?: string | null
           id?: string
           kind: Database["public"]["Enums"]["twin_ref_kind"]
           mime_type?: string | null
           notes?: string | null
+          replaces_id?: string | null
+          review_note?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           slot_label?: string | null
           sort_order?: number
           storage_path: string
+          submitted_at?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           creator_id?: string
+          deleted_at?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["twin_ref_kind"]
           mime_type?: string | null
           notes?: string | null
+          replaces_id?: string | null
+          review_note?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           slot_label?: string | null
           sort_order?: number
           storage_path?: string
+          submitted_at?: string | null
           updated_at?: string
         }
         Relationships: [

@@ -9,6 +9,7 @@ import { adminOverview, adminListVerifications, adminSetVerification, adminRecen
 import { adminListModeration, adminResolveModeration } from "@/lib/moderation.functions";
 import { adminListPendingAssets, adminSetAssetApproval } from "@/lib/admin.functions";
 import { adminListPendingPacks, adminSetPackApproval } from "@/lib/admin.functions";
+import { adminListPendingTwinRefs, adminSetTwinRefReview, adminGetTwinRefSignedUrl } from "@/lib/twin.functions";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -26,13 +27,15 @@ function AdminPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
-  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "audit">("overview");
+  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit">("overview");
   const [stats, setStats] = useState<any>(null);
   const [creators, setCreators] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
   const [pendingAssets, setPendingAssets] = useState<any[]>([]);
   const [pendingPacks, setPendingPacks] = useState<any[]>([]);
+  const [pendingTwin, setPendingTwin] = useState<any[]>([]);
+  const [twinPreviews, setTwinPreviews] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
 
   const overview = useServerFn(adminOverview);
@@ -45,6 +48,9 @@ function AdminPage() {
   const setApproval = useServerFn(adminSetAssetApproval);
   const listPendingPacks_ = useServerFn(adminListPendingPacks);
   const setPackApproval = useServerFn(adminSetPackApproval);
+  const listPendingTwin = useServerFn(adminListPendingTwinRefs);
+  const setTwinReview = useServerFn(adminSetTwinRefReview);
+  const signTwin = useServerFn(adminGetTwinRefSignedUrl);
 
   useEffect(() => {
     if (!user || !roles.includes("admin")) return;
@@ -56,6 +62,15 @@ function AdminPage() {
         if (tab === "audit") setAudit((await listAudit({})).events);
         if (tab === "synthetic") setPendingAssets((await listPending({})).assets);
         if (tab === "packs") setPendingPacks((await listPendingPacks_({})).packs);
+        if (tab === "twin") {
+          const r = (await listPendingTwin({})).refs;
+          setPendingTwin(r);
+          const entries: Array<[string, string]> = [];
+          for (const it of r.slice(0, 30)) {
+            try { const { url } = await signTwin({ data: { id: it.id } }); entries.push([it.id, url]); } catch { /* ignore */ }
+          }
+          setTwinPreviews(Object.fromEntries(entries));
+        }
       } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
     })();
   }, [tab, user, roles.join(",")]);
@@ -115,6 +130,17 @@ function AdminPage() {
     finally { setBusy(null); }
   }
 
+  async function decideTwin(id: string, status: "approved" | "rejected") {
+    setBusy(id);
+    try {
+      const note = status === "rejected" ? (window.prompt("Optional reviewer note visible to creator:", "") ?? undefined) : undefined;
+      await setTwinReview({ data: { id, status, note: note || undefined } });
+      setPendingTwin((prev) => prev.filter((r) => r.id !== id));
+      toast.success(status);
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(null); }
+  }
+
   return (
     <AppShell>
       <div className="mb-4">
@@ -123,7 +149,7 @@ function AdminPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-2">
-        {(["overview","verifications","moderation","synthetic","packs","audit"] as const).map((t) => (
+        {(["overview","verifications","moderation","synthetic","packs","twin","audit"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -194,6 +220,40 @@ function AdminPage() {
             </div>
           ))}
           {pendingPacks.length === 0 && <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">No packs awaiting review.</div>}
+        </div>
+      )}
+
+      {tab === "twin" && (
+        <div className="space-y-2">
+          {pendingTwin.map((r) => {
+            const isAudio = (r.mime_type ?? "").startsWith("audio/");
+            const url = twinPreviews[r.id];
+            return (
+              <div key={r.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+                <div className="size-20 overflow-hidden rounded-lg bg-surface-elevated/60">
+                  {isAudio ? (
+                    url ? <audio controls src={url} className="mt-10 w-full" /> : null
+                  ) : url ? (
+                    <img src={url} alt="" className="h-full w-full object-cover" />
+                  ) : null}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold">
+                    {r.slot_label || "Untitled"} <span className="ml-1 text-[10px] uppercase text-muted-foreground">{r.kind.replace("_ref", "")}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {r.creator ? `@${r.creator.handle}` : "unknown"} · submitted {r.submitted_at ? new Date(r.submitted_at).toLocaleString() : "—"}
+                  </div>
+                  {r.notes && <div className="mt-1 line-clamp-2 text-xs">{r.notes}</div>}
+                </div>
+                <div className="inline-flex gap-1">
+                  <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => decideTwin(r.id, "approved")}>Approve</Button>
+                  <Button size="sm" variant="ghost" disabled={busy === r.id} onClick={() => decideTwin(r.id, "rejected")}>Reject</Button>
+                </div>
+              </div>
+            );
+          })}
+          {pendingTwin.length === 0 && <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">No twin references awaiting review.</div>}
         </div>
       )}
 

@@ -32,13 +32,20 @@ export const getTwinProfile = createServerFn({ method: "GET" })
         .select("tone_summary, sales_style, approved_phrases, banned_phrases")
         .eq("creator_id", creator.id).maybeSingle(),
       supabase.from("twin_reference_assets")
-        .select("id, kind, storage_path, mime_type, slot_label, notes, sort_order, created_at")
+        .select("id, kind, storage_path, mime_type, slot_label, notes, sort_order, created_at, review_status, review_note, submitted_at, reviewed_at, deleted_at")
         .eq("creator_id", creator.id)
         .order("kind", { ascending: true })
         .order("sort_order", { ascending: true }),
     ]);
 
-    return { creator, consent: consent ?? null, voice: voice ?? null, refs: refs ?? [] };
+    const all = refs ?? [];
+    return {
+      creator,
+      consent: consent ?? null,
+      voice: voice ?? null,
+      refs: all.filter((r: any) => !r.deleted_at),
+      archivedRefs: all.filter((r: any) => !!r.deleted_at),
+    };
   });
 
 export const addTwinReference = createServerFn({ method: "POST" })
@@ -97,15 +104,141 @@ export const removeTwinReference = createServerFn({ method: "POST" })
     const { data: row } = await supabase
       .from("twin_reference_assets").select("storage_path, kind")
       .eq("id", data.id).eq("creator_id", creator.id).maybeSingle();
+    // Soft-delete for version history — creators can restore or hard-delete later.
     const { error } = await supabase
       .from("twin_reference_assets")
-      .delete().eq("id", data.id).eq("creator_id", creator.id);
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", data.id).eq("creator_id", creator.id);
     if (error) throw error;
-    if (row?.storage_path) {
+    // Any personas linking this ref: prune the id (no schema drift needed).
+    await supabase.rpc("has_role", { _user_id: userId, _role: "creator" }); // no-op safety
+    const { data: personas } = await supabase
+      .from("personas").select("id, linked_twin_ref_ids")
+      .eq("creator_id", creator.id);
+    for (const p of personas ?? []) {
+      const ids = ((p as any).linked_twin_ref_ids as string[] | null) ?? [];
+      if (ids.includes(data.id)) {
+        await supabase.from("personas")
+          .update({ linked_twin_ref_ids: ids.filter((i) => i !== data.id) })
+          .eq("id", (p as any).id);
+      }
+    }
+    await logAudit(userId, "twin.reference_archived", { type: "creator", id: creator.id }, { kind: row?.kind });
+    return { ok: true };
+  });
+
+export const restoreTwinReference = createServerFn({ method: "POST" })
+  .validator((d: { id: string }) => d)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const creator = await requireCreator(supabase, userId);
+    const { error } = await supabase
+      .from("twin_reference_assets")
+      .update({ deleted_at: null })
+      .eq("id", data.id).eq("creator_id", creator.id);
+    if (error) throw error;
+    await logAudit(userId, "twin.reference_restored", { type: "creator", id: creator.id }, {});
+    return { ok: true };
+  });
+
+export const hardDeleteTwinReference = createServerFn({ method: "POST" })
+  .validator((d: { id: string }) => d)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const creator = await requireCreator(supabase, userId);
+    const { data: row } = await supabase
+      .from("twin_reference_assets").select("storage_path, kind, deleted_at")
+      .eq("id", data.id).eq("creator_id", creator.id).maybeSingle();
+    if (!row) throw new Error("Reference not found.");
+    if (!row.deleted_at) throw new Error("Archive the reference before permanently deleting it.");
+    const { error } = await supabase
+      .from("twin_reference_assets").delete()
+      .eq("id", data.id).eq("creator_id", creator.id);
+    if (error) throw error;
+    if (row.storage_path) {
       await supabase.storage.from("content-assets").remove([row.storage_path]).catch(() => undefined);
     }
-    await logAudit(userId, "twin.reference_removed", { type: "creator", id: creator.id }, { kind: row?.kind });
+    await logAudit(userId, "twin.reference_deleted", { type: "creator", id: creator.id }, { kind: row.kind });
     return { ok: true };
+  });
+
+export const submitTwinReferencesForReview = createServerFn({ method: "POST" })
+  .validator((d: { ids?: string[] }) => d)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const creator = await requireCreator(supabase, userId);
+    let q = supabase.from("twin_reference_assets")
+      .update({ review_status: "pending", submitted_at: new Date().toISOString(), review_note: null })
+      .eq("creator_id", creator.id).is("deleted_at", null)
+      .in("review_status", ["draft", "rejected"]);
+    if (data.ids && data.ids.length) q = q.in("id", data.ids);
+    const { error, data: rows } = await q.select("id");
+    if (error) throw error;
+    await logAudit(userId, "twin.review_submitted", { type: "creator", id: creator.id }, { count: rows?.length ?? 0 });
+    return { submitted: rows?.length ?? 0 };
+  });
+
+// ---------- Admin: twin reference review queue ----------
+
+async function requireAdmin(context: { userId: string; supabase: any }) {
+  const { data, error } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+  if (error || !data) throw new Error("Forbidden");
+}
+
+export const adminListPendingTwinRefs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("twin_reference_assets")
+      .select("id, creator_id, kind, storage_path, mime_type, slot_label, notes, submitted_at, review_status")
+      .eq("review_status", "pending").is("deleted_at", null)
+      .order("submitted_at", { ascending: true }).limit(200);
+    if (error) throw error;
+    const creatorIds = Array.from(new Set((data ?? []).map((r: any) => r.creator_id)));
+    const { data: creators } = creatorIds.length
+      ? await supabaseAdmin.from("creators").select("id, handle, stage_name").in("id", creatorIds)
+      : { data: [] as any[] };
+    const byId = new Map((creators ?? []).map((c: any) => [c.id, c]));
+    return { refs: (data ?? []).map((r: any) => ({ ...r, creator: byId.get(r.creator_id) ?? null })) };
+  });
+
+export const adminSetTwinRefReview = createServerFn({ method: "POST" })
+  .validator((d: { id: string; status: "approved" | "rejected"; note?: string }) => d)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("twin_reference_assets")
+      .update({
+        review_status: data.status,
+        review_note: data.note ?? null,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: context.userId,
+      }).eq("id", data.id);
+    if (error) throw error;
+    await logAudit(context.userId, "admin.twin_ref_review", { type: "twin_reference", id: data.id }, { status: data.status });
+    return { ok: true };
+  });
+
+export const adminGetTwinRefSignedUrl = createServerFn({ method: "POST" })
+  .validator((d: { id: string }) => d)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("twin_reference_assets").select("storage_path").eq("id", data.id).maybeSingle();
+    if (error || !row) throw error ?? new Error("Not found");
+    const { data: signed, error: sErr } = await supabaseAdmin.storage
+      .from("content-assets").createSignedUrl(row.storage_path, 600);
+    if (sErr) throw sErr;
+    return { url: signed.signedUrl };
   });
 
 export const upsertTwinConsent = createServerFn({ method: "POST" })
