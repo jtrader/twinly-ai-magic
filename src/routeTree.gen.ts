@@ -37,6 +37,7 @@ import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$pa
 import { Route as CreatorsHandlePersonaRouteImport } from './routes/creators.$handle.$persona'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 import { Route as ApiPublicHooksHeygenRouteImport } from './routes/api/public/hooks/heygen'
+import { Route as ApiPublicCronHeygenPollRouteImport } from './routes/api/public/cron/heygen-poll'
 
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
@@ -178,6 +179,11 @@ const ApiPublicHooksHeygenRoute = ApiPublicHooksHeygenRouteImport.update({
   path: '/api/public/hooks/heygen',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicCronHeygenPollRoute = ApiPublicCronHeygenPollRouteImport.update({
+  id: '/api/public/cron/heygen-poll',
+  path: '/api/public/cron/heygen-poll',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -207,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
 }
 export interface FileRoutesByTo {
@@ -237,6 +244,7 @@ export interface FileRoutesByTo {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
 }
 export interface FileRoutesById {
@@ -268,6 +276,7 @@ export interface FileRoutesById {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
 }
 export interface FileRouteTypes {
@@ -300,6 +309,7 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/api/public/cron/heygen-poll'
     | '/api/public/hooks/heygen'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -330,6 +340,7 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/api/public/cron/heygen-poll'
     | '/api/public/hooks/heygen'
   id:
     | '__root__'
@@ -360,6 +371,7 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/api/public/cron/heygen-poll'
     | '/api/public/hooks/heygen'
   fileRoutesById: FileRoutesById
 }
@@ -389,6 +401,7 @@ export interface RootRouteChildren {
   StudioTwinRoute: typeof StudioTwinRoute
   StudioIndexRoute: typeof StudioIndexRoute
   ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
+  ApiPublicCronHeygenPollRoute: typeof ApiPublicCronHeygenPollRoute
   ApiPublicHooksHeygenRoute: typeof ApiPublicHooksHeygenRoute
 }
 
@@ -590,6 +603,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksHeygenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/heygen-poll': {
+      id: '/api/public/cron/heygen-poll'
+      path: '/api/public/cron/heygen-poll'
+      fullPath: '/api/public/cron/heygen-poll'
+      preLoaderRoute: typeof ApiPublicCronHeygenPollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -643,6 +663,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioTwinRoute: StudioTwinRoute,
   StudioIndexRoute: StudioIndexRoute,
   ChatHandlePersonaRoute: ChatHandlePersonaRoute,
+  ApiPublicCronHeygenPollRoute: ApiPublicCronHeygenPollRoute,
   ApiPublicHooksHeygenRoute: ApiPublicHooksHeygenRoute,
 }
 export const routeTree = rootRouteImport

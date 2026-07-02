@@ -5,7 +5,10 @@ import { assertTwinPolicy } from "./generate-requests.functions";
 
 async function requireCreator(supabase: any, userId: string) {
   const { data, error } = await supabase
-    .from("creators").select("id, handle").eq("user_id", userId).maybeSingle();
+    .from("creators")
+    .select("id, handle")
+    .eq("user_id", userId)
+    .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("Create your creator profile first.");
   return data as { id: string; handle: string };
@@ -18,23 +21,40 @@ async function attachPersonaAndPack(
   packId?: string,
 ) {
   if (personaId) {
-    await supabase.from("persona_content_permissions").upsert(
-      { persona_id: personaId, asset_id: assetId, permission_type: "included" },
-      { onConflict: "persona_id,asset_id" },
-    );
+    await supabase
+      .from("persona_content_permissions")
+      .upsert(
+        { persona_id: personaId, asset_id: assetId, permission_type: "included" },
+        { onConflict: "persona_id,asset_id" },
+      );
   }
   if (packId) {
     const { data: max } = await supabase
-      .from("content_pack_items").select("position").eq("pack_id", packId)
-      .order("position", { ascending: false }).limit(1);
+      .from("content_pack_items")
+      .select("position")
+      .eq("pack_id", packId)
+      .order("position", { ascending: false })
+      .limit(1);
     const pos = (max?.[0]?.position ?? -1) + 1;
-    await supabase.from("content_pack_items")
-      .upsert({ pack_id: packId, asset_id: assetId, position: pos }, { onConflict: "pack_id,asset_id", ignoreDuplicates: true });
+    await supabase
+      .from("content_pack_items")
+      .upsert(
+        { pack_id: packId, asset_id: assetId, position: pos },
+        { onConflict: "pack_id,asset_id", ignoreDuplicates: true },
+      );
     const { data: attach } = await supabase
-      .from("content_pack_personas").select("persona_id, permission_type").eq("pack_id", packId);
+      .from("content_pack_personas")
+      .select("persona_id, permission_type")
+      .eq("pack_id", packId);
     if (attach?.length) {
-      const links = attach.map((a: any) => ({ asset_id: assetId, persona_id: a.persona_id, permission_type: a.permission_type }));
-      await supabase.from("persona_content_permissions").upsert(links, { onConflict: "persona_id,asset_id" });
+      const links = attach.map((a: any) => ({
+        asset_id: assetId,
+        persona_id: a.persona_id,
+        permission_type: a.permission_type,
+      }));
+      await supabase
+        .from("persona_content_permissions")
+        .upsert(links, { onConflict: "persona_id,asset_id" });
     }
   }
 }
@@ -45,13 +65,10 @@ async function attachPersonaAndPack(
  */
 export const saveGeneratedImage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: {
-    title: string;
-    base64: string;
-    prompt: string;
-    personaId?: string;
-    packId?: string;
-  }) => d)
+  .validator(
+    (d: { title: string; base64: string; prompt: string; personaId?: string; packId?: string }) =>
+      d,
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const creator = await requireCreator(supabase, userId);
@@ -75,7 +92,8 @@ export const saveGeneratedImage = createServerFn({ method: "POST" })
 
     const title = (data.title.trim() || "AI image").slice(0, 120);
     const { data: asset, error } = await supabase
-      .from("content_assets").insert({
+      .from("content_assets")
+      .insert({
         creator_id: creator.id,
         title,
         asset_type: "image",
@@ -84,13 +102,21 @@ export const saveGeneratedImage = createServerFn({ method: "POST" })
         ai_generated_label: true,
         approval_status: "pending",
         category: "ai_image",
-      }).select("*").single();
+      })
+      .select("*")
+      .single();
     if (error) throw error;
 
     await attachPersonaAndPack(supabase, asset.id, data.personaId, data.packId);
-    await logAudit(userId, "ai.image_saved", { type: "asset", id: asset.id }, {
-      prompt: data.prompt.slice(0, 200), bytes: bytes.byteLength,
-    });
+    await logAudit(
+      userId,
+      "ai.image_saved",
+      { type: "asset", id: asset.id },
+      {
+        prompt: data.prompt.slice(0, 200),
+        bytes: bytes.byteLength,
+      },
+    );
     return { asset };
   });
 
@@ -101,13 +127,10 @@ export const saveGeneratedImage = createServerFn({ method: "POST" })
  */
 export const generateVoiceNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: {
-    prompt: string;
-    title?: string;
-    voice?: string;
-    personaId?: string;
-    packId?: string;
-  }) => d)
+  .validator(
+    (d: { prompt: string; title?: string; voice?: string; personaId?: string; packId?: string }) =>
+      d,
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const creator = await requireCreator(supabase, userId);
@@ -145,9 +168,12 @@ export const generateVoiceNote = createServerFn({ method: "POST" })
       .upload(path, buf, { contentType: "audio/mpeg", upsert: false });
     if (upErr) throw upErr;
 
-    const title = (data.title?.trim() || `AI voice note — ${new Date().toISOString().slice(0, 10)}`).slice(0, 120);
+    const title = (
+      data.title?.trim() || `AI voice note — ${new Date().toISOString().slice(0, 10)}`
+    ).slice(0, 120);
     const { data: asset, error } = await supabase
-      .from("content_assets").insert({
+      .from("content_assets")
+      .insert({
         creator_id: creator.id,
         title,
         asset_type: "audio",
@@ -156,17 +182,26 @@ export const generateVoiceNote = createServerFn({ method: "POST" })
         ai_generated_label: true,
         approval_status: "pending",
         category: "ai_voice_note",
-      }).select("*").single();
+      })
+      .select("*")
+      .single();
     if (error) throw error;
 
     await attachPersonaAndPack(supabase, asset.id, data.personaId, data.packId);
-    await logAudit(userId, "ai.voice_generated", { type: "asset", id: asset.id }, {
-      voice, chars: text.length,
-    });
+    await logAudit(
+      userId,
+      "ai.voice_generated",
+      { type: "asset", id: asset.id },
+      {
+        voice,
+        chars: text.length,
+      },
+    );
 
     // Signed URL so the UI can preview the result immediately
     const { data: signed } = await supabaseAdmin.storage
-      .from("content-assets").createSignedUrl(path, 60 * 60);
+      .from("content-assets")
+      .createSignedUrl(path, 60 * 60);
     return { asset, previewUrl: signed?.signedUrl ?? null };
   });
 
@@ -178,13 +213,15 @@ export const generateVoiceNote = createServerFn({ method: "POST" })
  */
 export const queueTalkingHead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: {
-    script: string;
-    title?: string;
-    personaId?: string;
-    packId?: string;
-    durationSeconds?: number;
-  }) => d)
+  .validator(
+    (d: {
+      script: string;
+      title?: string;
+      personaId?: string;
+      packId?: string;
+      durationSeconds?: number;
+    }) => d,
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const creator = await requireCreator(supabase, userId);
@@ -212,7 +249,10 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
       (persona?.heygen_voice_id?.trim() as string | undefined) ||
       process.env.HEYGEN_DEFAULT_VOICE_ID ||
       null;
-    if (!avatarId) throw new Error("This persona has no HeyGen avatar ID — set one in Persona → Twin tab, or configure HEYGEN_DEFAULT_AVATAR_ID.");
+    if (!avatarId)
+      throw new Error(
+        "This persona has no HeyGen avatar ID — set one in Persona → Twin tab, or configure HEYGEN_DEFAULT_AVATAR_ID.",
+      );
 
     // 1) Generate TTS audio via existing Lovable AI gateway pipeline.
     const key = process.env.LOVABLE_API_KEY;
@@ -230,7 +270,8 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
     if (!ttsRes.ok) {
       const err = await ttsRes.text().catch(() => "");
       if (ttsRes.status === 429) throw new Error("Rate limited — try again in a moment.");
-      if (ttsRes.status === 402) throw new Error("AI credits exhausted. Top up in workspace billing.");
+      if (ttsRes.status === 402)
+        throw new Error("AI credits exhausted. Top up in workspace billing.");
       throw new Error(`Voice generation failed (${ttsRes.status}): ${err.slice(0, 200)}`);
     }
     const audioBuf = new Uint8Array(await ttsRes.arrayBuffer());
@@ -248,23 +289,28 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
       .createSignedUrl(ttsPath, 60 * 60 * 6);
     if (signErr || !signed?.signedUrl) throw signErr ?? new Error("Failed to sign TTS URL");
 
-    const title = (data.title?.trim() || `AI talking-head — ${new Date().toISOString().slice(0, 10)}`).slice(0, 120);
+    const title = (
+      data.title?.trim() || `AI talking-head — ${new Date().toISOString().slice(0, 10)}`
+    ).slice(0, 120);
 
     // 2) Create the placeholder asset (rendering) so we can correlate the webhook.
     const insertRow: any = {
-        creator_id: creator.id,
-        title,
-        asset_type: "video",
-        is_synthetic: true,
-        ai_generated_label: true,
-        approval_status: "pending",
-        category: "ai_talking_head_rendering",
-        provider: "heygen",
-        provider_status: "submitted",
-        render_started_at: new Date().toISOString(),
-      };
+      creator_id: creator.id,
+      title,
+      asset_type: "video",
+      is_synthetic: true,
+      ai_generated_label: true,
+      approval_status: "pending",
+      category: "ai_talking_head_rendering",
+      provider: "heygen",
+      provider_status: "submitted",
+      render_started_at: new Date().toISOString(),
+    };
     const { data: asset, error: insErr } = await supabase
-      .from("content_assets").insert(insertRow).select("*").single();
+      .from("content_assets")
+      .insert(insertRow)
+      .select("*")
+      .single();
     if (insErr) throw insErr;
     await attachPersonaAndPack(supabase, asset.id, data.personaId, data.packId);
 
@@ -276,16 +322,26 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
         audioUrl: signed.signedUrl,
         title,
       });
-      await supabase.from("content_assets")
+      await supabase
+        .from("content_assets")
         .update({ provider_job_id: videoId, provider_status: "processing" })
         .eq("id", asset.id);
-      await logAudit(userId, "ai.talking_head_submitted", { type: "asset", id: asset.id }, {
-        chars: script.length, seconds, provider: "heygen", video_id: videoId,
-      });
+      await logAudit(
+        userId,
+        "ai.talking_head_submitted",
+        { type: "asset", id: asset.id },
+        {
+          chars: script.length,
+          seconds,
+          provider: "heygen",
+          video_id: videoId,
+        },
+      );
       return { asset: { ...asset, provider_job_id: videoId }, status: "rendering" as const };
     } catch (e: any) {
       const msg = e?.message ?? "HeyGen submit failed";
-      await supabase.from("content_assets")
+      await supabase
+        .from("content_assets")
         .update({
           approval_status: "rejected",
           category: "ai_talking_head_failed",
@@ -294,7 +350,10 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
         })
         .eq("id", asset.id);
       // Best-effort cleanup of the orphan TTS
-      await supabaseAdmin.storage.from("content-assets").remove([ttsPath]).catch(() => {});
+      await supabaseAdmin.storage
+        .from("content-assets")
+        .remove([ttsPath])
+        .catch(() => {});
       throw new Error(msg);
     }
   });
@@ -311,7 +370,9 @@ export const listTalkingHeadJobs = createServerFn({ method: "GET" })
     const creator = await requireCreator(supabase, userId);
     const { data, error } = await supabase
       .from("content_assets")
-      .select("id, title, created_at, approval_status, category, storage_path, provider, provider_status, provider_error, provider_job_id, render_started_at, render_completed_at")
+      .select(
+        "id, title, created_at, approval_status, category, storage_path, provider, provider_status, provider_error, provider_job_id, render_started_at, render_completed_at",
+      )
       .eq("creator_id", creator.id)
       .eq("asset_type", "video")
       .eq("is_synthetic", true)
@@ -324,7 +385,8 @@ export const listTalkingHeadJobs = createServerFn({ method: "GET" })
     const jobs = (data ?? []).map((r: any) => {
       let status: Status = "queued";
       if (r.approval_status === "approved") status = "approved";
-      else if (r.approval_status === "rejected" || r.approval_status === "blocked") status = "failed";
+      else if (r.approval_status === "rejected" || r.approval_status === "blocked")
+        status = "failed";
       else if (r.storage_path && r.approval_status === "pending") status = "completed";
       else if (r.category === "ai_talking_head_rendering") status = "rendering";
       else if (r.category === "ai_talking_head_failed") status = "failed";
@@ -346,6 +408,22 @@ export const listTalkingHeadJobs = createServerFn({ method: "GET" })
   });
 
 /**
+ * List avatars available on the connected HeyGen account, so creators pick
+ * a real avatar_id from a preview grid instead of pasting a raw ID they
+ * copied from the HeyGen dashboard (typo-prone, and no visual confirmation
+ * they picked the right one).
+ */
+export const listHeygenAvatarOptions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    await requireCreator(supabase, userId);
+    const { listHeygenAvatars } = await import("./heygen.server");
+    const avatars = await listHeygenAvatars();
+    return { avatars };
+  });
+
+/**
  * List personas + packs for the AI generate picker.
  */
 export const listGenerateTargets = createServerFn({ method: "GET" })
@@ -354,12 +432,16 @@ export const listGenerateTargets = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const creator = await requireCreator(supabase, userId);
     const [{ data: personas }, { data: packs }] = await Promise.all([
-      supabase.from("personas")
+      supabase
+        .from("personas")
         .select("id, slug, display_name, kind, sort_order")
-        .eq("creator_id", creator.id).order("sort_order"),
-      supabase.from("content_packs")
+        .eq("creator_id", creator.id)
+        .order("sort_order"),
+      supabase
+        .from("content_packs")
         .select("id, name, pack_type, status")
-        .eq("creator_id", creator.id).order("sort_order"),
+        .eq("creator_id", creator.id)
+        .order("sort_order"),
     ]);
     return { creator, personas: personas ?? [], packs: packs ?? [] };
   });
