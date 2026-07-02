@@ -70,3 +70,42 @@ export const adminRecentAudit = createServerFn({ method: "GET" })
     if (error) throw error;
     return { events: data ?? [] };
   });
+
+// Synthetic content review queue for admins.
+export const adminListPendingAssets = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("content_assets")
+      .select("id, title, asset_type, is_synthetic, ai_generated_label, approval_status, created_at, creator_id")
+      .in("approval_status", ["pending_review"])
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    const creatorIds = Array.from(new Set((data ?? []).map((a: any) => a.creator_id)));
+    const { data: creators } = creatorIds.length
+      ? await supabaseAdmin.from("creators").select("id, handle, stage_name").in("id", creatorIds)
+      : { data: [] as any[] };
+    const byId = new Map((creators ?? []).map((c: any) => [c.id, c]));
+    return {
+      assets: (data ?? []).map((a: any) => ({ ...a, creator: byId.get(a.creator_id) ?? null })),
+    };
+  });
+
+export const adminSetAssetApproval = createServerFn({ method: "POST" })
+  .validator((d: { assetId: string; status: "approved" | "rejected" | "pending_review" | "draft" }) => d)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { logAudit } = await import("@/lib/audit.server");
+    const { error } = await supabaseAdmin
+      .from("content_assets")
+      .update({ approval_status: data.status })
+      .eq("id", data.assetId);
+    if (error) throw error;
+    await logAudit(context.userId, "admin.asset_approval_set", { type: "asset", id: data.assetId }, { status: data.status });
+    return { ok: true };
+  });

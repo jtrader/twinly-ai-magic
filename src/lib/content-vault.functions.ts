@@ -161,6 +161,27 @@ export const deleteAsset = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Creator submits a synthetic asset for admin review (or withdraws).
+export const submitAssetForReview = createServerFn({ method: "POST" })
+  .validator((d: { assetId: string; withdraw?: boolean }) => d)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const next = data.withdraw ? "draft" : "pending_review";
+    const { error } = await supabase
+      .from("content_assets")
+      .update({ approval_status: next })
+      .eq("id", data.assetId);
+    if (error) throw error;
+    await logAudit(
+      userId,
+      data.withdraw ? "asset.review_withdrawn" : "asset.review_submitted",
+      { type: "asset", id: data.assetId },
+      { approval_status: next },
+    );
+    return { ok: true, approval_status: next };
+  });
+
 export const setAssetPersonaPermission = createServerFn({ method: "POST" })
   .validator((d: { assetId: string; personaId: string; permissionType: PermissionType }) => d)
   .middleware([requireSupabaseAuth])
