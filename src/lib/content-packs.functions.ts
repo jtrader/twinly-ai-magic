@@ -23,6 +23,14 @@ function slugify(name: string) {
     .slice(0, 60) || "pack";
 }
 
+function normalizeTags(tags?: string[] | null): string[] {
+  if (!tags?.length) return [];
+  const cleaned = tags
+    .map((t) => `${t ?? ""}`.trim().toLowerCase().replace(/\s+/g, "-").slice(0, 32))
+    .filter((t) => t.length > 0 && /^[a-z0-9][a-z0-9-]*$/.test(t));
+  return Array.from(new Set(cleaned)).slice(0, 20);
+}
+
 export const listPacks = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
