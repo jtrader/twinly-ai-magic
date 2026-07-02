@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
-import { Wand2, ImageIcon, Mic, Video, Save, Loader2 } from "lucide-react";
+import { Wand2, ImageIcon, Mic, Video, Save, Loader2, RefreshCw, X, AlertTriangle } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,105 @@ const VOICES = [
   { id: "ash", label: "Ash — deep" },
   { id: "sage", label: "Sage — smooth" },
 ];
+const VOICE_IDS = new Set(VOICES.map((v) => v.id));
+
+/* ----------------- Shared error model ----------------- */
+
+type GenError = {
+  code: "validation" | "moderation" | "rate_limit" | "credits" | "network" | "stream_incomplete" | "server";
+  title: string;
+  detail: string;
+  retryable: boolean;
+};
+
+function classifyError(e: unknown, kind: "image" | "voice" | "video"): GenError {
+  const raw = e instanceof Error ? e : new Error(typeof e === "string" ? e : "Unknown error");
+  const msg = raw.message ?? "";
+  const lower = msg.toLowerCase();
+
+  // Explicit tagged errors we throw ourselves
+  if ((raw as any).__code) {
+    const code = (raw as any).__code as GenError["code"];
+    return buildFromCode(code, msg, kind);
+  }
+
+  // HTTP-style prefixes we throw from fetch paths: "HTTP 429: ..." or "Generation failed: 402 ..."
+  const statusMatch = msg.match(/\b(4\d{2}|5\d{2})\b/);
+  const status = statusMatch ? Number(statusMatch[1]) : null;
+
+  if (lower.includes("content_policy") || lower.includes("moderation") || lower.includes("safety")) {
+    return {
+      code: "moderation",
+      title: "Prompt blocked by safety filters",
+      detail: "Rephrase the prompt without named public figures, copyrighted characters, or explicit terms and try again.",
+      retryable: false,
+    };
+  }
+  if (status === 429 || lower.includes("rate limit")) {
+    return { code: "rate_limit", title: "Too many requests", detail: "You're going faster than the model can keep up. Wait a few seconds and retry.", retryable: true };
+  }
+  if (status === 402 || lower.includes("credit") || lower.includes("quota") || lower.includes("insufficient")) {
+    return { code: "credits", title: "Out of AI credits", detail: "Your workspace has run out of AI credits. Top up from workspace billing, then retry.", retryable: false };
+  }
+  if (lower.includes("networkerror") || lower.includes("failed to fetch") || lower.includes("aborterror") || lower.includes("network")) {
+    return { code: "network", title: "Network issue", detail: "The request didn't reach the server. Check your connection and retry.", retryable: true };
+  }
+  if (lower.includes("stream ended")) {
+    return { code: "stream_incomplete", title: "Stream ended early", detail: "The image finished streaming without a completed frame. This is usually transient — retry.", retryable: true };
+  }
+  if (status && status >= 500) {
+    return { code: "server", title: "Server error", detail: `Upstream returned ${status}. Try again in a moment.`, retryable: true };
+  }
+  return { code: "server", title: labelFor(kind) + " failed", detail: msg || "Something went wrong. Retry, or adjust the prompt.", retryable: true };
+}
+
+function buildFromCode(code: GenError["code"], msg: string, kind: "image" | "voice" | "video"): GenError {
+  if (code === "validation") return { code, title: "Fix these details", detail: msg, retryable: false };
+  return classifyError(new Error(msg), kind);
+}
+
+function labelFor(kind: "image" | "voice" | "video") {
+  return kind === "image" ? "Image generation" : kind === "voice" ? "Voice generation" : "Talking-head queue";
+}
+
+function ErrorCard({ error, onRetry, onDismiss }: { error: GenError; onRetry?: () => void; onDismiss: () => void }) {
+  return (
+    <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-200">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-rose-100">{error.title}</div>
+          <div className="mt-0.5 text-rose-200/90">{error.detail}</div>
+          <div className="mt-2 flex gap-2">
+            {error.retryable && onRetry && (
+              <Button size="sm" variant="outline" onClick={onRetry} className="h-7 border-rose-300/40 bg-rose-400/10 text-rose-100 hover:bg-rose-400/20">
+                <RefreshCw className="mr-1 size-3.5" /> Retry
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={onDismiss} className="h-7 text-rose-200 hover:bg-rose-400/10">
+              <X className="mr-1 size-3.5" /> Dismiss
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FieldError({ msg }: { msg: string | null }) {
+  if (!msg) return null;
+  return <div className="mt-1 text-[11px] text-rose-300">{msg}</div>;
+}
+
+function validationError(msg: string): Error {
+  const e = new Error(msg);
+  (e as any).__code = "validation";
+  return e;
+}
+
+function useLastAttempt<T>() {
+  return useRef<T | null>(null);
+}
 
 function GeneratePage() {
   const { user, loading } = useSession();
@@ -173,12 +272,20 @@ function ImageTab({ personaId, packId }: { personaId: string; packId: string }) 
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [b64, setB64] = useState<string | null>(null);
   const [isFinal, setIsFinal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<GenError | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const lastAttempt = useLastAttempt<{ prompt: string }>();
 
-  async function generate() {
-    const p = prompt.trim();
-    if (p.length < 3) { toast.error("Add a longer prompt."); return; }
+  const promptTrim = prompt.trim();
+  const promptError =
+    prompt.length === 0 ? null
+    : promptTrim.length < 8 ? "Prompts need at least 8 characters so the model has something to work with."
+    : prompt.length > 2000 ? `Prompt is ${prompt.length}/2000 — shorten it.`
+    : null;
+  const titleError = title.length > 120 ? `Title is ${title.length}/120.` : null;
+  const canGenerate = !busy && !saving && promptTrim.length >= 8 && !promptError && !titleError;
+
+  async function runGenerate(p: string) {
     setBusy(true); setError(null); setDataUrl(null); setB64(null); setIsFinal(false);
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -190,7 +297,7 @@ function ImageTab({ personaId, packId }: { personaId: string; packId: string }) 
       });
       if (!res.ok || !res.body) throw new Error(`Generation failed: ${res.status} ${(await res.text().catch(() => "")).slice(0, 200)}`);
       await parseImageSSE(res.body, (frame, final, err) => {
-        if (err) { setError(err); return; }
+        if (err) { setError(classifyError(new Error(err), "image")); return; }
         flushSync(() => {
           if (frame) {
             setDataUrl(`data:image/png;base64,${frame}`);
@@ -200,11 +307,22 @@ function ImageTab({ personaId, packId }: { personaId: string; packId: string }) 
         });
       });
     } catch (e: any) {
-      if (e?.name !== "AbortError") setError(e.message ?? "Generation failed");
+      if (e?.name !== "AbortError") setError(classifyError(e, "image"));
     } finally {
       setBusy(false);
       abortRef.current = null;
     }
+  }
+
+  async function generate() {
+    if (promptError) { setError(classifyError(validationError(promptError), "image")); return; }
+    if (promptTrim.length < 8) { setError(classifyError(validationError("Prompts need at least 8 characters."), "image")); return; }
+    lastAttempt.current = { prompt: promptTrim };
+    await runGenerate(promptTrim);
+  }
+  async function retry() {
+    if (!lastAttempt.current) return;
+    await runGenerate(lastAttempt.current.prompt);
   }
 
   async function onSave() {
@@ -231,22 +349,24 @@ function ImageTab({ personaId, packId }: { personaId: string; packId: string }) 
         <Textarea className="mt-1.5" rows={3} maxLength={2000} value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="A cinematic close-up portrait, warm rim light, film grain…" />
+        <FieldError msg={promptError} />
       </div>
       <div>
         <Label>Title (optional)</Label>
         <Input className="mt-1.5" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
+        <FieldError msg={titleError} />
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={generate} disabled={busy || saving}>
+        <Button onClick={generate} disabled={!canGenerate} title={!canGenerate ? (promptError ?? titleError ?? "Add a prompt to generate.") : undefined}>
           {busy ? <><Loader2 className="mr-1 size-4 animate-spin" /> Generating…</> : <>Generate</>}
         </Button>
-        {dataUrl && b64 && (
+        {dataUrl && b64 && !error && (
           <Button variant="outline" onClick={onSave} disabled={saving || busy || !isFinal}>
             {saving ? <><Loader2 className="mr-1 size-4 animate-spin" /> Saving…</> : <><Save className="mr-1 size-4" /> Save to vault</>}
           </Button>
         )}
       </div>
-      {error && <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-300">{error}</div>}
+      {error && <ErrorCard error={error} onRetry={lastAttempt.current ? retry : undefined} onDismiss={() => setError(null)} />}
       {dataUrl && (
         <div className="overflow-hidden rounded-2xl border border-border bg-surface-elevated">
           <img
@@ -324,23 +444,42 @@ function VoiceTab({ personaId, packId }: { personaId: string; packId: string }) 
   const [voice, setVoice] = useState("alloy");
   const [busy, setBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [error, setError] = useState<GenError | null>(null);
+  const lastAttempt = useLastAttempt<{ script: string; title: string; voice: string }>();
 
-  async function generate() {
-    const t = script.trim();
-    if (t.length < 2) { toast.error("Say something first."); return; }
-    setBusy(true); setPreviewUrl(null);
+  const scriptTrim = script.trim();
+  const scriptError =
+    script.length === 0 ? null
+    : scriptTrim.length < 4 ? "Add a sentence or two — 4+ characters."
+    : script.length > 4000 ? `Script is ${script.length}/4000 — shorten it.`
+    : null;
+  const titleError = title.length > 120 ? `Title is ${title.length}/120.` : null;
+  const voiceError = VOICE_IDS.has(voice) ? null : "Pick a voice from the list.";
+  const canGenerate = !busy && scriptTrim.length >= 4 && !scriptError && !titleError && !voiceError;
+
+  async function runGenerate(payload: { script: string; title: string; voice: string }) {
+    setBusy(true); setError(null); setPreviewUrl(null);
     try {
       const res = await gen({ data: {
-        prompt: t, title, voice,
+        prompt: payload.script, title: payload.title, voice: payload.voice,
         personaId: personaId || undefined,
         packId: packId || undefined,
       }});
       setPreviewUrl(res.previewUrl ?? null);
       toast.success("Voice note saved — pending your approval.");
     } catch (e: any) {
-      toast.error(e.message ?? "Voice generation failed");
+      setError(classifyError(e, "voice"));
     } finally { setBusy(false); }
   }
+
+  async function generate() {
+    const firstError = scriptError ?? voiceError ?? titleError;
+    if (firstError) { setError(classifyError(validationError(firstError), "voice")); return; }
+    const payload = { script: scriptTrim, title, voice };
+    lastAttempt.current = payload;
+    await runGenerate(payload);
+  }
+  async function retry() { if (lastAttempt.current) await runGenerate(lastAttempt.current); }
 
   return (
     <div className="space-y-4">
@@ -349,7 +488,8 @@ function VoiceTab({ personaId, packId }: { personaId: string; packId: string }) 
         <Textarea className="mt-1.5" rows={4} maxLength={4000} value={script}
           onChange={(e) => setScript(e.target.value)}
           placeholder="Hey — thanks for subscribing. I recorded this quick voice note just for you…" />
-        <div className="mt-1 text-[11px] text-muted-foreground">{script.length}/4000 characters</div>
+        <div className={"mt-1 text-[11px] " + (script.length > 4000 ? "text-rose-300" : "text-muted-foreground")}>{script.length}/4000 characters</div>
+        <FieldError msg={scriptError} />
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <div>
@@ -360,15 +500,20 @@ function VoiceTab({ personaId, packId }: { personaId: string; packId: string }) 
               {VOICES.map((v) => <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>)}
             </SelectContent>
           </Select>
+          <FieldError msg={voiceError} />
         </div>
         <div>
           <Label>Title (optional)</Label>
           <Input className="mt-1.5" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
+          <FieldError msg={titleError} />
         </div>
       </div>
-      <Button onClick={generate} disabled={busy}>
-        {busy ? <><Loader2 className="mr-1 size-4 animate-spin" /> Generating…</> : <>Generate voice note</>}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={generate} disabled={!canGenerate} title={!canGenerate ? (scriptError ?? voiceError ?? titleError ?? "Add a script to generate.") : undefined}>
+          {busy ? <><Loader2 className="mr-1 size-4 animate-spin" /> Generating…</> : <>Generate voice note</>}
+        </Button>
+      </div>
+      {error && <ErrorCard error={error} onRetry={lastAttempt.current ? retry : undefined} onDismiss={() => setError(null)} />}
       {previewUrl && (
         <div className="rounded-2xl border border-border bg-surface-elevated p-3">
           <div className="mb-2 flex items-center gap-2">
@@ -390,24 +535,45 @@ function VideoTab({ personaId, packId }: { personaId: string; packId: string }) 
   const [title, setTitle] = useState("");
   const [seconds, setSeconds] = useState<string>("15");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<GenError | null>(null);
+  const lastAttempt = useLastAttempt<{ script: string; title: string; seconds: number }>();
 
-  async function submit() {
-    const t = script.trim();
-    if (t.length < 4) { toast.error("Add a short script."); return; }
-    setBusy(true);
+  const scriptTrim = script.trim();
+  const secondsNum = Number(seconds) || 0;
+  const scriptError =
+    script.length === 0 ? null
+    : scriptTrim.length < 10 ? "Talking-head scripts need at least 10 characters."
+    : script.length > 1000 ? `Script is ${script.length}/1000 — shorten it.`
+    : null;
+  const titleError = title.length > 120 ? `Title is ${title.length}/120.` : null;
+  const durationError = secondsNum < 5 || secondsNum > 60 ? "Pick a duration between 5 and 60 seconds." : null;
+  const canSubmit = !busy && scriptTrim.length >= 10 && !scriptError && !titleError && !durationError;
+
+  async function runSubmit(payload: { script: string; title: string; seconds: number }) {
+    setBusy(true); setError(null);
     try {
       await queue({ data: {
-        script: t, title,
-        durationSeconds: Number(seconds) || 15,
+        script: payload.script, title: payload.title,
+        durationSeconds: payload.seconds,
         personaId: personaId || undefined,
         packId: packId || undefined,
       }});
       toast.success("Talking-head clip queued. You'll be notified when the render is ready.");
       setScript(""); setTitle("");
+      lastAttempt.current = null;
     } catch (e: any) {
-      toast.error(e.message ?? "Could not queue clip");
+      setError(classifyError(e, "video"));
     } finally { setBusy(false); }
   }
+
+  async function submit() {
+    const firstError = scriptError ?? durationError ?? titleError;
+    if (firstError) { setError(classifyError(validationError(firstError), "video")); return; }
+    const payload = { script: scriptTrim, title, seconds: secondsNum };
+    lastAttempt.current = payload;
+    await runSubmit(payload);
+  }
+  async function retry() { if (lastAttempt.current) await runSubmit(lastAttempt.current); }
 
   return (
     <div className="space-y-4">
@@ -421,7 +587,8 @@ function VideoTab({ personaId, packId }: { personaId: string; packId: string }) 
         <Textarea className="mt-1.5" rows={4} maxLength={1000} value={script}
           onChange={(e) => setScript(e.target.value)}
           placeholder="Hi babe, welcome to my world. I've got something special for you tonight…" />
-        <div className="mt-1 text-[11px] text-muted-foreground">{script.length}/1000 characters</div>
+        <div className={"mt-1 text-[11px] " + (script.length > 1000 ? "text-rose-300" : "text-muted-foreground")}>{script.length}/1000 characters</div>
+        <FieldError msg={scriptError} />
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <div>
@@ -436,15 +603,18 @@ function VideoTab({ personaId, packId }: { personaId: string; packId: string }) 
               <SelectItem value="60">60 seconds</SelectItem>
             </SelectContent>
           </Select>
+          <FieldError msg={durationError} />
         </div>
         <div>
           <Label>Title (optional)</Label>
           <Input className="mt-1.5" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
+          <FieldError msg={titleError} />
         </div>
       </div>
-      <Button onClick={submit} disabled={busy}>
+      <Button onClick={submit} disabled={!canSubmit} title={!canSubmit ? (scriptError ?? durationError ?? titleError ?? "Add a script to queue.") : undefined}>
         {busy ? <><Loader2 className="mr-1 size-4 animate-spin" /> Queuing…</> : <>Queue talking-head clip</>}
       </Button>
+      {error && <ErrorCard error={error} onRetry={lastAttempt.current ? retry : undefined} onDismiss={() => setError(null)} />}
     </div>
   );
 }
