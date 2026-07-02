@@ -285,7 +285,9 @@ export const listAssetAudit = createServerFn({ method: "POST" })
     if (aerr) throw aerr;
     if (!asset) throw new Error("Asset not found.");
 
-    const { data: entries, error } = await supabase
+    // audit_logs is admin-RLS; ownership was just verified via user-scoped read.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: entries, error } = await supabaseAdmin
       .from("audit_logs")
       .select("id, action, metadata, created_at, actor_user_id")
       .eq("subject_type", "asset")
