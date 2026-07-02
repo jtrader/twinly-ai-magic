@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
@@ -20,6 +21,11 @@ import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclos
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DiscoverRoute = DiscoverRouteImport.update({
   id: '/discover',
   path: '/discover',
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRoute
   '/auth': typeof AuthRoute
   '/discover': typeof DiscoverRoute
+  '/onboarding': typeof OnboardingRoute
   '/creators/$handle': typeof CreatorsHandleRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/app': typeof AppRoute
   '/auth': typeof AuthRoute
   '/discover': typeof DiscoverRoute
+  '/onboarding': typeof OnboardingRoute
   '/creators/$handle': typeof CreatorsHandleRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/app': typeof AppRoute
   '/auth': typeof AuthRoute
   '/discover': typeof DiscoverRoute
+  '/onboarding': typeof OnboardingRoute
   '/creators/$handle': typeof CreatorsHandleRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/discover'
+    | '/onboarding'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/discover'
+    | '/onboarding'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/auth'
     | '/discover'
+    | '/onboarding'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRoute
   AuthRoute: typeof AuthRoute
   DiscoverRoute: typeof DiscoverRoute
+  OnboardingRoute: typeof OnboardingRoute
   CreatorsHandleRoute: typeof CreatorsHandleRoute
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
@@ -162,6 +175,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/discover': {
       id: '/discover'
       path: '/discover'
@@ -241,6 +261,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRoute,
   AuthRoute: AuthRoute,
   DiscoverRoute: DiscoverRoute,
+  OnboardingRoute: OnboardingRoute,
   CreatorsHandleRoute: CreatorsHandleRoute,
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
