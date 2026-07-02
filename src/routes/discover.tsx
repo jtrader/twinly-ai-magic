@@ -35,7 +35,7 @@ function Discover() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {creators.map((c) => (
+          {creators.map((c: any) => (
             <Link key={c.id} to="/creators/$handle" params={{ handle: c.handle }}
               className="group rounded-2xl border border-border bg-surface p-5 transition hover:border-brand/40 hover:bg-surface-elevated">
               <div className="flex items-center justify-between">
