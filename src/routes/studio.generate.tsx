@@ -649,7 +649,7 @@ function VideoTab({ personaId, packId }: { personaId: string; packId: string }) 
   );
 }
 
-function TalkingHeadJobs({ jobs, isLive, loading }: { jobs: Array<{ id: string; title: string; created_at: string; status: "queued" | "rendering" | "completed" | "approved" | "failed" }>; isLive: boolean; loading: boolean }) {
+function TalkingHeadJobs({ jobs, isLive, loading }: { jobs: Array<{ id: string; title: string; created_at: string; status: "queued" | "rendering" | "completed" | "approved" | "failed"; provider?: string | null; provider_status?: string | null; provider_error?: string | null; render_started_at?: string | null }>; isLive: boolean; loading: boolean }) {
   return (
     <section className="rounded-2xl border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
@@ -682,7 +682,15 @@ function TalkingHeadJobs({ jobs, isLive, loading }: { jobs: Array<{ id: string; 
           <div key={j.id} className="flex items-center justify-between gap-3 py-2.5">
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm text-foreground">{j.title}</div>
-              <time dateTime={j.created_at} className="text-[11px] text-muted-foreground">{relTime(j.created_at)}</time>
+              <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                <time dateTime={j.created_at}>{relTime(j.created_at)}</time>
+                {j.status === "rendering" && j.render_started_at && (
+                  <span>· rendering on {j.provider ?? "provider"} · {relTime(j.render_started_at)}</span>
+                )}
+                {j.status === "failed" && j.provider_error && (
+                  <span className="text-rose-300">· {j.provider_error}</span>
+                )}
+              </div>
             </div>
             <JobStatusPill status={j.status} />
             {(j.status === "completed" || j.status === "approved") && (
