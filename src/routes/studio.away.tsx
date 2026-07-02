@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useSession } from "@/lib/session";
 import { getAwaySettings, updateAwaySettings, type AwaySettings } from "@/lib/away.functions";
 import { toast } from "sonner";
@@ -169,5 +168,3 @@ function AwayMessageEditor({ initial, onSave, disabled }: { initial: string; onS
     </div>
   );
 }
-
-export { Input };

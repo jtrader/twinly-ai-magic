@@ -27,6 +27,7 @@ import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
 import { Route as StudioGenerateRouteImport } from './routes/studio.generate'
 import { Route as StudioCreateRouteImport } from './routes/studio.create'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
+import { Route as StudioAwayRouteImport } from './routes/studio.away'
 import { Route as StudioAnalyticsRouteImport } from './routes/studio.analytics'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
@@ -129,6 +130,11 @@ const StudioContentRoute = StudioContentRouteImport.update({
   path: '/studio/content',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioAwayRoute = StudioAwayRouteImport.update({
+  id: '/studio/away',
+  path: '/studio/away',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioAnalyticsRoute = StudioAnalyticsRouteImport.update({
   id: '/studio/analytics',
   path: '/studio/analytics',
@@ -201,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
+  '/studio/away': typeof StudioAwayRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/generate': typeof StudioGenerateRoute
@@ -232,6 +239,7 @@ export interface FileRoutesByTo {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
+  '/studio/away': typeof StudioAwayRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/generate': typeof StudioGenerateRoute
@@ -264,6 +272,7 @@ export interface FileRoutesById {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
+  '/studio/away': typeof StudioAwayRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/generate': typeof StudioGenerateRoute
@@ -297,6 +306,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/analytics'
+    | '/studio/away'
     | '/studio/content'
     | '/studio/create'
     | '/studio/generate'
@@ -328,6 +338,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/analytics'
+    | '/studio/away'
     | '/studio/content'
     | '/studio/create'
     | '/studio/generate'
@@ -359,6 +370,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/analytics'
+    | '/studio/away'
     | '/studio/content'
     | '/studio/create'
     | '/studio/generate'
@@ -391,6 +403,7 @@ export interface RootRouteChildren {
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
   StudioAnalyticsRoute: typeof StudioAnalyticsRoute
+  StudioAwayRoute: typeof StudioAwayRoute
   StudioContentRoute: typeof StudioContentRoute
   StudioCreateRoute: typeof StudioCreateRoute
   StudioGenerateRoute: typeof StudioGenerateRoute
@@ -533,6 +546,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioContentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/away': {
+      id: '/studio/away'
+      path: '/studio/away'
+      fullPath: '/studio/away'
+      preLoaderRoute: typeof StudioAwayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/analytics': {
       id: '/studio/analytics'
       path: '/studio/analytics'
@@ -653,6 +673,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
   StudioAnalyticsRoute: StudioAnalyticsRoute,
+  StudioAwayRoute: StudioAwayRoute,
   StudioContentRoute: StudioContentRoute,
   StudioCreateRoute: StudioCreateRoute,
   StudioGenerateRoute: StudioGenerateRoute,
