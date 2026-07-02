@@ -33,6 +33,7 @@ import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclos
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$packId'
+import { Route as CreatorsHandlePersonaRouteImport } from './routes/creators.$handle.$persona'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 import { Route as ApiPublicHooksHeygenRouteImport } from './routes/api/public/hooks/heygen'
 
@@ -156,6 +157,11 @@ const StudioPacksPackIdRoute = StudioPacksPackIdRouteImport.update({
   path: '/$packId',
   getParentRoute: () => StudioPacksRoute,
 } as any)
+const CreatorsHandlePersonaRoute = CreatorsHandlePersonaRouteImport.update({
+  id: '/$persona',
+  path: '/$persona',
+  getParentRoute: () => CreatorsHandleRoute,
+} as any)
 const ChatHandlePersonaRoute = ChatHandlePersonaRouteImport.update({
   id: '/chat/$handle/$persona',
   path: '/chat/$handle/$persona',
@@ -178,7 +184,7 @@ export interface FileRoutesByFullPath {
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
-  '/creators/$handle': typeof CreatorsHandleRoute
+  '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
@@ -192,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/studio/twin': typeof StudioTwinRoute
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
+  '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
 }
@@ -206,7 +213,7 @@ export interface FileRoutesByTo {
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
-  '/creators/$handle': typeof CreatorsHandleRoute
+  '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
@@ -220,6 +227,7 @@ export interface FileRoutesByTo {
   '/studio/twin': typeof StudioTwinRoute
   '/studio': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
+  '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
 }
@@ -235,7 +243,7 @@ export interface FileRoutesById {
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
-  '/creators/$handle': typeof CreatorsHandleRoute
+  '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
@@ -249,6 +257,7 @@ export interface FileRoutesById {
   '/studio/twin': typeof StudioTwinRoute
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
+  '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
 }
@@ -279,6 +288,7 @@ export interface FileRouteTypes {
     | '/studio/twin'
     | '/studio/'
     | '/chat/$handle/$persona'
+    | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
     | '/api/public/hooks/heygen'
   fileRoutesByTo: FileRoutesByTo
@@ -307,6 +317,7 @@ export interface FileRouteTypes {
     | '/studio/twin'
     | '/studio'
     | '/chat/$handle/$persona'
+    | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
     | '/api/public/hooks/heygen'
   id:
@@ -335,6 +346,7 @@ export interface FileRouteTypes {
     | '/studio/twin'
     | '/studio/'
     | '/chat/$handle/$persona'
+    | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
     | '/api/public/hooks/heygen'
   fileRoutesById: FileRoutesById
@@ -350,7 +362,7 @@ export interface RootRouteChildren {
   FanRoute: typeof FanRoute
   OnboardingRoute: typeof OnboardingRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
-  CreatorsHandleRoute: typeof CreatorsHandleRoute
+  CreatorsHandleRoute: typeof CreatorsHandleRouteWithChildren
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
@@ -537,6 +549,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioPacksPackIdRouteImport
       parentRoute: typeof StudioPacksRoute
     }
+    '/creators/$handle/$persona': {
+      id: '/creators/$handle/$persona'
+      path: '/$persona'
+      fullPath: '/creators/$handle/$persona'
+      preLoaderRoute: typeof CreatorsHandlePersonaRouteImport
+      parentRoute: typeof CreatorsHandleRoute
+    }
     '/chat/$handle/$persona': {
       id: '/chat/$handle/$persona'
       path: '/chat/$handle/$persona'
@@ -553,6 +572,18 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface CreatorsHandleRouteChildren {
+  CreatorsHandlePersonaRoute: typeof CreatorsHandlePersonaRoute
+}
+
+const CreatorsHandleRouteChildren: CreatorsHandleRouteChildren = {
+  CreatorsHandlePersonaRoute: CreatorsHandlePersonaRoute,
+}
+
+const CreatorsHandleRouteWithChildren = CreatorsHandleRoute._addFileChildren(
+  CreatorsHandleRouteChildren,
+)
 
 interface StudioPacksRouteChildren {
   StudioPacksPackIdRoute: typeof StudioPacksPackIdRoute
@@ -577,7 +608,7 @@ const rootRouteChildren: RootRouteChildren = {
   FanRoute: FanRoute,
   OnboardingRoute: OnboardingRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
-  CreatorsHandleRoute: CreatorsHandleRoute,
+  CreatorsHandleRoute: CreatorsHandleRouteWithChildren,
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
