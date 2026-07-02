@@ -4,14 +4,17 @@ import { logAudit } from "./audit.server";
 
 async function requireCreator(supabase: any, userId: string) {
   const { data, error } = await supabase
-    .from("creators").select("id").eq("user_id", userId).maybeSingle();
+    .from("creators")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("Complete your creator profile first.");
   return data as { id: string };
 }
 
-const OUTPUT_TYPES = ["image","audio","video","talking_head","promo_banner"] as const;
-type OutputType = typeof OUTPUT_TYPES[number];
+const OUTPUT_TYPES = ["image", "audio", "video", "talking_head", "promo_banner"] as const;
+type OutputType = (typeof OUTPUT_TYPES)[number];
 
 // Which consent flag each output type requires. Enforced server-side so
 // synthetic generation can never be requested for a modality the creator
@@ -48,7 +51,9 @@ export async function assertTwinPolicy(
     .single();
   if (cErr) throw cErr;
   if (creator.digital_twin_status !== "ready") {
-    throw new Error("Your Digital Twin Profile must be marked ready before generating synthetic content.");
+    throw new Error(
+      "Your Digital Twin Profile must be marked ready before generating synthetic content.",
+    );
   }
 
   const { data: consent, error: kErr } = await supabase
@@ -65,7 +70,7 @@ export async function assertTwinPolicy(
   }
   const field = CONSENT_FIELD[outputType];
   if (!consent[field]) {
-    throw new Error(`Consent for ${outputType.replace("_"," ")} generation has not been granted.`);
+    throw new Error(`Consent for ${outputType.replace("_", " ")} generation has not been granted.`);
   }
 
   // Forbidden-use guard: if the creator listed the output modality in
@@ -73,7 +78,7 @@ export async function assertTwinPolicy(
   const forbidden: string[] = Array.isArray(consent.forbidden_uses)
     ? consent.forbidden_uses.map((v: any) => String(v).toLowerCase())
     : [];
-  if (forbidden.includes(outputType) || forbidden.includes(field.replace("_ok",""))) {
+  if (forbidden.includes(outputType) || forbidden.includes(field.replace("_ok", ""))) {
     throw new Error("This output type is on your forbidden-uses list.");
   }
 
@@ -86,7 +91,9 @@ export async function assertTwinPolicy(
   if (pErr) throw pErr;
   if (!persona) throw new Error("Persona not found in your namespace.");
   if (persona.visibility !== "published") {
-    throw new Error("Persona must be published (approved) before it can receive synthetic content.");
+    throw new Error(
+      "Persona must be published (approved) before it can receive synthetic content.",
+    );
   }
 
   if (packId) {
@@ -99,7 +106,9 @@ export async function assertTwinPolicy(
     if (kErr2) throw kErr2;
     if (!pack) throw new Error("Content pack not found in your namespace.");
     if (pack.status !== "approved") {
-      throw new Error(`Pack "${pack.name}" is ${pack.status ?? "not approved"} — only approved packs can be used for generation.`);
+      throw new Error(
+        `Pack "${pack.name}" is ${pack.status ?? "not approved"} — only approved packs can be used for generation.`,
+      );
     }
 
     // Pack must be explicitly attached to the target persona
@@ -111,16 +120,22 @@ export async function assertTwinPolicy(
       .maybeSingle();
     if (linkErr) throw linkErr;
     if (!link) {
-      throw new Error(`Pack "${pack.name}" is not attached to this persona. Attach it in the Persona editor first.`);
+      throw new Error(
+        `Pack "${pack.name}" is not attached to this persona. Attach it in the Persona editor first.`,
+      );
     }
     if (link.permission_type === "restricted") {
-      throw new Error(`Pack "${pack.name}" is set to Restricted on this persona and cannot be used as a generation source.`);
+      throw new Error(
+        `Pack "${pack.name}" is set to Restricted on this persona and cannot be used as a generation source.`,
+      );
     }
 
     // Reject if any pack asset is forbidden (rejected / flagged / blocked / restricted / do_not_use)
     const { data: packAssets, error: paErr } = await supabase
       .from("content_pack_items")
-      .select("asset_id, content_assets:asset_id(id, approval_status, moderation_status, internal_label)")
+      .select(
+        "asset_id, content_assets:asset_id(id, approval_status, moderation_status, internal_label)",
+      )
       .eq("pack_id", packId);
     if (paErr) throw paErr;
     const forbiddenAssets = (packAssets ?? []).filter((row: any) => {
@@ -132,10 +147,16 @@ export async function assertTwinPolicy(
       return false;
     });
     if (forbiddenAssets.length) {
-      throw new Error(`Pack "${pack.name}" contains ${forbiddenAssets.length} forbidden asset(s). Remove or resolve them before generating.`);
+      throw new Error(
+        `Pack "${pack.name}" contains ${forbiddenAssets.length} forbidden asset(s). Remove or resolve them before generating.`,
+      );
     }
 
-    return { consent, persona, packPermission: link.permission_type as "included" | "ppv" | "restricted" };
+    return {
+      consent,
+      persona,
+      packPermission: link.permission_type as "included" | "ppv" | "restricted",
+    };
   }
 
   return { consent, persona, packPermission: null as "included" | "ppv" | "restricted" | null };
@@ -149,7 +170,9 @@ export const listGenerationRequests = createServerFn({ method: "POST" })
     const creator = await requireCreator(supabase, userId);
     let q = supabase
       .from("generation_requests")
-      .select("id, persona_id, pack_id, output_type, style_preset, prompt_notes, quantity, status, disclosure_label, produced_asset_ids, reviewer_note, submitted_at, reviewed_at, created_at, personas:persona_id(display_name, slug), content_packs:pack_id(name, slug)")
+      .select(
+        "id, persona_id, pack_id, output_type, style_preset, prompt_notes, quantity, status, disclosure_label, produced_asset_ids, reviewer_note, submitted_at, reviewed_at, created_at, personas:persona_id(display_name, slug), content_packs:pack_id(name, slug)",
+      )
       .eq("creator_id", creator.id)
       .order("created_at", { ascending: false })
       .limit(200);
@@ -161,16 +184,18 @@ export const listGenerationRequests = createServerFn({ method: "POST" })
 
 export const createGenerationRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: {
-    personaId?: string | null;
-    packId?: string | null;
-    outputType: OutputType;
-    stylePreset?: string;
-    promptNotes: string;
-    quantity: number;
-    disclosureLabel?: string;
-    submit?: boolean;
-  }) => d)
+  .validator(
+    (d: {
+      personaId?: string | null;
+      packId?: string | null;
+      outputType: OutputType;
+      stylePreset?: string;
+      promptNotes: string;
+      quantity: number;
+      disclosureLabel?: string;
+      submit?: boolean;
+    }) => d,
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const creator = await requireCreator(supabase, userId);
@@ -182,22 +207,39 @@ export const createGenerationRequest = createServerFn({ method: "POST" })
     // Enforce twin-consent + persona-approval policy at submit time. Drafts
     // may be saved without a persona, but submitting/queueing requires it.
     if (data.submit) {
-      await assertTwinPolicy(supabase, creator.id, data.outputType, data.personaId ?? null, data.packId ?? null);
+      await assertTwinPolicy(
+        supabase,
+        creator.id,
+        data.outputType,
+        data.personaId ?? null,
+        data.packId ?? null,
+      );
     } else if (data.personaId || data.packId) {
       // Even for drafts, verify ownership so cross-creator IDs cannot be stored.
       if (data.personaId) {
-        const { data: p } = await supabase.from("personas").select("id").eq("id", data.personaId).eq("creator_id", creator.id).maybeSingle();
+        const { data: p } = await supabase
+          .from("personas")
+          .select("id")
+          .eq("id", data.personaId)
+          .eq("creator_id", creator.id)
+          .maybeSingle();
         if (!p) throw new Error("Persona not found in your namespace.");
       }
       if (data.packId) {
-        const { data: k } = await supabase.from("content_packs").select("id").eq("id", data.packId).eq("creator_id", creator.id).maybeSingle();
+        const { data: k } = await supabase
+          .from("content_packs")
+          .select("id")
+          .eq("id", data.packId)
+          .eq("creator_id", creator.id)
+          .maybeSingle();
         if (!k) throw new Error("Content pack not found in your namespace.");
       }
     }
 
     const status = data.submit ? "queued" : "draft";
     const { data: row, error } = await supabase
-      .from("generation_requests").insert({
+      .from("generation_requests")
+      .insert({
         creator_id: creator.id,
         persona_id: data.personaId || null,
         pack_id: data.packId || null,
@@ -212,13 +254,24 @@ export const createGenerationRequest = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw error;
-    await logAudit(userId, "generate.request_created", { type: "generation_request", id: row.id }, { status, outputType: data.outputType, qty });
+    await logAudit(
+      userId,
+      "generate.request_created",
+      { type: "generation_request", id: row.id },
+      { status, outputType: data.outputType, qty },
+    );
     return { request: row };
   });
 
 export const updateRequestStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { id: string; action: "submit" | "cancel" | "mark_generated" | "needs_review" | "approve" | "reject"; note?: string }) => d)
+  .validator(
+    (d: {
+      id: string;
+      action: "submit" | "cancel" | "mark_generated" | "needs_review" | "approve" | "reject";
+      note?: string;
+    }) => d,
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const creator = await requireCreator(supabase, userId);
@@ -232,30 +285,70 @@ export const updateRequestStatus = createServerFn({ method: "POST" })
       .single();
     if (exErr) throw exErr;
     if (data.action === "submit" || data.action === "approve") {
-      await assertTwinPolicy(supabase, creator.id, existing.output_type as OutputType, existing.persona_id, existing.pack_id);
+      await assertTwinPolicy(
+        supabase,
+        creator.id,
+        existing.output_type as OutputType,
+        existing.persona_id,
+        existing.pack_id,
+      );
     }
     const patch: any = {};
     switch (data.action) {
-      case "submit": patch.status = "queued"; patch.submitted_at = new Date().toISOString(); break;
-      case "cancel": patch.status = "rejected"; patch.reviewed_at = new Date().toISOString(); patch.reviewed_by = userId; patch.reviewer_note = data.note ?? "Cancelled by creator"; break;
-      case "mark_generated": patch.status = "generated"; break;
-      case "needs_review": patch.status = "needs_review"; break;
-      case "approve": patch.status = "approved"; patch.reviewed_at = new Date().toISOString(); patch.reviewed_by = userId; patch.reviewer_note = data.note ?? null; break;
-      case "reject": patch.status = "rejected"; patch.reviewed_at = new Date().toISOString(); patch.reviewed_by = userId; patch.reviewer_note = data.note ?? null; break;
-      default: throw new Error("Unknown action.");
+      case "submit":
+        patch.status = "queued";
+        patch.submitted_at = new Date().toISOString();
+        break;
+      case "cancel":
+        patch.status = "rejected";
+        patch.reviewed_at = new Date().toISOString();
+        patch.reviewed_by = userId;
+        patch.reviewer_note = data.note ?? "Cancelled by creator";
+        break;
+      case "mark_generated":
+        patch.status = "generated";
+        break;
+      case "needs_review":
+        patch.status = "needs_review";
+        break;
+      case "approve":
+        patch.status = "approved";
+        patch.reviewed_at = new Date().toISOString();
+        patch.reviewed_by = userId;
+        patch.reviewer_note = data.note ?? null;
+        break;
+      case "reject":
+        patch.status = "rejected";
+        patch.reviewed_at = new Date().toISOString();
+        patch.reviewed_by = userId;
+        patch.reviewer_note = data.note ?? null;
+        break;
+      default:
+        throw new Error("Unknown action.");
     }
     const { data: row, error } = await supabase
-      .from("generation_requests").update(patch).eq("id", data.id)
-      .select("*").single();
+      .from("generation_requests")
+      .update(patch)
+      .eq("id", data.id)
+      .select("*")
+      .single();
     if (error) throw error;
-    await logAudit(userId, `generate.${data.action}`, { type: "generation_request", id: row.id }, { note: data.note ?? null });
+    await logAudit(
+      userId,
+      `generate.${data.action}`,
+      { type: "generation_request", id: row.id },
+      { note: data.note ?? null },
+    );
     return { request: row };
   });
 
 /**
- * Creates placeholder AI-draft assets tied to an approved request and marks
- * the request "published". No real media is generated yet — the assets are
- * empty synthetic drafts awaiting future provider output.
+ * Creates the approved request's output assets and marks the request
+ * "published". Image/promo_banner requests are rendered synchronously via
+ * Venice.ai and land with real pixel data. Audio/video/talking_head
+ * requests still fall back to empty synthetic drafts pending their own
+ * provider wiring (voice notes and talking heads already have dedicated
+ * flows in ai-generate.functions.ts — this queue path is image-only for now).
  */
 export const publishRequestPlaceholders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -264,54 +357,167 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const creator = await requireCreator(supabase, userId);
     const { data: req, error: reqErr } = await supabase
-      .from("generation_requests").select("*").eq("id", data.id).eq("creator_id", creator.id).single();
+      .from("generation_requests")
+      .select("*")
+      .eq("id", data.id)
+      .eq("creator_id", creator.id)
+      .single();
     if (reqErr) throw reqErr;
     if (req.status !== "approved") throw new Error("Only approved requests can be published.");
     // Re-verify policy at publish time so a consent revocation or persona
     // unpublish between approval and publish still blocks synthetic writes.
-    const policy = await assertTwinPolicy(supabase, creator.id, req.output_type as OutputType, req.persona_id, req.pack_id);
+    const policy = await assertTwinPolicy(
+      supabase,
+      creator.id,
+      req.output_type as OutputType,
+      req.persona_id,
+      req.pack_id,
+    );
 
     const kindMap: Record<string, string> = {
-      image: "image", promo_banner: "image",
+      image: "image",
+      promo_banner: "image",
       audio: "audio",
-      video: "video", talking_head: "video",
+      video: "video",
+      talking_head: "video",
     };
-    const rows: any[] = Array.from({ length: req.quantity }, (_, i) => ({
-      creator_id: creator.id,
-      title: `AI ${req.output_type.replace("_", " ")} · draft ${i + 1}`,
-      asset_type: kindMap[req.output_type] ?? "image",
-      is_synthetic: true,
-      ai_generated_label: true,
-      ai_disclosure_required: true,
-      approval_status: "approved",
-      source_type: "ai_generated",
-      internal_label: "approved_synthetic",
-      visibility: "private",
-      category: `ai_${req.output_type}`,
-    }));
+
+    const isVeniceImage = req.output_type === "image" || req.output_type === "promo_banner";
+    let rows: any[];
+
+    if (isVeniceImage) {
+      const { generateVeniceImages } = await import("./venice.server");
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+      let generated;
+      try {
+        generated = await generateVeniceImages({
+          prompt: req.prompt_notes,
+          count: req.quantity,
+          stylePreset: req.style_preset ?? undefined,
+        });
+      } catch (e: any) {
+        const msg = e?.message ?? "Venice image generation failed";
+        await supabase
+          .from("generation_requests")
+          .update({
+            status: "failed",
+            reviewer_note: msg.slice(0, 500),
+          })
+          .eq("id", data.id);
+        await logAudit(
+          userId,
+          "generate.publish_failed",
+          { type: "generation_request", id: data.id },
+          { provider: "venice", error: msg },
+        );
+        throw new Error(msg);
+      }
+
+      const perImageCost = Math.round(generated.costCents / generated.images.length);
+      const uploaded: { path: string }[] = [];
+      for (let i = 0; i < generated.images.length; i++) {
+        const path = `${creator.id}/generated/venice-${data.id}-${i}-${Date.now()}.png`;
+        const { error: upErr } = await supabaseAdmin.storage
+          .from("content-assets")
+          .upload(path, generated.images[i].bytes, { contentType: "image/png", upsert: false });
+        if (upErr) {
+          // Best-effort cleanup of anything already uploaded this batch.
+          await supabaseAdmin.storage
+            .from("content-assets")
+            .remove(uploaded.map((u) => u.path))
+            .catch(() => {});
+          await supabase
+            .from("generation_requests")
+            .update({
+              status: "failed",
+              reviewer_note: `Storage upload failed: ${upErr.message}`.slice(0, 500),
+            })
+            .eq("id", data.id);
+          throw upErr;
+        }
+        uploaded.push({ path });
+      }
+
+      rows = uploaded.map((u, i) => ({
+        creator_id: creator.id,
+        title: `AI ${req.output_type.replace("_", " ")} · ${i + 1}`,
+        asset_type: kindMap[req.output_type] ?? "image",
+        storage_path: u.path,
+        is_synthetic: true,
+        ai_generated_label: true,
+        ai_disclosure_required: true,
+        approval_status: "approved",
+        source_type: "ai_generated",
+        internal_label: "approved_synthetic",
+        visibility: "private",
+        category: `ai_${req.output_type}`,
+        provider: "venice",
+        provider_status: "completed",
+        cost_cents: perImageCost,
+      }));
+    } else {
+      rows = Array.from({ length: req.quantity }, (_, i) => ({
+        creator_id: creator.id,
+        title: `AI ${req.output_type.replace("_", " ")} · draft ${i + 1}`,
+        asset_type: kindMap[req.output_type] ?? "image",
+        is_synthetic: true,
+        ai_generated_label: true,
+        ai_disclosure_required: true,
+        approval_status: "approved",
+        source_type: "ai_generated",
+        internal_label: "approved_synthetic",
+        visibility: "private",
+        category: `ai_${req.output_type}`,
+      }));
+    }
+
     const { data: inserted, error } = await supabase
-      .from("content_assets").insert(rows).select("id");
+      .from("content_assets")
+      .insert(rows)
+      .select("id");
     if (error) throw error;
     const ids = (inserted ?? []).map((r: any) => r.id);
 
     // link to pack if provided
     if (req.pack_id && ids.length) {
-      const items: any[] = ids.map((asset_id: string, idx: number) => ({ pack_id: req.pack_id, asset_id, position: idx }));
-      await supabase.from("content_pack_items").upsert(items, { onConflict: "pack_id,asset_id", ignoreDuplicates: true });
+      const items: any[] = ids.map((asset_id: string, idx: number) => ({
+        pack_id: req.pack_id,
+        asset_id,
+        position: idx,
+      }));
+      await supabase
+        .from("content_pack_items")
+        .upsert(items, { onConflict: "pack_id,asset_id", ignoreDuplicates: true });
     }
     // link to persona if provided
     if (req.persona_id && ids.length) {
       // Inherit the pack↔persona access level so produced synthetic assets
       // are visible to fans at exactly the same tier the source pack is.
       const inherited = policy.packPermission ?? "included";
-      const perms: any[] = ids.map((asset_id: string) => ({ persona_id: req.persona_id, asset_id, permission_type: inherited }));
-      await supabase.from("persona_content_permissions").upsert(perms, { onConflict: "persona_id,asset_id" });
+      const perms: any[] = ids.map((asset_id: string) => ({
+        persona_id: req.persona_id,
+        asset_id,
+        permission_type: inherited,
+      }));
+      await supabase
+        .from("persona_content_permissions")
+        .upsert(perms, { onConflict: "persona_id,asset_id" });
     }
 
-    await supabase.from("generation_requests").update({
-      status: "published", produced_asset_ids: ids,
-    }).eq("id", data.id);
-    await logAudit(userId, "generate.published", { type: "generation_request", id: data.id }, { count: ids.length });
+    await supabase
+      .from("generation_requests")
+      .update({
+        status: "published",
+        produced_asset_ids: ids,
+      })
+      .eq("id", data.id);
+    await logAudit(
+      userId,
+      "generate.published",
+      { type: "generation_request", id: data.id },
+      { count: ids.length },
+    );
     return { count: ids.length };
   });
 
@@ -322,8 +528,16 @@ export const listCreateTargets = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const creator = await requireCreator(supabase, userId);
     const [{ data: personas }, { data: packs }] = await Promise.all([
-      supabase.from("personas").select("id, display_name, slug, kind").eq("creator_id", creator.id).order("sort_order"),
-      supabase.from("content_packs").select("id, name, slug, pack_type, status").eq("creator_id", creator.id).order("sort_order"),
+      supabase
+        .from("personas")
+        .select("id, display_name, slug, kind")
+        .eq("creator_id", creator.id)
+        .order("sort_order"),
+      supabase
+        .from("content_packs")
+        .select("id, name, slug, pack_type, status")
+        .eq("creator_id", creator.id)
+        .order("sort_order"),
     ]);
     return { personas: personas ?? [], packs: packs ?? [] };
   });
