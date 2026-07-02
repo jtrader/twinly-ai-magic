@@ -137,6 +137,7 @@ function ContentVaultPage() {
         </div>
         <div className="flex gap-2">
           <Link to="/studio/personas"><Button variant="ghost">Personas</Button></Link>
+          <Link to="/studio/packs"><Button variant="ghost">Packs</Button></Link>
           <Button variant="ghost" onClick={() => setPreviewOpen(true)}>
             <Eye className="mr-2 h-4 w-4" />Preview
           </Button>
