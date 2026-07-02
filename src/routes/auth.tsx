@@ -3,6 +3,12 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RoleSignupForm } from "@/components/twinly/RoleSignupForm";
 
+function sanitizeRedirect(value: string | null) {
+  if (!value) return "/app";
+  if (!value.startsWith("/") || value.startsWith("//")) return "/app";
+  return value;
+}
+
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
@@ -10,8 +16,10 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const navigate = useNavigate();
   useEffect(() => {
+    const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const redirectTarget = sanitizeRedirect(params?.get("redirect") ?? null);
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/app" });
+      if (data.session) navigate({ to: redirectTarget });
     });
   }, [navigate]);
 
@@ -35,6 +43,12 @@ function AuthPage() {
         <div className="rounded-2xl border border-border bg-surface p-6">
           <h1 className="font-display text-2xl font-bold">Enter Twinly.life</h1>
           <p className="mt-1 text-sm text-muted-foreground">18+ only. Every AI persona is clearly disclosed.</p>
+          <div className="mt-4 rounded-xl border border-brand/25 bg-brand/10 p-3 text-xs text-muted-foreground">
+            <p className="font-semibold text-foreground">Creators: secure persona setup is connected.</p>
+            <p className="mt-1">
+              Choose creator or agency during signup to continue into default persona creation, custom persona setup, training inputs, and content-pack assignment.
+            </p>
+          </div>
           <div className="mt-6"><RoleSignupForm /></div>
         </div>
         <p className="mt-4 text-center text-xs text-muted-foreground">
