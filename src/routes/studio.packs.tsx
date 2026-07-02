@@ -88,7 +88,10 @@ function PacksPage() {
   const personaById = useMemo(() => new Map((data?.personas ?? []).map((p) => [p.id, p])), [data]);
 
   // Map pack -> asset tags (union of asset-level tags for assets in the pack)
-  const assetTagsById = useMemo(() => new Map(((data as any)?.assetTags ?? []).map((r: any) => [r.id, (r.tags ?? []) as string[]])), [data]);
+  const assetTagsById = useMemo(
+    () => new Map<string, string[]>(((data as any)?.assetTags ?? []).map((r: any) => [r.id as string, (r.tags ?? []) as string[]])),
+    [data],
+  );
   const packAssetTags = useMemo(() => {
     const m = new Map<string, Set<string>>();
     for (const it of data?.items ?? []) {
