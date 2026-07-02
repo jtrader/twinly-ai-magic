@@ -30,7 +30,6 @@ import {
   setAssetPersonaPermission, removeAssetFromPersona, getAssetSignedUrl,
   bulkCreateAssets, listAssetAudit, submitAssetForReview,
 } from "@/lib/content-vault.functions";
-import { supabase as supabaseClient } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/studio/content")({ component: ContentVaultPage });
 
