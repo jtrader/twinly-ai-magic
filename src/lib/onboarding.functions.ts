@@ -75,7 +75,7 @@ export const updatePersonaBasics = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { personaId: string; displayName?: string; description?: string }) => d)
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = {};
+    const patch: { display_name?: string; description?: string | null } = {};
     if (data.displayName !== undefined) {
       const v = data.displayName.trim();
       if (v.length < 2 || v.length > 60) throw new Error("Persona name must be 2–60 characters.");
