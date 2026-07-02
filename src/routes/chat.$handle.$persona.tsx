@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { sendPersonaMessage, ensurePersonaConversation, transcribeVoiceObject } from "@/lib/chat.functions";
+import { getCreatorAvailability } from "@/lib/away.functions";
 import { VoiceRecorder } from "@/components/twinly/VoiceRecorder";
 import { VoicePlayer } from "@/components/twinly/VoicePlayer";
 import { toast } from "sonner";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { Moon } from "lucide-react";
 
 const loadPersonaChat = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -33,7 +35,8 @@ const loadPersonaChat = createServerFn({ method: "GET" })
       const { data: m } = await supabase.from("messages").select("*").eq("conversation_id", convo.id).order("created_at", { ascending: true });
       messages = m ?? [];
     }
-    return { creator, persona, conversationId: convo?.id ?? null, messages };
+    const availability = await getCreatorAvailability({ data: { handle: data.handle } });
+    return { creator, persona, conversationId: convo?.id ?? null, messages, availability };
   });
 
 export const Route = createFileRoute("/chat/$handle/$persona")({
@@ -63,7 +66,9 @@ function ChatPage() {
   }, [messages.length]);
 
   if (!initial) return <AppShell><div className="py-20 text-center text-muted-foreground">Persona not found.</div></AppShell>;
-  const { creator, persona } = initial;
+  const { creator, persona, availability } = initial;
+  const isAway = !!availability?.away_mode;
+  const aiPaused = isAway && persona.kind === "ai" && !availability?.away_allow_ai_personas;
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -79,7 +84,7 @@ function ChatPage() {
       setConversationId(res.conversationId);
       if (res.assistantText) {
         setMessages((m) => [...m, { id: crypto.randomUUID(), sender_type: "ai", body: res.assistantText, ai_generated: true, created_at: new Date().toISOString() }]);
-      } else if (res.kind === "real_me") {
+      } else if (res.kind === "real_me" && !res.awayAutoReply) {
         toast.message("Message delivered to creator", { description: "Real Me replies come from the verified creator directly." });
       }
     } catch (err: any) {
@@ -110,7 +115,7 @@ function ChatPage() {
       if (res.assistantText) {
         setMessages((m) => [...m, {
           id: crypto.randomUUID(),
-          sender_type: "ai",
+          sender_type: res.awayAutoReply ? "system" : "ai",
           body: res.assistantText,
           ai_generated: true,
           attachment_url: res.assistantVoiceUrl ?? null,
@@ -134,11 +139,24 @@ function ChatPage() {
             <div className="text-xs text-muted-foreground">@{creator.handle}</div>
           </div>
           <div className="flex items-center gap-2">
+            <AvailabilityPill away={isAway} />
             <PersonaBadge kind={persona.kind as any} />
             <ReportDialog targetType="persona" targetId={persona.id} label="Report" />
           </div>
         </div>
         <AiDisclosureBanner kind={persona.kind as any} label={persona.disclosure_label} className="mb-4" />
+        {isAway && persona.kind === "real_me" && (
+          <div className="mb-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
+            <span className="font-semibold">{creator.stage_name} is away.</span>{" "}
+            {availability?.away_auto_reply_enabled ? "You'll get an auto-reply on Real Me. " : "Real Me replies are paused. "}
+            {availability?.away_allow_ai_personas && "Try one of their AI personas in the meantime."}
+          </div>
+        )}
+        {aiPaused && (
+          <div className="mb-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
+            <span className="font-semibold">{creator.stage_name}</span> has paused AI personas while away.
+          </div>
+        )}
 
         <div ref={scrollRef} className="min-h-[50vh] flex-1 space-y-3 overflow-y-auto rounded-2xl border border-border bg-surface/60 p-4">
           {messages.length === 0 && (
@@ -153,11 +171,17 @@ function ChatPage() {
                   ? "bg-brand text-brand-foreground"
                   : m.sender_type === "ai"
                     ? "bg-surface-elevated border border-brand/20"
-                    : "bg-surface-elevated border border-real/30"
+                    : m.sender_type === "system"
+                      ? "bg-amber-400/5 border border-amber-400/30"
+                      : "bg-surface-elevated border border-real/30"
               )}>
                 {m.sender_type !== "fan" && (
                   <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                    {m.sender_type === "ai" ? `${persona.display_name} · AI` : persona.display_name}
+                    {m.sender_type === "ai"
+                      ? `${persona.display_name} · AI`
+                      : m.sender_type === "system"
+                        ? "Away auto-reply"
+                        : persona.display_name}
                   </div>
                 )}
                 {m.attachment_kind === "audio" && m.attachment_url && conversationId ? (
