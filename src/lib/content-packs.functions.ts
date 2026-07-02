@@ -334,6 +334,7 @@ type BulkPackItem = {
   storagePath: string;
   category?: string;
   isSynthetic?: boolean;
+  tags?: string[];
 };
 
 // Create assets in the vault and add them all to a pack in one call.
@@ -364,6 +365,7 @@ export const bulkUploadToPack = createServerFn({ method: "POST" })
         category: it.category?.trim() || null,
         is_synthetic: !!it.isSynthetic,
         ai_generated_label: !!it.isSynthetic,
+        tags: normalizeTags(it.tags),
       };
     });
 
