@@ -143,8 +143,6 @@ export const Route = createFileRoute("/api/public/hooks/heygen")({
           provider_status: "completed",
           provider_error: null,
           render_completed_at: new Date().toISOString(),
-          size_bytes: buf.byteLength,
-          mime_type: contentType,
         } as any).eq("id", (asset as any).id);
 
         return json(200, { ok: true });

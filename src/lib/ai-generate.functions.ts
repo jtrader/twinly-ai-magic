@@ -262,7 +262,6 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
         provider: "heygen",
         provider_status: "submitted",
         render_started_at: new Date().toISOString(),
-        metadata: { tts_path: ttsPath, seconds, avatar_id: avatarId, voice_id: voiceId ?? null },
       };
     const { data: asset, error: insErr } = await supabase
       .from("content_assets").insert(insertRow).select("*").single();
