@@ -92,18 +92,53 @@ async function assertTwinPolicy(
   if (packId) {
     const { data: pack, error: kErr2 } = await supabase
       .from("content_packs")
-      .select("id, status, creator_id")
+      .select("id, status, creator_id, name")
       .eq("id", packId)
       .eq("creator_id", creatorId)
       .maybeSingle();
     if (kErr2) throw kErr2;
     if (!pack) throw new Error("Content pack not found in your namespace.");
-    if (pack.status && !["approved","draft","pending"].includes(pack.status)) {
-      throw new Error("Selected pack is not eligible.");
+    if (pack.status !== "approved") {
+      throw new Error(`Pack "${pack.name}" is ${pack.status ?? "not approved"} — only approved packs can be used for generation.`);
     }
+
+    // Pack must be explicitly attached to the target persona
+    const { data: link, error: linkErr } = await supabase
+      .from("content_pack_personas")
+      .select("permission_type")
+      .eq("pack_id", packId)
+      .eq("persona_id", personaId)
+      .maybeSingle();
+    if (linkErr) throw linkErr;
+    if (!link) {
+      throw new Error(`Pack "${pack.name}" is not attached to this persona. Attach it in the Persona editor first.`);
+    }
+    if (link.permission_type === "restricted") {
+      throw new Error(`Pack "${pack.name}" is set to Restricted on this persona and cannot be used as a generation source.`);
+    }
+
+    // Reject if any pack asset is forbidden (rejected / flagged / blocked / restricted / do_not_use)
+    const { data: packAssets, error: paErr } = await supabase
+      .from("content_pack_items")
+      .select("asset_id, content_assets:asset_id(id, approval_status, moderation_status, internal_label)")
+      .eq("pack_id", packId);
+    if (paErr) throw paErr;
+    const forbiddenAssets = (packAssets ?? []).filter((row: any) => {
+      const a = row.content_assets;
+      if (!a) return false;
+      if (a.approval_status === "rejected") return true;
+      if (a.moderation_status === "flagged" || a.moderation_status === "blocked") return true;
+      if (a.internal_label === "restricted" || a.internal_label === "do_not_use") return true;
+      return false;
+    });
+    if (forbiddenAssets.length) {
+      throw new Error(`Pack "${pack.name}" contains ${forbiddenAssets.length} forbidden asset(s). Remove or resolve them before generating.`);
+    }
+
+    return { consent, persona, packPermission: link.permission_type as "included" | "ppv" | "restricted" };
   }
 
-  return { consent, persona };
+  return { consent, persona, packPermission: null as "included" | "ppv" | "restricted" | null };
 }
 
 export const listGenerationRequests = createServerFn({ method: "POST" })
@@ -234,7 +269,7 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
     if (req.status !== "approved") throw new Error("Only approved requests can be published.");
     // Re-verify policy at publish time so a consent revocation or persona
     // unpublish between approval and publish still blocks synthetic writes.
-    await assertTwinPolicy(supabase, creator.id, req.output_type as OutputType, req.persona_id, req.pack_id);
+    const policy = await assertTwinPolicy(supabase, creator.id, req.output_type as OutputType, req.persona_id, req.pack_id);
 
     const kindMap: Record<string, string> = {
       image: "image", promo_banner: "image",
@@ -266,7 +301,10 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
     }
     // link to persona if provided
     if (req.persona_id && ids.length) {
-      const perms: any[] = ids.map((asset_id: string) => ({ persona_id: req.persona_id, asset_id, permission_type: "included" }));
+      // Inherit the pack↔persona access level so produced synthetic assets
+      // are visible to fans at exactly the same tier the source pack is.
+      const inherited = policy.packPermission ?? "included";
+      const perms: any[] = ids.map((asset_id: string) => ({ persona_id: req.persona_id, asset_id, permission_type: inherited }));
       await supabase.from("persona_content_permissions").upsert(perms, { onConflict: "persona_id,asset_id" });
     }
 
