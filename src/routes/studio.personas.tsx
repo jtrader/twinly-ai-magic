@@ -769,6 +769,54 @@ function EditPersonaDialog({
           </div>
         </div>
         )}
+        {tab === "saved" && (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Reusable replies for this persona. Available in the Real Me inbox composer. Mark items as “Few-shot examples” to also feed them into the AI persona's tone at chat time.
+          </p>
+          <div className="rounded-lg border border-border bg-surface p-3">
+            <div className="mb-1 text-xs font-semibold">New saved reply</div>
+            <Input placeholder="Label (e.g. Welcome DM)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} maxLength={120} />
+            <Textarea className="mt-2" rows={3} maxLength={4000} placeholder="Body — the reply text" value={newBody} onChange={(e) => setNewBody(e.target.value)} />
+            <label className="mt-2 flex items-center justify-between rounded-md border border-border/60 bg-background/40 px-2 py-1.5 text-xs">
+              <span>Use as few-shot example for AI persona</span>
+              <Switch checked={newFewShot} onCheckedChange={setNewFewShot} />
+            </label>
+            <div className="mt-2 flex justify-end">
+              <Button size="sm" onClick={addSaved} disabled={!newLabel.trim() || savedBusy === "new"}>
+                <Plus className="mr-1 size-3" /> Add
+              </Button>
+            </div>
+          </div>
+          {savedLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
+          {!savedLoading && savedItems && savedItems.length === 0 && (
+            <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              No saved replies yet.
+            </div>
+          )}
+          {!savedLoading && savedItems && savedItems.length > 0 && (
+            <div className="max-h-[280px] space-y-2 overflow-y-auto pr-1">
+              {savedItems.map((s: any) => (
+                <div key={s.id} className="rounded-lg border border-border bg-surface p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold">{s.label}</div>
+                      {s.body && <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">{s.body}</div>}
+                    </div>
+                    <Button size="icon" variant="ghost" onClick={() => removeSaved(s.id)} disabled={savedBusy === s.id} title="Delete">
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                  <label className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Few-shot example for AI</span>
+                    <Switch checked={!!s.use_as_few_shot} onCheckedChange={(v) => toggleFewShot(s, v)} disabled={savedBusy === s.id} />
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        )}
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button onClick={submit} disabled={busy}>{busy ? "Saving…" : "Save changes"}</Button>
