@@ -76,8 +76,9 @@ function AdminPage() {
   async function resolve(id: string, status: "resolved" | "dismissed") {
     setBusy(id);
     try {
-      await resolveMod({ data: { id, status } });
-      setEvents((prev) => prev.map((e) => e.id === id ? { ...e, status } : e));
+      const resolution = window.prompt(`Optional note visible to reporter (${status}):`, "") ?? undefined;
+      await resolveMod({ data: { id, status, resolution: resolution || undefined } });
+      setEvents((prev) => prev.map((e) => e.id === id ? { ...e, status, resolution: resolution || e.resolution } : e));
       toast.success(status);
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
     finally { setBusy(null); }
