@@ -76,7 +76,7 @@ function StudioHome() {
         <Tile to="/studio/personas" icon={<Sparkles className="size-5 text-brand-glow" />} title="Persona studio" desc="Create, edit, publish, reorder personas." />
         <Tile to="/studio/content" icon={<Library className="size-5 text-brand-glow" />} title="Content vault" desc="Upload assets and attach per persona." />
         <Tile to="/studio/inbox" icon={<MessageCircle className="size-5 text-brand-glow" />} title="Real Me inbox" desc="Reply to fans on your Real Me persona." />
-        <Tile icon={<Wallet className="size-5 text-brand-glow" />} title="Payouts" desc="Bank account, tax, disbursements." disabled />
+        <Tile to="/studio/payouts" icon={<Wallet className="size-5 text-brand-glow" />} title="Payouts" desc="Payment history, subscribers, next payout." />
         <Tile icon={<ShieldCheck className="size-5 text-brand-glow" />} title="Consent & verification" desc="Digital twin consent, ID checks." disabled />
       </div>
     </AppShell>
