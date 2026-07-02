@@ -32,6 +32,7 @@ function AppHome() {
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <Tile title="Discover creators" desc="Browse verified creators and their personas." to="/discover" cta="Explore" />
+        <Tile title="Your dashboard" desc="Subscriptions, recent chats, and account." to="/fan" cta="Open dashboard" />
         {isCreator && creator && (
           <Tile title="Your creator profile" desc={`@${creator.handle} — manage personas, vault, and disclosures.`} to="/creators/$handle" params={{ handle: creator.handle }} cta="Open" />
         )}

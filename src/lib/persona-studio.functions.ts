@@ -101,6 +101,13 @@ export const updatePersona = createServerFn({ method: "POST" })
     systemPrompt?: string;
     isExplicit?: boolean;
     priceCents?: number;
+    trainingNotes?: {
+      tone_examples?: string;
+      dos?: string;
+      donts?: string;
+      sample_phrasings?: string;
+      voice_ref_url?: string;
+    };
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -112,6 +119,7 @@ export const updatePersona = createServerFn({ method: "POST" })
       system_prompt?: string | null;
       is_explicit?: boolean;
       price_cents?: number;
+      training_notes?: Record<string, string>;
     } = {};
     if (data.displayName !== undefined) {
       const v = data.displayName.trim();
@@ -135,6 +143,14 @@ export const updatePersona = createServerFn({ method: "POST" })
     }
     if (data.isExplicit !== undefined) patch.is_explicit = !!data.isExplicit;
     if (data.priceCents !== undefined) patch.price_cents = Math.max(0, Math.floor(data.priceCents));
+    if (data.trainingNotes !== undefined) {
+      const t = data.trainingNotes;
+      const clean: Record<string, string> = {};
+      for (const [k, v] of Object.entries(t)) {
+        if (typeof v === "string" && v.trim()) clean[k] = v.trim().slice(0, 4000);
+      }
+      patch.training_notes = clean;
+    }
 
     if (Object.keys(patch).length === 0) return { ok: true };
 

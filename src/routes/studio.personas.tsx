@@ -337,6 +337,12 @@ function EditPersonaDialog({
   const [systemPrompt, setSystemPrompt] = useState("");
   const [isExplicit, setExplicit] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [toneExamples, setToneExamples] = useState("");
+  const [dos, setDos] = useState("");
+  const [donts, setDonts] = useState("");
+  const [samplePhrasings, setSamplePhrasings] = useState("");
+  const [voiceRefUrl, setVoiceRefUrl] = useState("");
+  const [tab, setTab] = useState<"basics" | "training">("basics");
 
   useEffect(() => {
     if (persona) {
@@ -345,6 +351,13 @@ function EditPersonaDialog({
       setDisclosure(persona.disclosure_label);
       setSystemPrompt((persona as any).system_prompt ?? "");
       setExplicit(!!(persona as any).is_explicit);
+      const tn = ((persona as any).training_notes ?? {}) as Record<string, string>;
+      setToneExamples(tn.tone_examples ?? "");
+      setDos(tn.dos ?? "");
+      setDonts(tn.donts ?? "");
+      setSamplePhrasings(tn.sample_phrasings ?? "");
+      setVoiceRefUrl(tn.voice_ref_url ?? "");
+      setTab("basics");
     }
   }, [persona]);
 
@@ -357,6 +370,12 @@ function EditPersonaDialog({
         displayName, description, disclosureLabel,
         systemPrompt: persona.kind === "ai" ? systemPrompt : undefined,
         isExplicit: persona.kind === "ai" ? isExplicit : undefined,
+        trainingNotes: {
+          tone_examples: toneExamples,
+          dos, donts,
+          sample_phrasings: samplePhrasings,
+          voice_ref_url: voiceRefUrl,
+        },
       }});
       toast.success("Persona saved");
       onSaved();
@@ -374,6 +393,17 @@ function EditPersonaDialog({
             {persona?.kind === "ai" ? "AI persona — disclosure is required." : "Real Me — human-led replies."}
           </DialogDescription>
         </DialogHeader>
+        <div className="mb-3 flex gap-1 border-b border-border">
+          {(["basics", "training"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={"px-3 py-1.5 text-xs font-semibold uppercase tracking-widest " + (tab === t ? "border-b-2 border-brand text-foreground" : "text-muted-foreground")}
+            >{t === "basics" ? "Basics" : "Training"}</button>
+          ))}
+        </div>
+        {tab === "basics" && (
         <div className="space-y-4">
           <div>
             <Label>Name</Label>
@@ -404,6 +434,42 @@ function EditPersonaDialog({
             </>
           )}
         </div>
+        )}
+        {tab === "training" && (
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            These inputs shape how the persona sounds. They're merged into the AI system prompt at chat time and are only visible to you.
+          </p>
+          <div>
+            <Label>Tone & voice examples</Label>
+            <Textarea className="mt-1.5" rows={3} maxLength={4000} value={toneExamples} onChange={(e) => setToneExamples(e.target.value)}
+              placeholder="Playful, teasing, uses emojis sparingly. Never sarcastic." />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <Label>Do's</Label>
+              <Textarea className="mt-1.5" rows={4} maxLength={4000} value={dos} onChange={(e) => setDos(e.target.value)}
+                placeholder="- Address fans by name&#10;- Offer VIP upsells naturally" />
+            </div>
+            <div>
+              <Label>Don'ts</Label>
+              <Textarea className="mt-1.5" rows={4} maxLength={4000} value={donts} onChange={(e) => setDonts(e.target.value)}
+                placeholder="- Never claim to be human&#10;- No political topics" />
+            </div>
+          </div>
+          <div>
+            <Label>Sample phrasings</Label>
+            <Textarea className="mt-1.5" rows={3} maxLength={4000} value={samplePhrasings} onChange={(e) => setSamplePhrasings(e.target.value)}
+              placeholder={"“hey babe 💜 what are we getting into tonight?”"} />
+          </div>
+          <div>
+            <Label>Voice reference URL (optional)</Label>
+            <Input className="mt-1.5" value={voiceRefUrl} onChange={(e) => setVoiceRefUrl(e.target.value)}
+              placeholder="https://…/voice-sample.mp3" />
+            <p className="mt-1 text-xs text-muted-foreground">Placeholder for future voice-clone training input.</p>
+          </div>
+        </div>
+        )}
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button onClick={submit} disabled={busy}>{busy ? "Saving…" : "Save changes"}</Button>

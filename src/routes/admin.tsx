@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useSession, useUserRoles } from "@/lib/session";
 import { adminOverview, adminListVerifications, adminSetVerification, adminRecentAudit } from "@/lib/admin.functions";
 import { adminListModeration, adminResolveModeration } from "@/lib/moderation.functions";
+import { adminListPendingAssets, adminSetAssetApproval } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -24,11 +25,12 @@ function AdminPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
-  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "audit">("overview");
+  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "audit">("overview");
   const [stats, setStats] = useState<any>(null);
   const [creators, setCreators] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
+  const [pendingAssets, setPendingAssets] = useState<any[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
 
   const overview = useServerFn(adminOverview);
@@ -37,6 +39,8 @@ function AdminPage() {
   const listMod = useServerFn(adminListModeration);
   const resolveMod = useServerFn(adminResolveModeration);
   const listAudit = useServerFn(adminRecentAudit);
+  const listPending = useServerFn(adminListPendingAssets);
+  const setApproval = useServerFn(adminSetAssetApproval);
 
   useEffect(() => {
     if (!user || !roles.includes("admin")) return;
@@ -46,6 +50,7 @@ function AdminPage() {
         if (tab === "verifications") setCreators((await listVer({})).creators);
         if (tab === "moderation") setEvents((await listMod({ data: {} })).events);
         if (tab === "audit") setAudit((await listAudit({})).events);
+        if (tab === "synthetic") setPendingAssets((await listPending({})).assets);
       } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
     })();
   }, [tab, user, roles.join(",")]);
@@ -84,6 +89,16 @@ function AdminPage() {
     finally { setBusy(null); }
   }
 
+  async function decideAsset(id: string, status: "approved" | "rejected") {
+    setBusy(id);
+    try {
+      await setApproval({ data: { assetId: id, status } });
+      setPendingAssets((prev) => prev.filter((a) => a.id !== id));
+      toast.success(status);
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(null); }
+  }
+
   return (
     <AppShell>
       <div className="mb-4">
@@ -92,7 +107,7 @@ function AdminPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-2">
-        {(["overview","verifications","moderation","audit"] as const).map((t) => (
+        {(["overview","verifications","moderation","synthetic","audit"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -102,12 +117,45 @@ function AdminPage() {
       </div>
 
       {tab === "overview" && stats && (
+        <>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <Stat label="Users" value={stats.users} />
           <Stat label="Creators" value={stats.creators} />
           <Stat label="Pending verifications" value={stats.pendingVerifications} tone={stats.pendingVerifications > 0 ? "warn" : "ok"} />
           <Stat label="Personas" value={stats.personas} />
           <Stat label="Open reports" value={stats.openReports} tone={stats.openReports > 0 ? "warn" : "ok"} />
+        </div>
+        <div className="mt-4">
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Analytics (placeholders)</div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Stat label="DAU" value="—" />
+            <Stat label="Messages / day" value="—" />
+            <Stat label="GMV (MTD)" value="—" />
+            <Stat label="Age-gate pass rate" value="—" />
+          </div>
+        </div>
+        </>
+      )}
+
+      {tab === "synthetic" && (
+        <div className="space-y-2">
+          {pendingAssets.map((a) => (
+            <div key={a.id} className="rounded-2xl border border-border bg-surface p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold">{a.title}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {a.asset_type} · {a.creator ? `@${a.creator.handle}` : "unknown"} · {new Date(a.created_at).toLocaleString()}
+                  </div>
+                </div>
+                <div className="inline-flex gap-1">
+                  <Button size="sm" variant="outline" disabled={busy === a.id} onClick={() => decideAsset(a.id, "approved")}>Approve</Button>
+                  <Button size="sm" variant="ghost" disabled={busy === a.id} onClick={() => decideAsset(a.id, "rejected")}>Reject</Button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {pendingAssets.length === 0 && <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">No synthetic assets awaiting review.</div>}
         </div>
       )}
 
