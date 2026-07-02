@@ -1,17 +1,19 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client.server";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { RoleSignupForm } from "@/components/twinly/RoleSignupForm";
 
 export const Route = createFileRoute("/auth")({
-  beforeLoad: async () => {
-    const client = supabase();
-    const { data } = await client.auth.getUser();
-    if (data.user) throw redirect({ to: "/app" });
-  },
   component: AuthPage,
 });
 
 function AuthPage() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate({ to: "/app" });
+    });
+  }, [navigate]);
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
