@@ -533,12 +533,27 @@ function VoiceTab({ personaId, packId }: { personaId: string; packId: string }) 
 
 function VideoTab({ personaId, packId }: { personaId: string; packId: string }) {
   const queue = useServerFn(queueTalkingHead);
+  const listJobs = useServerFn(listTalkingHeadJobs);
+  const qc = useQueryClient();
   const [script, setScript] = useState("");
   const [title, setTitle] = useState("");
   const [seconds, setSeconds] = useState<string>("15");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<GenError | null>(null);
   const lastAttempt = useLastAttempt<{ script: string; title: string; seconds: number }>();
+
+  type Job = { id: string; title: string; created_at: string; status: "queued" | "rendering" | "completed" | "approved" | "failed" };
+  const jobsQuery = useQuery({
+    queryKey: ["talking-head-jobs"],
+    queryFn: async () => (await listJobs()) as { jobs: Job[] },
+    refetchInterval: (q) => {
+      const jobs = q.state.data?.jobs ?? [];
+      return jobs.some((j) => j.status === "queued" || j.status === "rendering") ? 4000 : false;
+    },
+    refetchOnWindowFocus: true,
+  });
+  const jobs = jobsQuery.data?.jobs ?? [];
+  const isLive = jobs.some((j) => j.status === "queued" || j.status === "rendering");
 
   const scriptTrim = script.trim();
   const secondsNum = Number(seconds) || 0;
@@ -563,6 +578,7 @@ function VideoTab({ personaId, packId }: { personaId: string; packId: string }) 
       toast.success("Talking-head clip queued. You'll be notified when the render is ready.");
       setScript(""); setTitle("");
       lastAttempt.current = null;
+      qc.invalidateQueries({ queryKey: ["talking-head-jobs"] });
     } catch (e: any) {
       setError(classifyError(e, "video"));
     } finally { setBusy(false); }
@@ -617,6 +633,81 @@ function VideoTab({ personaId, packId }: { personaId: string; packId: string }) 
         {busy ? <><Loader2 className="mr-1 size-4 animate-spin" /> Queuing…</> : <>Queue talking-head clip</>}
       </Button>
       {error && <ErrorCard error={error} onRetry={lastAttempt.current ? retry : undefined} onDismiss={() => setError(null)} />}
+      <TalkingHeadJobs jobs={jobs} isLive={isLive} loading={jobsQuery.isLoading} />
     </div>
   );
+}
+
+function TalkingHeadJobs({ jobs, isLive, loading }: { jobs: Array<{ id: string; title: string; created_at: string; status: "queued" | "rendering" | "completed" | "approved" | "failed" }>; isLive: boolean; loading: boolean }) {
+  return (
+    <section className="rounded-2xl border border-border bg-surface p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Recent renders</div>
+        <div className="flex items-center gap-1.5 text-[11px]" aria-live="polite">
+          {isLive ? (
+            <>
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+                <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
+              </span>
+              <span className="text-emerald-300">Live</span>
+            </>
+          ) : (
+            <>
+              <span className="size-2 rounded-full bg-muted-foreground/40" />
+              <span className="text-muted-foreground">Idle</span>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="mt-3 divide-y divide-border">
+        {loading && jobs.length === 0 && (
+          <div className="py-4 text-xs text-muted-foreground">Loading recent jobs…</div>
+        )}
+        {!loading && jobs.length === 0 && (
+          <div className="py-4 text-xs text-muted-foreground">No talking-head jobs yet. Queue a clip above to see it here.</div>
+        )}
+        {jobs.slice(0, 10).map((j) => (
+          <div key={j.id} className="flex items-center justify-between gap-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm text-foreground">{j.title}</div>
+              <time dateTime={j.created_at} className="text-[11px] text-muted-foreground">{relTime(j.created_at)}</time>
+            </div>
+            <JobStatusPill status={j.status} />
+            {(j.status === "completed" || j.status === "approved") && (
+              <Link to="/studio/content" className="text-[11px] text-brand-glow hover:underline">Open in vault</Link>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function JobStatusPill({ status }: { status: "queued" | "rendering" | "completed" | "approved" | "failed" }) {
+  const config = {
+    queued:    { label: "Queued",           cls: "border-amber-400/30 bg-amber-400/10 text-amber-300",     icon: <Clock className="size-3" /> },
+    rendering: { label: "Rendering…",       cls: "border-brand/40 bg-brand/10 text-brand-glow",             icon: <Loader2 className="size-3 animate-spin" /> },
+    completed: { label: "Ready for review", cls: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300", icon: <CheckCircle2 className="size-3" /> },
+    approved:  { label: "Approved",         cls: "border-emerald-400/40 bg-transparent text-emerald-300",   icon: <ShieldCheck className="size-3" /> },
+    failed:    { label: "Failed",           cls: "border-rose-400/30 bg-rose-400/10 text-rose-300",         icon: <AlertTriangle className="size-3" /> },
+  }[status];
+  return (
+    <span aria-label={config.label} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${config.cls}`}>
+      {config.icon} {config.label}
+    </span>
+  );
+}
+
+function relTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const s = Math.round(diffMs / 1000);
+  if (s < 60) return rtf.format(-s, "second");
+  const m = Math.round(s / 60);
+  if (m < 60) return rtf.format(-m, "minute");
+  const h = Math.round(m / 60);
+  if (h < 24) return rtf.format(-h, "hour");
+  const d = Math.round(h / 24);
+  return rtf.format(-d, "day");
 }
