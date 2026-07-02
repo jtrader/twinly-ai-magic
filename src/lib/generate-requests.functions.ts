@@ -30,7 +30,7 @@ const CONSENT_FIELD: Record<OutputType, "image_ok" | "voice_ok" | "video_ok"> = 
  * ("published" visibility), and the pack (if any) belongs to them.
  * Returns the loaded consent + persona rows for downstream namespacing.
  */
-async function assertTwinPolicy(
+export async function assertTwinPolicy(
   supabase: any,
   creatorId: string,
   outputType: OutputType,
