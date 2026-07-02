@@ -24,11 +24,13 @@ import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
 import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
 import { Route as StudioPacksRouteImport } from './routes/studio.packs'
 import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
+import { Route as StudioGenerateRouteImport } from './routes/studio.generate'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
+import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$packId'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 
@@ -107,6 +109,11 @@ const StudioInboxRoute = StudioInboxRouteImport.update({
   path: '/studio/inbox',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioGenerateRoute = StudioGenerateRouteImport.update({
+  id: '/studio/generate',
+  path: '/studio/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioContentRoute = StudioContentRouteImport.update({
   id: '/studio/content',
   path: '/studio/content',
@@ -132,6 +139,11 @@ const CreatorsHandleRoute = CreatorsHandleRouteImport.update({
   path: '/creators/$handle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
+  id: '/api/generate-image',
+  path: '/api/generate-image',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioPacksPackIdRoute = StudioPacksPackIdRouteImport.update({
   id: '/$packId',
   path: '/$packId',
@@ -153,11 +165,13 @@ export interface FileRoutesByFullPath {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
+  '/api/generate-image': typeof ApiGenerateImageRoute
   '/creators/$handle': typeof CreatorsHandleRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
@@ -177,11 +191,13 @@ export interface FileRoutesByTo {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
+  '/api/generate-image': typeof ApiGenerateImageRoute
   '/creators/$handle': typeof CreatorsHandleRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
@@ -202,11 +218,13 @@ export interface FileRoutesById {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
+  '/api/generate-image': typeof ApiGenerateImageRoute
   '/creators/$handle': typeof CreatorsHandleRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
@@ -228,11 +246,13 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/api/generate-image'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
     | '/studio/payouts'
@@ -252,11 +272,13 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/api/generate-image'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
     | '/studio/payouts'
@@ -276,11 +298,13 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/api/generate-image'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
     | '/studio/payouts'
@@ -301,11 +325,13 @@ export interface RootRouteChildren {
   DiscoverRoute: typeof DiscoverRoute
   FanRoute: typeof FanRoute
   OnboardingRoute: typeof OnboardingRoute
+  ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   CreatorsHandleRoute: typeof CreatorsHandleRoute
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
   StudioContentRoute: typeof StudioContentRoute
+  StudioGenerateRoute: typeof StudioGenerateRoute
   StudioInboxRoute: typeof StudioInboxRoute
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
   StudioPayoutsRoute: typeof StudioPayoutsRoute
@@ -422,6 +448,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioInboxRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/generate': {
+      id: '/studio/generate'
+      path: '/studio/generate'
+      fullPath: '/studio/generate'
+      preLoaderRoute: typeof StudioGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/content': {
       id: '/studio/content'
       path: '/studio/content'
@@ -455,6 +488,13 @@ declare module '@tanstack/react-router' {
       path: '/creators/$handle'
       fullPath: '/creators/$handle'
       preLoaderRoute: typeof CreatorsHandleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/generate-image': {
+      id: '/api/generate-image'
+      path: '/api/generate-image'
+      fullPath: '/api/generate-image'
+      preLoaderRoute: typeof ApiGenerateImageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/studio/packs/$packId': {
@@ -496,11 +536,13 @@ const rootRouteChildren: RootRouteChildren = {
   DiscoverRoute: DiscoverRoute,
   FanRoute: FanRoute,
   OnboardingRoute: OnboardingRoute,
+  ApiGenerateImageRoute: ApiGenerateImageRoute,
   CreatorsHandleRoute: CreatorsHandleRoute,
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
   StudioContentRoute: StudioContentRoute,
+  StudioGenerateRoute: StudioGenerateRoute,
   StudioInboxRoute: StudioInboxRoute,
   StudioPacksRoute: StudioPacksRouteWithChildren,
   StudioPayoutsRoute: StudioPayoutsRoute,
