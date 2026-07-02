@@ -42,7 +42,12 @@ export function RoleSignupForm() {
   }
 
   async function google() {
-    const res = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/app" });
+    const res = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/auth/callback" });
+    if (res.error) toast.error(res.error.message);
+  }
+
+  async function apple() {
+    const res = await lovable.auth.signInWithOAuth("apple", { redirect_uri: window.location.origin + "/auth/callback" });
     if (res.error) toast.error(res.error.message);
   }
 
@@ -89,6 +94,16 @@ export function RoleSignupForm() {
       </div>
       <Button type="button" variant="outline" onClick={google} className="w-full">
         Continue with Google
+      </Button>
+      <Button
+        type="button"
+        onClick={apple}
+        className="w-full bg-black text-white hover:bg-black/90"
+      >
+        <svg viewBox="0 0 384 512" className="mr-2 h-4 w-4 fill-current" aria-hidden="true">
+          <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zM255.9 84.5c26.7-31.7 24.3-60.6 23.5-71-23.6 1.4-50.9 16.1-66.5 34.2-17.2 19.4-27.3 43.4-25.1 70.5 25.5 2 48.7-11.1 68.1-33.7z" />
+        </svg>
+        Continue with Apple
       </Button>
     </div>
   );
