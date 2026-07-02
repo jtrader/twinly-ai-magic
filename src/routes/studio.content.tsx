@@ -279,7 +279,7 @@ function EmptyState({ onUpload, filtered }: { onUpload: () => void; filtered: bo
 }
 
 function AssetCard({
-  asset, personas, permissions, onChanged, onDelete, onEdit,
+  asset, personas, permissions, onChanged, onDelete, onEdit, onAudit,
 }: {
   asset: Asset;
   personas: Persona[];
@@ -287,6 +287,7 @@ function AssetCard({
   onChanged: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onAudit: () => void;
 }) {
   const Icon = ASSET_ICON[asset.asset_type] ?? FileText;
   const [preview, setPreview] = useState<string | null>(null);
@@ -397,6 +398,9 @@ function AssetCard({
         </div>
 
         <div className="mt-auto flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={onAudit} title="Audit trail">
+            <History className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="sm" onClick={onEdit}>Edit</Button>
           <Button variant="ghost" size="sm" onClick={onDelete} className="text-destructive hover:text-destructive">
             <Trash2 className="h-4 w-4" />
