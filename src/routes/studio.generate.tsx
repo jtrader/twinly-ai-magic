@@ -382,6 +382,11 @@ function ImageTab({ personaId, packId }: { personaId: string; packId: string }) 
         <Button onClick={generate} disabled={!canGenerate} title={!canGenerate ? (promptError ?? titleError ?? "Add a prompt to generate.") : undefined}>
           {busy ? <><Loader2 className="mr-1 size-4 animate-spin" /> Generating…</> : <>Generate</>}
         </Button>
+        {busy && (
+          <Button variant="outline" onClick={() => abortRef.current?.abort()}>
+            <Square className="mr-1 size-4" /> Stop
+          </Button>
+        )}
         {dataUrl && b64 && !error && (
           <Button variant="outline" onClick={onSave} disabled={saving || busy || !isFinal}>
             {saving ? <><Loader2 className="mr-1 size-4 animate-spin" /> Saving…</> : <><Save className="mr-1 size-4" /> Save to vault</>}
@@ -396,12 +401,28 @@ function ImageTab({ personaId, packId }: { personaId: string; packId: string }) 
             alt="AI preview"
             className={"h-auto w-full object-contain transition-[filter] duration-300 " + (isFinal ? "blur-0" : "blur-2xl")}
           />
-          <div className="flex items-center justify-between p-2 text-[11px] text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2 text-[11px] text-muted-foreground">
             <span className="inline-flex items-center gap-1">
               <Badge variant="outline" className="text-[10px] uppercase">AI-generated</Badge>
-              {!isFinal && <span>Streaming preview…</span>}
-              {isFinal && <span>Final frame ready.</span>}
+              {!isFinal ? <span>Preview frame · streaming…</span> : <span>Final frame ready.</span>}
             </span>
+            <div className="flex flex-wrap items-center gap-1">
+              <Button size="sm" variant="ghost" disabled={busy || !lastAttempt.current} onClick={retry} title="Re-stream with the same prompt">
+                <RefreshCw className="mr-1 size-3.5" /> Re-stream
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => { const u = dataUrl; setDataUrl(null); requestAnimationFrame(() => setDataUrl(u)); }} title="Reload the preview image">
+                <RotateCcw className="mr-1 size-3.5" /> Reload
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => window.open(dataUrl, "_blank", "noopener")} title="Open full size in a new tab">
+                <ExternalLink className="mr-1 size-3.5" /> Open
+              </Button>
+              <Button size="sm" variant="ghost" disabled={!isFinal || !b64} onClick={() => triggerDownload(dataUrl, `${slugify(title || prompt)}-${timestampStamp()}.png`)} title={isFinal ? "Download PNG" : "Available once the final frame arrives"}>
+                <Download className="mr-1 size-3.5" /> Download
+              </Button>
+              <Button size="sm" variant="ghost" disabled={!prompt} onClick={async () => { try { await navigator.clipboard.writeText(prompt); toast.success("Prompt copied"); } catch { toast.error("Could not copy"); } }} title="Copy prompt">
+                <Copy className="mr-1 size-3.5" /> Copy prompt
+              </Button>
+            </div>
           </div>
         </div>
       )}
