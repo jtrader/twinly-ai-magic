@@ -623,6 +623,73 @@ function EditPersonaDialog({
           )}
         </div>
         )}
+        {tab === "twin" && (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Choose which identity, voice, and style references from your <Link to="/studio/twin" className="text-brand-glow hover:underline">Digital Twin Profile</Link> this persona uses.
+          </p>
+          <div className="rounded-lg border border-border bg-surface p-3 text-xs">
+            <div className="mb-2 font-semibold">Reference scope</div>
+            <div className="space-y-2">
+              {([
+                { v: "all", label: "Use all approved twin references", hint: "Broadest — inherits every approved identity, voice, and style ref." },
+                { v: "selected", label: "Use only selected references", hint: "Pick specific refs below. Great for a tightly styled persona." },
+                { v: "none", label: "Do not use twin references", hint: "The persona won't draw from your digital twin." },
+              ] as const).map((opt) => (
+                <label key={opt.v} className="flex cursor-pointer items-start gap-2 rounded-md border border-border/60 bg-background/40 p-2">
+                  <input type="radio" name="twin-mode" className="mt-1" checked={twinLinkMode === opt.v}
+                    onChange={() => setTwinLinkMode(opt.v)} />
+                  <div>
+                    <div className="text-sm font-medium">{opt.label}</div>
+                    <div className="text-xs text-muted-foreground">{opt.hint}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+          {twinLinkMode === "selected" && (
+            twinRefs === null ? (
+              <div className="text-sm text-muted-foreground">Loading references…</div>
+            ) : twinRefs.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No twin references yet.{" "}
+                <Link to="/studio/twin" className="text-brand-glow hover:underline">Upload some</Link>
+              </div>
+            ) : (
+              <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                {(["identity_ref", "voice_ref", "style_ref"] as const).map((k) => {
+                  const group = twinRefs.filter((r: any) => r.kind === k);
+                  if (!group.length) return null;
+                  return (
+                    <div key={k}>
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                        {k === "identity_ref" ? "Identity" : k === "voice_ref" ? "Voice" : "Style"}
+                      </div>
+                      <div className="space-y-1">
+                        {group.map((r: any) => {
+                          const on = linkedRefIds.includes(r.id);
+                          const approved = r.review_status === "approved";
+                          return (
+                            <label key={r.id} className="flex cursor-pointer items-center justify-between gap-2 rounded-md border border-border/60 bg-background/40 px-2 py-1.5 text-xs">
+                              <div className="min-w-0 flex-1 truncate">
+                                <span className="font-medium">{r.slot_label || "Untitled"}</span>{" "}
+                                <span className={`ml-1 rounded-full border px-1.5 py-0.5 text-[9px] uppercase ${approved ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" : "border-border bg-surface text-muted-foreground"}`}>
+                                  {r.review_status ?? "draft"}
+                                </span>
+                              </div>
+                              <Switch checked={on} onCheckedChange={(v) => setLinkedRefIds((s) => v ? [...s, r.id] : s.filter((i) => i !== r.id))} />
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+        </div>
+        )}
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button onClick={submit} disabled={busy}>{busy ? "Saving…" : "Save changes"}</Button>
