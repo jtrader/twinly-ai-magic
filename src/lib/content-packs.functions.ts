@@ -97,7 +97,7 @@ export const getPack = createServerFn({ method: "POST" })
   });
 
 export const createPack = createServerFn({ method: "POST" })
-  .validator((d: { name: string; packType: PackType; description?: string; startsAt?: string | null; endsAt?: string | null }) => d)
+  .validator((d: { name: string; packType: PackType; description?: string; startsAt?: string | null; endsAt?: string | null; tags?: string[] }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -126,6 +126,7 @@ export const createPack = createServerFn({ method: "POST" })
         description: data.description?.trim() || null,
         starts_at: data.startsAt || null,
         ends_at: data.endsAt || null,
+        tags: normalizeTags(data.tags),
       })
       .select("*").single();
     if (error) throw error;
@@ -143,6 +144,7 @@ export const updatePack = createServerFn({ method: "POST" })
     coverAssetId?: string | null;
     startsAt?: string | null;
     endsAt?: string | null;
+    tags?: string[];
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -157,6 +159,7 @@ export const updatePack = createServerFn({ method: "POST" })
     if (data.coverAssetId !== undefined) patch.cover_asset_id = data.coverAssetId || null;
     if (data.startsAt !== undefined) patch.starts_at = data.startsAt || null;
     if (data.endsAt !== undefined) patch.ends_at = data.endsAt || null;
+    if (data.tags !== undefined) patch.tags = normalizeTags(data.tags);
     if (!Object.keys(patch).length) return { ok: true };
 
     const { error } = await context.supabase.from("content_packs").update(patch).eq("id", data.packId);
