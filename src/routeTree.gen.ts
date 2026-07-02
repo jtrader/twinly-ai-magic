@@ -39,6 +39,7 @@ import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$pa
 import { Route as CreatorsHandlePersonaRouteImport } from './routes/creators.$handle.$persona'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 import { Route as ApiPublicBootstrapSupportAdminRouteImport } from './routes/api/public/bootstrap-support-admin'
+import { Route as ApiPublicBootstrapDemoCreatorsRouteImport } from './routes/api/public/bootstrap-demo-creators'
 import { Route as ApiPublicHooksHeygenRouteImport } from './routes/api/public/hooks/heygen'
 import { Route as ApiPublicCronHeygenPollRouteImport } from './routes/api/public/cron/heygen-poll'
 
@@ -193,6 +194,12 @@ const ApiPublicBootstrapSupportAdminRoute =
     path: '/api/public/bootstrap-support-admin',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicBootstrapDemoCreatorsRoute =
+  ApiPublicBootstrapDemoCreatorsRouteImport.update({
+    id: '/api/public/bootstrap-demo-creators',
+    path: '/api/public/bootstrap-demo-creators',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksHeygenRoute = ApiPublicHooksHeygenRouteImport.update({
   id: '/api/public/hooks/heygen',
   path: '/api/public/hooks/heygen',
@@ -231,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/twin': typeof StudioTwinRoute
   '/studio/': typeof StudioIndexRoute
+  '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
@@ -265,6 +273,7 @@ export interface FileRoutesByTo {
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/twin': typeof StudioTwinRoute
   '/studio': typeof StudioIndexRoute
+  '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
@@ -300,6 +309,7 @@ export interface FileRoutesById {
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/twin': typeof StudioTwinRoute
   '/studio/': typeof StudioIndexRoute
+  '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
@@ -336,6 +346,7 @@ export interface FileRouteTypes {
     | '/studio/personas'
     | '/studio/twin'
     | '/studio/'
+    | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
@@ -370,6 +381,7 @@ export interface FileRouteTypes {
     | '/studio/personas'
     | '/studio/twin'
     | '/studio'
+    | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
@@ -404,6 +416,7 @@ export interface FileRouteTypes {
     | '/studio/personas'
     | '/studio/twin'
     | '/studio/'
+    | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
@@ -438,6 +451,7 @@ export interface RootRouteChildren {
   StudioPersonasRoute: typeof StudioPersonasRoute
   StudioTwinRoute: typeof StudioTwinRoute
   StudioIndexRoute: typeof StudioIndexRoute
+  ApiPublicBootstrapDemoCreatorsRoute: typeof ApiPublicBootstrapDemoCreatorsRoute
   ApiPublicBootstrapSupportAdminRoute: typeof ApiPublicBootstrapSupportAdminRoute
   ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
   ApiPublicCronHeygenPollRoute: typeof ApiPublicCronHeygenPollRoute
@@ -656,6 +670,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBootstrapSupportAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/bootstrap-demo-creators': {
+      id: '/api/public/bootstrap-demo-creators'
+      path: '/api/public/bootstrap-demo-creators'
+      fullPath: '/api/public/bootstrap-demo-creators'
+      preLoaderRoute: typeof ApiPublicBootstrapDemoCreatorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/heygen': {
       id: '/api/public/hooks/heygen'
       path: '/api/public/hooks/heygen'
@@ -733,6 +754,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioPersonasRoute: StudioPersonasRoute,
   StudioTwinRoute: StudioTwinRoute,
   StudioIndexRoute: StudioIndexRoute,
+  ApiPublicBootstrapDemoCreatorsRoute: ApiPublicBootstrapDemoCreatorsRoute,
   ApiPublicBootstrapSupportAdminRoute: ApiPublicBootstrapSupportAdminRoute,
   ChatHandlePersonaRoute: ChatHandlePersonaRoute,
   ApiPublicCronHeygenPollRoute: ApiPublicCronHeygenPollRoute,
