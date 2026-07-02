@@ -29,6 +29,7 @@ import {
 import {
   listPacks, attachPackToPersona, detachPackFromPersona,
 } from "@/lib/content-packs.functions";
+import { getTwinProfile } from "@/lib/twin.functions";
 
 export const Route = createFileRoute("/studio/personas")({ component: PersonaStudioPage });
 
@@ -345,7 +346,21 @@ function EditPersonaDialog({
   const [donts, setDonts] = useState("");
   const [samplePhrasings, setSamplePhrasings] = useState("");
   const [voiceRefUrl, setVoiceRefUrl] = useState("");
-  const [tab, setTab] = useState<"basics" | "training" | "packs">("basics");
+  const [tab, setTab] = useState<"basics" | "training" | "packs" | "twin">("basics");
+
+  // Twin linking
+  const [twinLinkMode, setTwinLinkMode] = useState<"all" | "selected" | "none">("all");
+  const [linkedRefIds, setLinkedRefIds] = useState<string[]>([]);
+  const [twinRefs, setTwinRefs] = useState<any[] | null>(null);
+  const loadTwin = useServerFn(getTwinProfile);
+
+  useEffect(() => {
+    if (!persona || tab !== "twin" || twinRefs) return;
+    (async () => {
+      try { const r = await loadTwin(); setTwinRefs(r.refs as any[]); }
+      catch (e: any) { toast.error(e?.message ?? "Failed to load twin refs"); }
+    })();
+  }, [persona, tab, twinRefs, loadTwin]);
 
   // Packs state
   const loadPacks = useServerFn(listPacks);
@@ -386,6 +401,9 @@ function EditPersonaDialog({
       setDonts(tn.donts ?? "");
       setSamplePhrasings(tn.sample_phrasings ?? "");
       setVoiceRefUrl(tn.voice_ref_url ?? "");
+      setTwinLinkMode(((persona as any).twin_link_mode as any) ?? "all");
+      setLinkedRefIds(((persona as any).linked_twin_ref_ids as string[] | null) ?? []);
+      setTwinRefs(null);
       setTab("basics");
     }
   }, [persona]);
@@ -441,6 +459,8 @@ function EditPersonaDialog({
           sample_phrasings: samplePhrasings,
           voice_ref_url: voiceRefUrl,
         },
+        twinLinkMode,
+        linkedTwinRefIds: twinLinkMode === "selected" ? linkedRefIds : [],
       }});
       toast.success("Persona saved");
       onSaved();
@@ -459,13 +479,13 @@ function EditPersonaDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="mb-3 flex gap-1 border-b border-border">
-          {(["basics", "training", "packs"] as const).map((t) => (
+          {(["basics", "training", "packs", "twin"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={"px-3 py-1.5 text-xs font-semibold uppercase tracking-widest " + (tab === t ? "border-b-2 border-brand text-foreground" : "text-muted-foreground")}
-            >{t === "basics" ? "Basics" : t === "training" ? "Training" : "Packs"}</button>
+            >{t === "basics" ? "Basics" : t === "training" ? "Training" : t === "packs" ? "Packs" : "Twin"}</button>
           ))}
         </div>
         {tab === "basics" && (
