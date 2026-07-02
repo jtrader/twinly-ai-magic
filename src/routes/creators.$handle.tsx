@@ -19,7 +19,7 @@ const loadCreator = createServerFn({ method: "GET" })
       .from("personas")
       .select("id, slug, display_name, description, kind, disclosure_label, price_cents, visibility, starts_at, ends_at, sort_order")
       .eq("creator_id", creator.id)
-      .in("visibility", ["public", "unlisted"])
+      .in("visibility", ["public", "subscribers", "vip"])
       .order("sort_order", { ascending: true });
     return { creator, personas: personas ?? [] };
   });
