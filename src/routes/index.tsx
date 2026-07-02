@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { AgeGateDialog } from "@/components/twinly/AgeGateDialog";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
 import { ShieldCheck, Sparkles, Bot, User2, Lock } from "lucide-react";
+import heroReal from "@/assets/hero-real.png.asset.json";
+import heroAi from "@/assets/hero-ai.png";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -28,7 +30,7 @@ function TopNav() {
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <Link to="/" className="font-display text-lg font-bold tracking-tight">
-          Twinly<span className="text-brand-glow">.ai</span>
+          Twinly<span className="text-brand-glow">.life</span>
         </Link>
         <div className="flex items-center gap-2">
           <Link to="/discover" className="hidden text-sm text-muted-foreground hover:text-foreground md:block">Discover</Link>
@@ -44,24 +46,78 @@ function Hero() {
   return (
     <section className="relative overflow-hidden">
       <div className="absolute inset-0 -z-10 opacity-60 [background:radial-gradient(60%_60%_at_50%_0%,theme(colors.brand)/20,transparent)]" />
-      <div className="mx-auto max-w-4xl px-4 pb-16 pt-16 text-center md:pt-28">
-        <div className="inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-xs font-semibold tracking-widest uppercase text-brand-glow">
-          <Sparkles className="size-3.5" /> Verified creator platform
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-16 pt-16 md:grid-cols-[1fr_1.05fr] md:items-center md:pt-24">
+        <div className="text-center md:text-left">
+          <div className="inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-xs font-semibold tracking-widest uppercase text-brand-glow">
+            <Sparkles className="size-3.5" /> Verified creator platform
+          </div>
+          <h1 className="mt-6 font-display text-4xl font-bold leading-[1.05] tracking-tight md:text-6xl">
+            Real when it matters.<br />
+            <span className="text-brand-glow">AI when you want the fantasy.</span>
+          </h1>
+          <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground md:mx-0 md:text-lg">
+            Twinly.life lets verified creators launch official AI twins and unlimited personas — every AI clearly disclosed, every experience creator-controlled.
+          </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row md:justify-start">
+            <Link to="/discover"><Button size="lg" className="w-full sm:w-auto">Explore creators</Button></Link>
+            <Link to="/auth"><Button size="lg" variant="outline" className="w-full sm:w-auto">Apply as creator</Button></Link>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">18+ only · Adult platform · Consent-first design</p>
         </div>
-        <h1 className="mt-6 font-display text-4xl font-bold leading-[1.05] tracking-tight md:text-6xl">
-          Real when it matters.<br />
-          <span className="text-brand-glow">AI when you want the fantasy.</span>
-        </h1>
-        <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground md:text-lg">
-          Twinly.ai lets verified creators launch official AI twins and unlimited personas — every AI clearly disclosed, every experience creator-controlled.
-        </p>
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link to="/discover"><Button size="lg" className="w-full sm:w-auto">Explore creators</Button></Link>
-          <Link to="/auth"><Button size="lg" variant="outline" className="w-full sm:w-auto">Apply as creator</Button></Link>
-        </div>
-        <p className="mt-4 text-xs text-muted-foreground">18+ only · Adult platform · Consent-first design</p>
+        <HeroCompare />
       </div>
     </section>
+  );
+}
+
+function HeroCompare() {
+  const items = [
+    {
+      src: heroReal.url,
+      badge: "Real Me",
+      badgeClass: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
+      caption: "Verified creator · human-shot",
+    },
+    {
+      src: heroAi,
+      badge: "AI persona",
+      badgeClass: "border-brand/40 bg-brand/15 text-brand-glow",
+      caption: "AI-rendered fantasy · always disclosed",
+    },
+  ];
+  return (
+    <div className="relative">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        {items.map((it) => (
+          <figure
+            key={it.badge}
+            className="group relative overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_20px_60px_-20px_rgba(120,60,255,0.35)]"
+          >
+            <div className="aspect-[4/5] w-full overflow-hidden">
+              <img
+                src={it.src}
+                alt={`${it.badge} — ${it.caption}`}
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]"
+                loading="eager"
+                width={1024}
+                height={1280}
+              />
+            </div>
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/85 via-background/10 to-transparent" />
+            <figcaption className="absolute inset-x-0 bottom-0 p-3">
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${it.badgeClass}`}>
+                {it.badge === "AI persona" ? <Bot className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
+                {it.badge}
+              </span>
+              <div className="mt-1 text-[11px] text-muted-foreground">{it.caption}</div>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+      <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 rounded-full border border-brand/40 bg-background/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-brand-glow backdrop-blur sm:block">
+        Real → AI
+      </div>
+    </div>
   );
 }
 
@@ -148,7 +204,7 @@ function ForCreators() {
 function Footer() {
   return (
     <footer className="border-t border-border/60 py-8 text-center text-xs text-muted-foreground">
-      <div>© {new Date().getFullYear()} Twinly.ai · 18+ · <Link to="/legal/terms" className="underline">Terms</Link> · <Link to="/legal/privacy" className="underline">Privacy</Link> · <Link to="/legal/ai-disclosure" className="underline">AI disclosure</Link></div>
+      <div>© {new Date().getFullYear()} Twinly.life · 18+ · <Link to="/legal/terms" className="underline">Terms</Link> · <Link to="/legal/privacy" className="underline">Privacy</Link> · <Link to="/legal/ai-disclosure" className="underline">AI disclosure</Link></div>
     </footer>
   );
 }

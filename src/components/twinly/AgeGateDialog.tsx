@@ -61,7 +61,7 @@ export function AgeGateDialog() {
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">You must be 18+ to continue</DialogTitle>
           <DialogDescription className="pt-2 text-sm text-muted-foreground">
-            Twinly.ai is an adult platform. By continuing, you confirm you are at least 18 years old and legally able to view adult material in your jurisdiction.
+            Twinly.life is an adult platform. By continuing, you confirm you are at least 18 years old and legally able to view adult material in your jurisdiction.
           </DialogDescription>
         </DialogHeader>
         <div className="mt-4 space-y-2">

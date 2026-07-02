@@ -16,7 +16,7 @@ export const verifyAge = createServerFn({ method: "POST" })
     const dob = new Date(data.dob);
     if (Number.isNaN(dob.getTime())) throw new Error("Invalid date of birth");
     const age = yearsBetween(dob, new Date());
-    if (age < 18) throw new Error("You must be 18 or older to use Twinly.ai");
+    if (age < 18) throw new Error("You must be 18 or older to use Twinly.life");
 
     const { error } = await context.supabase
       .from("profiles")

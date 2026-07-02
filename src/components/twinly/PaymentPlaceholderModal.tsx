@@ -16,7 +16,7 @@ export function PaymentPlaceholderModal({ open, onOpenChange, action }: {
           </div>
           <DialogTitle className="font-display">Payments coming soon</DialogTitle>
           <DialogDescription>
-            {action} will unlock once billing is enabled. Twinly.ai uses adult-compliant processors — no card is charged during preview.
+            {action} will unlock once billing is enabled. Twinly.life uses adult-compliant processors — no card is charged during preview.
           </DialogDescription>
         </DialogHeader>
         <Button onClick={() => onOpenChange(false)}>Got it</Button>

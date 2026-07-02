@@ -22,7 +22,7 @@ export function Legal({ title, children }: { title: string; children: React.Reac
 export const Route = createFileRoute("/legal/terms")({
   component: () => (
     <AppShell><Legal title="Terms of Service">
-      <p>Placeholder MVP terms. Twinly.ai is 18+. Content is provided by verified creators. AI personas are clearly disclosed on every message.</p>
+      <p>Placeholder MVP terms. Twinly.life is 18+. Content is provided by verified creators. AI personas are clearly disclosed on every message.</p>
     </Legal></AppShell>
   ),
 });

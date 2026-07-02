@@ -31,7 +31,7 @@ function Discover() {
       {creators.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-10 text-center">
           <div className="font-display text-xl font-semibold">No creators yet</div>
-          <p className="mt-2 text-sm text-muted-foreground">Twinly.ai is invite-only during preview. Verified creators launching soon.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Twinly.life is invite-only during preview. Verified creators launching soon.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

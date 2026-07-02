@@ -21,7 +21,7 @@ function AuthPage() {
           Twinly<span className="text-brand-glow">.ai</span>
         </Link>
         <div className="rounded-2xl border border-border bg-surface p-6">
-          <h1 className="font-display text-2xl font-bold">Enter Twinly.ai</h1>
+          <h1 className="font-display text-2xl font-bold">Enter Twinly.life</h1>
           <p className="mt-1 text-sm text-muted-foreground">18+ only. Every AI persona is clearly disclosed.</p>
           <div className="mt-6"><RoleSignupForm /></div>
         </div>
