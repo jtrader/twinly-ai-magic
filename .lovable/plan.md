@@ -1,67 +1,100 @@
+# Twinly Create — Audit Report
 
-## Goal
+## Verdict per requirement
 
-Add three capabilities to the persona chat surface:
+| # | Requirement | Status |
+|---|---|---|
+| 1 | Dynamic personas (4 seeded defaults) | ✅ Works — but seeded as `draft`, no publish nudge |
+| 2 | Custom personas + attach to packs | ✅ Works — no pack-type ↔ persona-kind guard |
+| 3 | Packs assigned to 1+ personas (M:N) | ✅ Fully implemented |
+| 4 | Real vs synthetic clearly separated | ⚠️ Schema ✅, UI ✅, but `saveGeneratedImage` / `generateVoiceNote` / `queueTalkingHead` inserts **omit** `source_type`, `internal_label`, `ai_disclosure_required` → assets land labelled `real_upload` |
+| 5 | Synthetic can't publish without approval | ✅ Queue path enforced; ⚠️ direct-generate path bypasses twin/policy checks |
+| 6 | Digital Twin Profile per creator | ✅ Fully implemented |
+| 7 | Consent gates generation | 🔴 Queue path ✅; `saveGeneratedImage` + `generateVoiceNote` do **not** call `assertTwinPolicy` |
+| 8 | Revoked consent blocks new work | 🔴 Same bypass as REQ 7 for image/voice |
+| 9 | Restricted / Do Not Use hidden from fans | ✅ `fan-feed.functions.ts` filters correctly |
+| 10 | Creators only see own data | ✅ RLS + `requireCreator`; ⚠️ `getTwinRefSignedUrl` accepts arbitrary path |
+| 11 | Admins manage all | ✅ Implemented |
+| 12 | Fans can't reach `/studio/*` | ⚠️ Client-side redirect only, no `beforeLoad` role gate |
+| 13 | Assets tie to creator/persona/pack/status | ✅ via queue; ⚠️ no `generation_request_id` FK on `content_assets` |
+| 14 | Approved assets publish to persona libraries | ✅ Works; edge case: inherits `restricted` silently |
+| 15 | Mobile-first, dark, PWA | ⚠️ Dark/mobile ✅; **no 192/512 PNG icons, no service worker** |
 
-1. **Fans can send voice messages** to any persona (Real Me + AI).
-2. **Creators/personas can reply with voice** — creators record voice notes into the Real Me inbox; AI personas can optionally generate a TTS voice reply.
-3. **Creators can save messages per persona** — canned replies that can be inserted into the composer (Real Me) or seeded as few-shot examples for the AI persona.
+## Critical bugs (block the whole Create flow)
 
-## Database changes (one migration)
+1. **Enum mismatch — `digital_twin_status`.** `assertTwinPolicy` checks `!== "ready"` but the enum is `none|pending|approved|revoked` (`generate-requests.functions.ts:53`). No creator can ever pass → entire queue is dead.
+2. **Enum mismatch — `persona.visibility`.** Checks `!== "published"` but enum is `draft|public|subscribers|vip|hidden` (`generate-requests.functions.ts:93`). Also always throws.
+3. **Direct-generate path bypasses consent.** `ai-generate.functions.ts:66-206` — `saveGeneratedImage` and `generateVoiceNote` never call `assertTwinPolicy`. Revoked creators can still generate + save. `queueTalkingHead` correctly gates.
+4. **Missing synthetic-labelling columns on direct-generate inserts.** Assets land as `source_type='real_upload'`, `internal_label='real_upload'`, `ai_disclosure_required=false`. Breaks fan-feed restricted filter and disclosure banner.
 
-- Extend `public.messages`:
-  - `attachment_url text` (storage object path)
-  - `attachment_kind text check in ('audio','image')` — starts audio-only
-  - `attachment_duration_ms integer`
-  - `transcript text` (STT result, searchable + shown as caption)
-- New table `public.persona_saved_messages`:
-  - `creator_id`, `persona_id`, `label text`, `body text`, `kind text check in ('text','voice')`, `attachment_url text`, `sort_order int`, timestamps
-  - GRANT to authenticated + service_role; RLS: only `can_manage_creator(creator_id)` can select/insert/update/delete.
-- New private storage bucket `voice-messages` (created via `supabase--storage_create_bucket`) with RLS on `storage.objects` scoping read to conversation participants (fan_id or creator owner) and write to the sender's own `{userId}/...` prefix.
+## Security / schema issues
 
-## Backend (server functions)
+- No storage RLS / path-prefix check on `getTwinRefSignedUrl` (`twin.functions.ts:301`).
+- `/studio/*` routes have no server-side creator role gate — only `useEffect` redirects.
+- `content_assets` has no `generation_request_id` FK — traceability gap.
+- `upsertTwinConsent` doesn't require `signed_at` when `*_ok` flags flip true.
+- No pack-type ↔ persona-kind compatibility guard.
 
-Add to `src/lib/chat.functions.ts`:
-- `uploadVoiceMessage` — accepts base64/blob metadata, returns signed upload target (client uploads directly to storage), then persists a `messages` row with `attachment_kind='audio'`, `attachment_url`, `duration_ms`. Runs rate-limit + moderation on `transcript` (once transcribed).
-- Extend `sendPersonaMessage` to accept optional `attachmentUrl`/`durationMs`/`transcript` and skip the text-only content guard when a voice attachment is present.
-- `transcribeVoice` — server fn that calls Lovable AI Gateway STT (Whisper) with the storage object, writes `transcript` back to the message row.
-- For AI personas: if the persona has `voice_enabled` (existing `creator_voice_profiles` row), synthesise TTS for the assistant reply via Lovable AI Gateway TTS, upload to `voice-messages`, and store as an assistant message with `attachment_kind='audio'`.
-- `getSignedVoiceUrl` — mints a short-lived signed URL for playback, gated by conversation participation.
+## UX gaps
 
-New file `src/lib/saved-messages.functions.ts`:
-- `listSavedMessages({ personaId })`, `createSavedMessage`, `updateSavedMessage`, `deleteSavedMessage`, `reorderSavedMessages`. All wrapped in `requireSupabaseAuth` + `can_manage_creator` check.
+- `window.prompt()` for rejection reason (`studio.create.tsx:292`) — bad on mobile.
+- No skeleton on `studio.create.tsx`; no per-route error boundaries.
+- Seeded personas land as `draft` with no onboarding CTA → empty fan feed.
+- Publish button on image tab disabled until stream final, no explainer copy.
+- PWA: only favicon.ico in manifest, no maskable icons, no service worker → not installable.
 
-## Frontend
+---
 
-`src/routes/chat.$handle.$persona.tsx` (fan chat):
-- Add a mic button to the composer using `MediaRecorder` (webm/opus). Show recording timer + waveform placeholder + cancel/send controls.
-- On send: upload blob to `voice-messages/{userId}/{uuid}.webm`, then call `sendPersonaMessage` with attachment metadata. Optimistically render a voice bubble with an inline `<audio>` player.
-- Render incoming messages with `attachment_kind='audio'` as a play/pause pill + duration + (transcript caption once available).
+# Recommended fix order
 
-`src/routes/studio.inbox.tsx` (creator Real Me inbox):
-- Add mic button to reply composer with the same recorder flow — creates a message with `sender_type='creator'` and voice attachment.
-- Add a "Saved replies" popover: lists persona's `persona_saved_messages`, click to insert text into composer or send voice directly.
+**Phase A — Unblock Create (critical, must ship first)**
 
-`src/routes/studio.personas.tsx` (persona editor):
-- New **Saved messages** tab per persona: CRUD list with label, body, optional voice recording; drag-reorder. Toggle "Use as AI few-shot examples" (adds to system prompt context) for AI personas.
+1. Fix `assertTwinPolicy` enum checks:
+   - `digital_twin_status !== "ready"` → `!== "approved"`
+   - `visibility !== "published"` → `!["public","subscribers","vip"].includes(visibility)`
+2. Add `assertTwinPolicy(kind, personaId, packId?)` calls to `saveGeneratedImage` (kind `image`) and `generateVoiceNote` (kind `voice`).
+3. Backfill missing insert fields on all three direct-generate paths: `source_type: 'ai_generated'`, `internal_label: 'ai_draft'`, `ai_disclosure_required: true`.
 
-Small `VoiceRecorder` component in `src/components/twinly/` reused across fan chat + inbox + saved-messages editor. Small `VoicePlayer` component for bubbles.
+**Phase B — Harden**
 
-## Security & UX guardrails
+4. Add `beforeLoad` creator-role gate on the `_authenticated/studio` layout (redirect fans to `/` with a toast).
+5. Path-prefix check in `getTwinRefSignedUrl`: reject unless path starts with `${creator.id}/`.
+6. Migration: `content_assets.generation_request_id uuid REFERENCES generation_requests(id) ON DELETE SET NULL`, index it, backfill from `produced_asset_ids`. Update `publishRequestPlaceholders` + direct-generate paths to set it.
+7. `upsertTwinConsent`: require `signed_at` when any `*_ok` flag is true.
+8. Guard pack↔persona attach by kind (e.g. block `wicked` pack on `real_me` persona) in `attachPackToPersona`.
 
-- Voice bucket is private; playback always via signed URLs bounded to conversation participants.
-- Max recording length: 60s (client-enforced + rejected server-side if `duration_ms > 60000`).
-- Same rate limiter as text chat (`chat` bucket).
-- Voice attachments run STT first, then the transcript flows through `screen_message` for moderation — blocked severity rejects the message and deletes the storage object.
-- Age-gate (`assertAdult`) still enforced.
+**Phase C — UX & PWA**
 
-## Assumptions
+9. Replace `window.prompt` rejection with a proper `<Dialog>` + textarea.
+10. Add per-route `errorComponent` + `pendingComponent` to every `studio.*.tsx`.
+11. Onboarding banner in `studio.personas.tsx` when any default persona is still `draft`, with one-click publish.
+12. PWA icons: generate 192, 512, and 512 maskable PNGs; wire them in `public/manifest.webmanifest`. Add a minimal service worker (offline shell + cache-first for static assets).
 
-- Lovable AI Gateway provides STT + TTS endpoints; if the current gateway helper lacks them, add small wrappers in `src/lib/venice.server.ts` sibling file `src/lib/voice.server.ts` (server-only).
-- AI voice replies are opt-in per persona (existing `creator_voice_profiles` row acts as the flag); no new consent surface needed beyond the existing Digital Twin consent.
-- Only audio for now — no video messages, no image attachments (schema leaves room for later).
+---
 
-## Out of scope
+# Build prompt (to hand to the build agent after approval)
 
-- Real-time voice calls
-- Per-message tipping/PPV on voice notes (existing subscription/tier gate still applies at the persona level)
+> Fix the Twinly Create audit findings in this order. Do not add new features.
+>
+> **A. Critical (in one migration-free code change):**
+> 1. In `src/lib/generate-requests.functions.ts`, in `assertTwinPolicy`: change the `digital_twin_status` check from `"ready"` to `"approved"`, and change the persona visibility check to allow `visibility in ("public","subscribers","vip")` (reject the rest with the current error message).
+> 2. In `src/lib/ai-generate.functions.ts`:
+>    - Import `assertTwinPolicy` (export it from `generate-requests.functions.ts` if not exported yet, as an internal server-only helper — do not expose it as a `createServerFn`).
+>    - Call `await assertTwinPolicy({ supabase, creatorId: creator.id, kind: "image", personaId, packId })` at the top of `saveGeneratedImage` handler, and `kind: "voice"` at the top of `generateVoiceNote`.
+>    - On the insert payloads in `saveGeneratedImage`, `generateVoiceNote`, and `queueTalkingHead`, add: `source_type: "ai_generated"`, `internal_label: "ai_draft"`, `ai_disclosure_required: true`.
+>
+> **B. Harden:**
+> 3. Create `src/routes/_authenticated/studio.tsx` (or update existing) with a `beforeLoad` that calls a server fn returning whether the user has a `creators` row (or `has_role` `creator`/`admin`); if not, `throw redirect({ to: "/", search: { toast: "creator-only" } })`.
+> 4. In `src/lib/twin.functions.ts` `getTwinRefSignedUrl`, reject when `storagePath` does not start with `${creator.id}/`.
+> 5. Migration `content_assets_generation_request_link`: add nullable `generation_request_id uuid references public.generation_requests(id) on delete set null`, index it, backfill from `generation_requests.produced_asset_ids`. Set it in `publishRequestPlaceholders`, `saveGeneratedImage`, `generateVoiceNote`, `queueTalkingHead`.
+> 6. In `upsertTwinConsent`, if any of the `*_ok` flags in the payload is `true`, require `signed_at`; otherwise throw.
+> 7. In `content-packs.functions.ts::attachPackToPersona`, reject when `pack.pack_type === "wicked"` and `persona.kind === "real_me"`.
+>
+> **C. UX & PWA:**
+> 8. Replace the `window.prompt` in `src/routes/studio.create.tsx` rejection flow with a shadcn `Dialog` + `Textarea` + confirm button. Pass the reason to the existing server fn.
+> 9. Add `errorComponent` and `pendingComponent` to every `src/routes/studio.*.tsx` route (spinner + retry that calls `router.invalidate()` and `reset()`).
+> 10. In `src/routes/studio.personas.tsx`, if any persona has `is_default_seed && visibility === 'draft'`, render a top banner "Publish your default personas to appear in Discover" with a one-click publish action.
+> 11. Generate 192×192, 512×512, and 512×512 maskable PNG icons for the Twin-T logo into `public/icons/`. Update `public/manifest.webmanifest` `icons` array to reference them (`purpose: "any"` and `purpose: "maskable"`).
+> 12. Add a Vite PWA plugin config (or a minimal `public/sw.js` + registration in `__root.tsx`) that caches the app shell and lets Twinly install on iOS/Android.
+>
+> Verify with `tsgo` after each phase and take a Playwright screenshot of `/studio/create` and `/studio/generate` after Phase A to confirm the queue is no longer permanently blocked. Do not touch auto-generated files under `src/integrations/supabase/` or `src/routeTree.gen.ts`.
