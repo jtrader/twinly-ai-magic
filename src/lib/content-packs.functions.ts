@@ -31,7 +31,7 @@ export const listPacks = createServerFn({ method: "GET" })
 
     const { data: packs, error } = await supabase
       .from("content_packs")
-      .select("id, name, slug, pack_type, description, cover_asset_id, status, starts_at, ends_at, sort_order, review_note, created_at, updated_at")
+      .select("id, name, slug, pack_type, description, cover_asset_id, status, starts_at, ends_at, sort_order, review_note, review_feedback, reviewed_at, tags, created_at, updated_at")
       .eq("creator_id", creator.id)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false });
@@ -54,7 +54,10 @@ export const listPacks = createServerFn({ method: "GET" })
       .eq("creator_id", creator.id)
       .order("sort_order", { ascending: true });
 
-    return { creator, packs: packs ?? [], items, attach, personas: personas ?? [] };
+    // Also surface asset tags in the summary so filter chips work across packs
+    const { data: assetTagRows } = await supabase
+      .from("content_assets").select("id, tags").eq("creator_id", creator.id);
+    return { creator, packs: packs ?? [], items, attach, personas: personas ?? [], assetTags: assetTagRows ?? [] };
   });
 
 export const getPack = createServerFn({ method: "POST" })
@@ -77,7 +80,7 @@ export const getPack = createServerFn({ method: "POST" })
       supabase.from("content_pack_items").select("asset_id, position, added_at").eq("pack_id", pack.id).order("position", { ascending: true }),
       supabase.from("content_pack_personas").select("persona_id, permission_type, attached_at").eq("pack_id", pack.id),
       supabase.from("personas").select("id, slug, display_name, kind, sort_order").eq("creator_id", creator.id).order("sort_order"),
-      supabase.from("content_assets").select("id, title, asset_type, storage_path, external_url, is_synthetic, ai_generated_label, approval_status, moderation_status, category, created_at").eq("creator_id", creator.id).order("created_at", { ascending: false }),
+      supabase.from("content_assets").select("id, title, asset_type, storage_path, external_url, is_synthetic, ai_generated_label, approval_status, moderation_status, category, tags, created_at").eq("creator_id", creator.id).order("created_at", { ascending: false }),
     ]);
     if (itemsRes.error) throw itemsRes.error;
     if (attachRes.error) throw attachRes.error;
