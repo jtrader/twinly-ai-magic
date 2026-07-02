@@ -19,6 +19,7 @@ import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
+import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
@@ -76,6 +77,11 @@ const StudioPersonasRoute = StudioPersonasRouteImport.update({
   path: '/studio/personas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioInboxRoute = StudioInboxRouteImport.update({
+  id: '/studio/inbox',
+  path: '/studio/inbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioContentRoute = StudioContentRouteImport.update({
   id: '/studio/content',
   path: '/studio/content',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/inbox': typeof StudioInboxRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/inbox': typeof StudioInboxRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/studio/content': typeof StudioContentRoute
+  '/studio/inbox': typeof StudioInboxRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/': typeof StudioIndexRoute
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/inbox'
     | '/studio/personas'
     | '/studio/'
     | '/chat/$handle/$persona'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/inbox'
     | '/studio/personas'
     | '/studio'
     | '/chat/$handle/$persona'
@@ -214,6 +225,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/studio/content'
+    | '/studio/inbox'
     | '/studio/personas'
     | '/studio/'
     | '/chat/$handle/$persona'
@@ -233,6 +245,7 @@ export interface RootRouteChildren {
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
   StudioContentRoute: typeof StudioContentRoute
+  StudioInboxRoute: typeof StudioInboxRoute
   StudioPersonasRoute: typeof StudioPersonasRoute
   StudioIndexRoute: typeof StudioIndexRoute
   ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
@@ -310,6 +323,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioPersonasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/inbox': {
+      id: '/studio/inbox'
+      path: '/studio/inbox'
+      fullPath: '/studio/inbox'
+      preLoaderRoute: typeof StudioInboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/content': {
       id: '/studio/content'
       path: '/studio/content'
@@ -369,6 +389,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
   StudioContentRoute: StudioContentRoute,
+  StudioInboxRoute: StudioInboxRoute,
   StudioPersonasRoute: StudioPersonasRoute,
   StudioIndexRoute: StudioIndexRoute,
   ChatHandlePersonaRoute: ChatHandlePersonaRoute,
