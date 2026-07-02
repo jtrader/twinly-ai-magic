@@ -263,7 +263,7 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
         provider: "heygen",
         provider_status: "submitted",
         render_started_at: new Date().toISOString(),
-        metadata: { tts_path: ttsPath, seconds, avatar_id: avatarId, voice_id: voiceId ?? null },
+        metadata: { tts_path: ttsPath, seconds, avatar_id: avatarId, voice_id: voiceId ?? null } as any,
       }).select("*").single();
     if (insErr) throw insErr;
     await attachPersonaAndPack(supabase, asset.id, data.personaId, data.packId);
