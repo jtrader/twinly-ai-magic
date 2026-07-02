@@ -39,6 +39,6 @@ export function PersonaCard(p: PersonaCardProps) {
       </div>
     </div>
   );
-  if (p.href) return <Link to={p.href} className="block h-full">{body}</Link>;
+  if (p.href) return <a href={p.href} className="block h-full">{body}</a>;
   return <button type="button" onClick={p.onClick} className="block w-full text-left h-full">{body}</button>;
 }
