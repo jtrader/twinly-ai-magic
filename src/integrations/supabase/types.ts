@@ -698,6 +698,9 @@ export type Database = {
       messages: {
         Row: {
           ai_generated: boolean
+          attachment_duration_ms: number | null
+          attachment_kind: string | null
+          attachment_url: string | null
           body: string
           conversation_id: string
           created_at: string
@@ -705,9 +708,13 @@ export type Database = {
           moderation_status: Database["public"]["Enums"]["moderation_status"]
           persona_id: string | null
           sender_type: Database["public"]["Enums"]["sender_type"]
+          transcript: string | null
         }
         Insert: {
           ai_generated?: boolean
+          attachment_duration_ms?: number | null
+          attachment_kind?: string | null
+          attachment_url?: string | null
           body: string
           conversation_id: string
           created_at?: string
@@ -715,9 +722,13 @@ export type Database = {
           moderation_status?: Database["public"]["Enums"]["moderation_status"]
           persona_id?: string | null
           sender_type: Database["public"]["Enums"]["sender_type"]
+          transcript?: string | null
         }
         Update: {
           ai_generated?: boolean
+          attachment_duration_ms?: number | null
+          attachment_kind?: string | null
+          attachment_url?: string | null
           body?: string
           conversation_id?: string
           created_at?: string
@@ -725,6 +736,7 @@ export type Database = {
           moderation_status?: Database["public"]["Enums"]["moderation_status"]
           persona_id?: string | null
           sender_type?: Database["public"]["Enums"]["sender_type"]
+          transcript?: string | null
         }
         Relationships: [
           {
@@ -821,6 +833,66 @@ export type Database = {
           },
         ]
       }
+      persona_saved_messages: {
+        Row: {
+          attachment_duration_ms: number | null
+          attachment_url: string | null
+          body: string | null
+          created_at: string
+          creator_id: string
+          id: string
+          kind: string
+          label: string
+          persona_id: string
+          sort_order: number
+          updated_at: string
+          use_as_few_shot: boolean
+        }
+        Insert: {
+          attachment_duration_ms?: number | null
+          attachment_url?: string | null
+          body?: string | null
+          created_at?: string
+          creator_id: string
+          id?: string
+          kind?: string
+          label: string
+          persona_id: string
+          sort_order?: number
+          updated_at?: string
+          use_as_few_shot?: boolean
+        }
+        Update: {
+          attachment_duration_ms?: number | null
+          attachment_url?: string | null
+          body?: string | null
+          created_at?: string
+          creator_id?: string
+          id?: string
+          kind?: string
+          label?: string
+          persona_id?: string
+          sort_order?: number
+          updated_at?: string
+          use_as_few_shot?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "persona_saved_messages_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "persona_saved_messages_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       personas: {
         Row: {
           boundary_rules: Json
@@ -845,9 +917,11 @@ export type Database = {
           system_prompt: string | null
           tone_rules: Json
           training_notes: Json
+          tts_voice: string | null
           twin_link_mode: string
           updated_at: string
           visibility: Database["public"]["Enums"]["visibility"]
+          voice_reply_enabled: boolean
         }
         Insert: {
           boundary_rules?: Json
@@ -872,9 +946,11 @@ export type Database = {
           system_prompt?: string | null
           tone_rules?: Json
           training_notes?: Json
+          tts_voice?: string | null
           twin_link_mode?: string
           updated_at?: string
           visibility?: Database["public"]["Enums"]["visibility"]
+          voice_reply_enabled?: boolean
         }
         Update: {
           boundary_rules?: Json
@@ -899,9 +975,11 @@ export type Database = {
           system_prompt?: string | null
           tone_rules?: Json
           training_notes?: Json
+          tts_voice?: string | null
           twin_link_mode?: string
           updated_at?: string
           visibility?: Database["public"]["Enums"]["visibility"]
+          voice_reply_enabled?: boolean
         }
         Relationships: [
           {
