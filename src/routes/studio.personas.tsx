@@ -694,6 +694,22 @@ function EditPersonaDialog({
               </div>
             )
           )}
+          <div className="rounded-lg border border-border bg-surface p-3 text-xs">
+            <div className="mb-1 font-semibold">HeyGen render IDs (talking-head)</div>
+            <p className="mb-2 text-muted-foreground">
+              Paste the avatar and (optional) voice IDs from your HeyGen account. Used when this persona queues a talking-head clip. Leave blank to fall back to workspace defaults.
+            </p>
+            <div className="grid gap-2 md:grid-cols-2">
+              <div>
+                <Label className="text-[11px]">Avatar ID</Label>
+                <Input className="mt-1" value={heygenAvatarId} onChange={(e) => setHeygenAvatarId(e.target.value)} placeholder="e.g. Daisy_sitting_sofa_side_public" maxLength={120} />
+              </div>
+              <div>
+                <Label className="text-[11px]">Voice ID (optional)</Label>
+                <Input className="mt-1" value={heygenVoiceId} onChange={(e) => setHeygenVoiceId(e.target.value)} placeholder="Leave blank to use our TTS voice selection" maxLength={120} />
+              </div>
+            </div>
+          </div>
         </div>
         )}
         <DialogFooter>
