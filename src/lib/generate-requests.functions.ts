@@ -13,6 +13,99 @@ async function requireCreator(supabase: any, userId: string) {
 const OUTPUT_TYPES = ["image","audio","video","talking_head","promo_banner"] as const;
 type OutputType = typeof OUTPUT_TYPES[number];
 
+// Which consent flag each output type requires. Enforced server-side so
+// synthetic generation can never be requested for a modality the creator
+// has not explicitly consented to via their Digital Twin Profile.
+const CONSENT_FIELD: Record<OutputType, "image_ok" | "voice_ok" | "video_ok"> = {
+  image: "image_ok",
+  promo_banner: "image_ok",
+  audio: "voice_ok",
+  video: "video_ok",
+  talking_head: "video_ok",
+};
+
+/**
+ * Verifies the creator has an active Digital Twin consent covering the
+ * requested output modality, the persona belongs to them and is approved
+ * ("published" visibility), and the pack (if any) belongs to them.
+ * Returns the loaded consent + persona rows for downstream namespacing.
+ */
+async function assertTwinPolicy(
+  supabase: any,
+  creatorId: string,
+  outputType: OutputType,
+  personaId: string | null,
+  packId: string | null,
+) {
+  if (!personaId) {
+    throw new Error("Choose an approved persona before requesting synthetic content.");
+  }
+
+  const { data: creator, error: cErr } = await supabase
+    .from("creators")
+    .select("id, digital_twin_status")
+    .eq("id", creatorId)
+    .single();
+  if (cErr) throw cErr;
+  if (creator.digital_twin_status !== "ready") {
+    throw new Error("Your Digital Twin Profile must be marked ready before generating synthetic content.");
+  }
+
+  const { data: consent, error: kErr } = await supabase
+    .from("digital_twin_consent")
+    .select("likeness_ok, image_ok, voice_ok, video_ok, signed_at, revoked_at, forbidden_uses")
+    .eq("creator_id", creatorId)
+    .maybeSingle();
+  if (kErr) throw kErr;
+  if (!consent || !consent.signed_at || consent.revoked_at) {
+    throw new Error("Active Digital Twin consent is required.");
+  }
+  if (!consent.likeness_ok) {
+    throw new Error("Likeness consent has not been granted.");
+  }
+  const field = CONSENT_FIELD[outputType];
+  if (!consent[field]) {
+    throw new Error(`Consent for ${outputType.replace("_"," ")} generation has not been granted.`);
+  }
+
+  // Forbidden-use guard: if the creator listed the output modality in
+  // forbidden_uses, block outright.
+  const forbidden: string[] = Array.isArray(consent.forbidden_uses)
+    ? consent.forbidden_uses.map((v: any) => String(v).toLowerCase())
+    : [];
+  if (forbidden.includes(outputType) || forbidden.includes(field.replace("_ok",""))) {
+    throw new Error("This output type is on your forbidden-uses list.");
+  }
+
+  const { data: persona, error: pErr } = await supabase
+    .from("personas")
+    .select("id, visibility, creator_id")
+    .eq("id", personaId)
+    .eq("creator_id", creatorId)
+    .maybeSingle();
+  if (pErr) throw pErr;
+  if (!persona) throw new Error("Persona not found in your namespace.");
+  if (persona.visibility !== "published") {
+    throw new Error("Persona must be published (approved) before it can receive synthetic content.");
+  }
+
+  if (packId) {
+    const { data: pack, error: kErr2 } = await supabase
+      .from("content_packs")
+      .select("id, status, creator_id")
+      .eq("id", packId)
+      .eq("creator_id", creatorId)
+      .maybeSingle();
+    if (kErr2) throw kErr2;
+    if (!pack) throw new Error("Content pack not found in your namespace.");
+    if (pack.status && !["approved","draft","pending"].includes(pack.status)) {
+      throw new Error("Selected pack is not eligible.");
+    }
+  }
+
+  return { consent, persona };
+}
+
 export const listGenerationRequests = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { status?: string } | undefined) => d ?? {})
@@ -51,6 +144,22 @@ export const createGenerationRequest = createServerFn({ method: "POST" })
     const notes = (data.promptNotes ?? "").trim().slice(0, 2000);
     if (!notes) throw new Error("Add prompt notes so reviewers know what to generate.");
 
+    // Enforce twin-consent + persona-approval policy at submit time. Drafts
+    // may be saved without a persona, but submitting/queueing requires it.
+    if (data.submit) {
+      await assertTwinPolicy(supabase, creator.id, data.outputType, data.personaId ?? null, data.packId ?? null);
+    } else if (data.personaId || data.packId) {
+      // Even for drafts, verify ownership so cross-creator IDs cannot be stored.
+      if (data.personaId) {
+        const { data: p } = await supabase.from("personas").select("id").eq("id", data.personaId).eq("creator_id", creator.id).maybeSingle();
+        if (!p) throw new Error("Persona not found in your namespace.");
+      }
+      if (data.packId) {
+        const { data: k } = await supabase.from("content_packs").select("id").eq("id", data.packId).eq("creator_id", creator.id).maybeSingle();
+        if (!k) throw new Error("Content pack not found in your namespace.");
+      }
+    }
+
     const status = data.submit ? "queued" : "draft";
     const { data: row, error } = await supabase
       .from("generation_requests").insert({
@@ -77,6 +186,19 @@ export const updateRequestStatus = createServerFn({ method: "POST" })
   .validator((d: { id: string; action: "submit" | "cancel" | "mark_generated" | "needs_review" | "approve" | "reject"; note?: string }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const creator = await requireCreator(supabase, userId);
+    // Load request first so we can re-verify policy on any state change that
+    // moves the request forward (submit / approve).
+    const { data: existing, error: exErr } = await supabase
+      .from("generation_requests")
+      .select("id, creator_id, persona_id, pack_id, output_type, status")
+      .eq("id", data.id)
+      .eq("creator_id", creator.id)
+      .single();
+    if (exErr) throw exErr;
+    if (data.action === "submit" || data.action === "approve") {
+      await assertTwinPolicy(supabase, creator.id, existing.output_type as OutputType, existing.persona_id, existing.pack_id);
+    }
     const patch: any = {};
     switch (data.action) {
       case "submit": patch.status = "queued"; patch.submitted_at = new Date().toISOString(); break;
@@ -110,6 +232,9 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
       .from("generation_requests").select("*").eq("id", data.id).eq("creator_id", creator.id).single();
     if (reqErr) throw reqErr;
     if (req.status !== "approved") throw new Error("Only approved requests can be published.");
+    // Re-verify policy at publish time so a consent revocation or persona
+    // unpublish between approval and publish still blocks synthetic writes.
+    await assertTwinPolicy(supabase, creator.id, req.output_type as OutputType, req.persona_id, req.pack_id);
 
     const kindMap: Record<string, string> = {
       image: "image", promo_banner: "image",
