@@ -185,3 +185,77 @@ export const loadConversation = createServerFn({ method: "GET" })
     const { data: messages } = await supabase.from("messages").select("*").eq("conversation_id", data.conversationId).order("created_at", { ascending: true });
     return { convo, messages: messages ?? [] };
   });
+
+/** Ensure the current user participates in a conversation. Returns the convo row. */
+async function requireConversationAccess(supabase: any, userId: string, conversationId: string) {
+  const { data: convo, error } = await supabase
+    .from("conversations")
+    .select("id, fan_id, creator_id, persona_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!convo) throw new Error("Conversation not found");
+  if (convo.fan_id === userId) return convo;
+  // creator/agency ownership check via admin
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: creator } = await supabaseAdmin
+    .from("creators")
+    .select("user_id")
+    .eq("id", convo.creator_id)
+    .maybeSingle();
+  if (creator?.user_id === userId) return convo;
+  throw new Error("Not authorized for this conversation");
+}
+
+/** Mint a short-lived signed URL for a voice-messages object, scoped to a conversation. */
+export const getSignedVoiceUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { conversationId: string; path: string }) => d)
+  .handler(async ({ data, context }) => {
+    await requireConversationAccess(context.supabase, context.userId, data.conversationId);
+    if (!data.path.startsWith(`${data.conversationId}/`)) {
+      throw new Error("Invalid voice path");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: signed, error } = await supabaseAdmin.storage
+      .from("voice-messages")
+      .createSignedUrl(data.path, 300);
+    if (error) throw error;
+    return { url: signed?.signedUrl ?? null };
+  });
+
+/**
+ * Transcribe an already-uploaded voice-messages object. Returns the transcript.
+ * Client uploads first, then calls this before sending the message so the
+ * outbound moderation gate can screen the transcript.
+ */
+export const transcribeVoiceObject = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { conversationId: string; path: string; mimeType?: string }) => d)
+  .handler(async ({ data, context }) => {
+    await requireConversationAccess(context.supabase, context.userId, data.conversationId);
+    if (!data.path.startsWith(`${data.conversationId}/`)) throw new Error("Invalid voice path");
+
+    const allowed = await checkRateLimit(context.supabase, "voice_stt", 30, 300);
+    if (!allowed) throw new Error("Too many voice notes. Please slow down.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: blob, error } = await supabaseAdmin.storage
+      .from("voice-messages")
+      .download(data.path);
+    if (error || !blob) throw new Error("Voice file not found");
+    if (blob.size < 512) throw new Error("Recording is too short");
+    if (blob.size > 25 * 1024 * 1024) throw new Error("Voice note too large");
+
+    const bytes = await blob.arrayBuffer();
+    const mime = data.mimeType || blob.type || "audio/webm";
+    const ext = mime.includes("mp4") ? "mp4" : mime.includes("mpeg") ? "mp3" : mime.includes("wav") ? "wav" : "webm";
+    const { transcribeAudio } = await import("./voice.server");
+    try {
+      const transcript = await transcribeAudio(bytes, `voice.${ext}`, mime);
+      return { transcript };
+    } catch (e: any) {
+      console.error("[twinly] STT error:", e);
+      return { transcript: "" };
+    }
+  });
