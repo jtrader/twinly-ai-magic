@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
-import { Sparkles, MessageCircle, ShieldCheck, Compass } from "lucide-react";
+import { Sparkles, MessageCircle, ShieldCheck, Compass, Heart } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { getMyFeed, listMyFollows } from "@/lib/follows.functions";
 
 export const Route = createFileRoute("/fan")({
   component: FanDashboard,
@@ -24,6 +26,10 @@ function FanDashboard() {
   const [convos, setConvos] = useState<any[]>([]);
   const [profile, setProfile] = useState<{ age_verified_at: string | null } | null>(null);
   const [ready, setReady] = useState(false);
+  const [feed, setFeed] = useState<any[]>([]);
+  const [follows, setFollows] = useState<any[]>([]);
+  const loadFeed = useServerFn(getMyFeed);
+  const loadFollows = useServerFn(listMyFollows);
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
@@ -42,6 +48,11 @@ function FanDashboard() {
       setSubs(s ?? []);
       setConvos(c ?? []);
       setProfile(p ?? null);
+      try {
+        const [f, fol] = await Promise.all([loadFeed({}), loadFollows({})]);
+        setFeed(f.items ?? []);
+        setFollows(fol ?? []);
+      } catch {}
       setReady(true);
     })();
   }, [user]);
@@ -62,8 +73,68 @@ function FanDashboard() {
         <Stat label="Active subscriptions" value={subs.filter((s) => s.status === "active").length} />
         <Stat label="Recent chats" value={convos.length} />
         <Stat label="Age verified" value={profile?.age_verified_at ? "Yes" : "No"} tone={profile?.age_verified_at ? "ok" : "warn"} />
-        <Stat label="Followed creators" value={subs.length} />
+        <Stat label="Followed creators" value={follows.length} />
       </div>
+
+      <section className="mb-6">
+        <SectionHead icon={<Heart className="size-4 text-brand-glow" />} title="Your feed" />
+        {feed.length === 0 ? (
+          <EmptyRow text="Follow creators to build your feed." cta={{ to: "/discover", label: "Discover creators" }} />
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {feed.slice(0, 12).map((it) => (
+              <Link
+                key={it.personaId}
+                to="/creators/$handle/$persona"
+                params={{ handle: it.handle, persona: it.personaSlug }}
+                className="block rounded-2xl border border-border bg-surface p-4 hover:border-brand/40 hover:bg-surface-elevated"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate font-display font-semibold">
+                      {it.displayName}
+                      {it.favorite && <Heart className="ml-1 inline size-3 fill-current text-brand-glow" />}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {it.stageName} · @{it.handle}
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-xs">{it.kind === "ai" ? "AI" : "Real"}</Badge>
+                </div>
+                {it.disclosureLabel && (
+                  <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{it.disclosureLabel}</p>
+                )}
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {follows.length > 0 && (
+        <section className="mb-6">
+          <SectionHead icon={<Heart className="size-4 text-brand-glow" />} title="Following" />
+          <div className="grid gap-3 md:grid-cols-2">
+            {follows.map((f) => (
+              <div key={f.creatorId} className="rounded-2xl border border-border bg-surface p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate font-display font-semibold">
+                      {f.stageName ?? "Creator"}
+                      {f.favorite && <Heart className="ml-1 inline size-3 fill-current text-brand-glow" />}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">@{f.handle}</div>
+                  </div>
+                  {f.handle && (
+                    <Link to="/creators/$handle" params={{ handle: f.handle }}>
+                      <Button size="sm" variant="outline">Open</Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mb-6">
         <SectionHead icon={<Sparkles className="size-4 text-brand-glow" />} title="Your subscriptions" />
