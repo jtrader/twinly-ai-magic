@@ -189,6 +189,12 @@ export type Database = {
           is_synthetic: boolean
           moderation_status: Database["public"]["Enums"]["moderation_status"]
           price_cents: number
+          provider: string | null
+          provider_error: string | null
+          provider_job_id: string | null
+          provider_status: string | null
+          render_completed_at: string | null
+          render_started_at: string | null
           source_type: Database["public"]["Enums"]["asset_source_type"]
           storage_path: string | null
           tags: string[]
@@ -212,6 +218,12 @@ export type Database = {
           is_synthetic?: boolean
           moderation_status?: Database["public"]["Enums"]["moderation_status"]
           price_cents?: number
+          provider?: string | null
+          provider_error?: string | null
+          provider_job_id?: string | null
+          provider_status?: string | null
+          render_completed_at?: string | null
+          render_started_at?: string | null
           source_type?: Database["public"]["Enums"]["asset_source_type"]
           storage_path?: string | null
           tags?: string[]
@@ -235,6 +247,12 @@ export type Database = {
           is_synthetic?: boolean
           moderation_status?: Database["public"]["Enums"]["moderation_status"]
           price_cents?: number
+          provider?: string | null
+          provider_error?: string | null
+          provider_job_id?: string | null
+          provider_status?: string | null
+          render_completed_at?: string | null
+          render_started_at?: string | null
           source_type?: Database["public"]["Enums"]["asset_source_type"]
           storage_path?: string | null
           tags?: string[]
@@ -810,6 +828,8 @@ export type Database = {
           disclosure_label: string
           display_name: string
           ends_at: string | null
+          heygen_avatar_id: string | null
+          heygen_voice_id: string | null
           id: string
           is_default_seed: boolean
           is_explicit: boolean
@@ -835,6 +855,8 @@ export type Database = {
           disclosure_label: string
           display_name: string
           ends_at?: string | null
+          heygen_avatar_id?: string | null
+          heygen_voice_id?: string | null
           id?: string
           is_default_seed?: boolean
           is_explicit?: boolean
@@ -860,6 +882,8 @@ export type Database = {
           disclosure_label?: string
           display_name?: string
           ends_at?: string | null
+          heygen_avatar_id?: string | null
+          heygen_voice_id?: string | null
           id?: string
           is_default_seed?: boolean
           is_explicit?: boolean
