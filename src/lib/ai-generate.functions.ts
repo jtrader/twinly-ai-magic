@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { logAudit } from "./audit.server";
+import { assertTwinPolicy } from "./generate-requests.functions";
 
 async function requireCreator(supabase: any, userId: string) {
   const { data, error } = await supabase
@@ -190,10 +191,67 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
     const script = data.script.trim();
     if (script.length < 4) throw new Error("Script must be at least 4 characters.");
     if (script.length > 1000) throw new Error("Script must be under 1000 characters.");
+    if (!data.personaId) throw new Error("Pick a persona so we know which avatar/voice to render.");
     const seconds = Math.min(60, Math.max(5, Math.floor(data.durationSeconds ?? 15)));
 
+    // Twin consent + persona ownership + pack membership (video modality).
+    await assertTwinPolicy(supabase, creator.id, "video", data.personaId, data.packId ?? null);
+
+    // Resolve HeyGen avatar/voice: persona override → workspace defaults → error.
+    const { data: persona, error: pErr } = await supabase
+      .from("personas")
+      .select("id, heygen_avatar_id, heygen_voice_id")
+      .eq("id", data.personaId)
+      .maybeSingle();
+    if (pErr) throw pErr;
+    const avatarId =
+      (persona?.heygen_avatar_id?.trim() as string | undefined) ||
+      process.env.HEYGEN_DEFAULT_AVATAR_ID ||
+      null;
+    const voiceId =
+      (persona?.heygen_voice_id?.trim() as string | undefined) ||
+      process.env.HEYGEN_DEFAULT_VOICE_ID ||
+      null;
+    if (!avatarId) throw new Error("This persona has no HeyGen avatar ID — set one in Persona → Twin tab, or configure HEYGEN_DEFAULT_AVATAR_ID.");
+
+    // 1) Generate TTS audio via existing Lovable AI gateway pipeline.
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+    const ttsRes = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-4o-mini-tts",
+        input: script,
+        voice: (voiceId as string) || "alloy",
+        response_format: "mp3",
+      }),
+    });
+    if (!ttsRes.ok) {
+      const err = await ttsRes.text().catch(() => "");
+      if (ttsRes.status === 429) throw new Error("Rate limited — try again in a moment.");
+      if (ttsRes.status === 402) throw new Error("AI credits exhausted. Top up in workspace billing.");
+      throw new Error(`Voice generation failed (${ttsRes.status}): ${err.slice(0, 200)}`);
+    }
+    const audioBuf = new Uint8Array(await ttsRes.arrayBuffer());
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const ttsPath = `${creator.id}/generated/tts-${Date.now()}.mp3`;
+    const { error: ttsUpErr } = await supabaseAdmin.storage
+      .from("content-assets")
+      .upload(ttsPath, audioBuf, { contentType: "audio/mpeg", upsert: false });
+    if (ttsUpErr) throw ttsUpErr;
+
+    // HeyGen needs a publicly-fetchable URL for the audio — signed URL, 6h.
+    const { data: signed, error: signErr } = await supabaseAdmin.storage
+      .from("content-assets")
+      .createSignedUrl(ttsPath, 60 * 60 * 6);
+    if (signErr || !signed?.signedUrl) throw signErr ?? new Error("Failed to sign TTS URL");
+
     const title = (data.title?.trim() || `AI talking-head — ${new Date().toISOString().slice(0, 10)}`).slice(0, 120);
-    const { data: asset, error } = await supabase
+
+    // 2) Create the placeholder asset (rendering) so we can correlate the webhook.
+    const { data: asset, error: insErr } = await supabase
       .from("content_assets").insert({
         creator_id: creator.id,
         title,
@@ -201,15 +259,44 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
         is_synthetic: true,
         ai_generated_label: true,
         approval_status: "pending",
-        category: "ai_talking_head_queued",
+        category: "ai_talking_head_rendering",
+        provider: "heygen",
+        provider_status: "submitted",
+        render_started_at: new Date().toISOString(),
+        metadata: { tts_path: ttsPath, seconds, avatar_id: avatarId, voice_id: voiceId ?? null },
       }).select("*").single();
-    if (error) throw error;
-
+    if (insErr) throw insErr;
     await attachPersonaAndPack(supabase, asset.id, data.personaId, data.packId);
-    await logAudit(userId, "ai.talking_head_queued", { type: "asset", id: asset.id }, {
-      chars: script.length, seconds,
-    });
-    return { asset, status: "queued" as const };
+
+    // 3) Submit to HeyGen. On failure, mark the asset failed but keep the TTS for retry visibility.
+    try {
+      const { submitTalkingHead } = await import("./heygen.server");
+      const { videoId } = await submitTalkingHead({
+        avatarId,
+        audioUrl: signed.signedUrl,
+        title,
+      });
+      await supabase.from("content_assets")
+        .update({ provider_job_id: videoId, provider_status: "processing" })
+        .eq("id", asset.id);
+      await logAudit(userId, "ai.talking_head_submitted", { type: "asset", id: asset.id }, {
+        chars: script.length, seconds, provider: "heygen", video_id: videoId,
+      });
+      return { asset: { ...asset, provider_job_id: videoId }, status: "rendering" as const };
+    } catch (e: any) {
+      const msg = e?.message ?? "HeyGen submit failed";
+      await supabase.from("content_assets")
+        .update({
+          approval_status: "rejected",
+          category: "ai_talking_head_failed",
+          provider_status: "failed",
+          provider_error: msg.slice(0, 500),
+        })
+        .eq("id", asset.id);
+      // Best-effort cleanup of the orphan TTS
+      await supabaseAdmin.storage.from("content-assets").remove([ttsPath]).catch(() => {});
+      throw new Error(msg);
+    }
   });
 
 /**
@@ -224,7 +311,7 @@ export const listTalkingHeadJobs = createServerFn({ method: "GET" })
     const creator = await requireCreator(supabase, userId);
     const { data, error } = await supabase
       .from("content_assets")
-      .select("id, title, created_at, approval_status, category, storage_path")
+      .select("id, title, created_at, approval_status, category, storage_path, provider, provider_status, provider_error, provider_job_id, render_started_at, render_completed_at")
       .eq("creator_id", creator.id)
       .eq("asset_type", "video")
       .eq("is_synthetic", true)
@@ -240,6 +327,7 @@ export const listTalkingHeadJobs = createServerFn({ method: "GET" })
       else if (r.approval_status === "rejected" || r.approval_status === "blocked") status = "failed";
       else if (r.storage_path && r.approval_status === "pending") status = "completed";
       else if (r.category === "ai_talking_head_rendering") status = "rendering";
+      else if (r.category === "ai_talking_head_failed") status = "failed";
       else if (r.category === "ai_talking_head_queued") status = "queued";
       return {
         id: r.id as string,
@@ -247,6 +335,11 @@ export const listTalkingHeadJobs = createServerFn({ method: "GET" })
         created_at: r.created_at as string,
         approval_status: r.approval_status as string | null,
         status,
+        provider: (r.provider as string | null) ?? null,
+        provider_status: (r.provider_status as string | null) ?? null,
+        provider_error: (r.provider_error as string | null) ?? null,
+        render_started_at: (r.render_started_at as string | null) ?? null,
+        render_completed_at: (r.render_completed_at as string | null) ?? null,
       };
     });
     return { jobs };
