@@ -205,3 +205,95 @@ export const getAssetSignedUrl = createServerFn({ method: "POST" })
     if (error) throw error;
     return { url: signed.signedUrl };
   });
+
+type BulkItem = {
+  title: string;
+  assetType: AssetType;
+  storagePath?: string;
+  externalUrl?: string;
+  category?: string;
+  isSynthetic?: boolean;
+};
+
+export const bulkCreateAssets = createServerFn({ method: "POST" })
+  .validator((d: {
+    items: BulkItem[];
+    attachPersonaIds?: string[];
+    permissionType?: PermissionType;
+  }) => d)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const creator = await requireCreator(supabase, userId);
+
+    if (!data.items?.length) throw new Error("No files to import.");
+    if (data.items.length > 50) throw new Error("Import up to 50 files at a time.");
+
+    const rows = data.items.map((it) => {
+      const title = (it.title ?? "").trim();
+      if (title.length < 1 || title.length > 120) throw new Error(`Invalid title: "${it.title}"`);
+      if (!it.storagePath && !it.externalUrl) throw new Error(`Missing source for "${title}"`);
+      if (it.storagePath && !it.storagePath.startsWith(`${creator.id}/`)) {
+        throw new Error("Storage path not owned by this creator.");
+      }
+      return {
+        creator_id: creator.id,
+        title,
+        asset_type: it.assetType,
+        storage_path: it.storagePath ?? null,
+        external_url: it.externalUrl ?? null,
+        category: it.category?.trim() || null,
+        is_synthetic: !!it.isSynthetic,
+        ai_generated_label: !!it.isSynthetic,
+      };
+    });
+
+    const { data: inserted, error } = await supabase
+      .from("content_assets").insert(rows).select("id");
+    if (error) throw error;
+
+    const permission = data.permissionType ?? "included";
+    if (data.attachPersonaIds?.length && inserted?.length) {
+      const links: any[] = [];
+      for (const a of inserted) {
+        for (const persona_id of data.attachPersonaIds) {
+          links.push({ asset_id: a.id, persona_id, permission_type: permission });
+        }
+      }
+      const { error: linkErr } = await supabase
+        .from("persona_content_permissions").insert(links);
+      if (linkErr) throw linkErr;
+    }
+
+    await logAudit(userId, "asset.bulk_created", { type: "creator", id: creator.id }, {
+      count: inserted?.length ?? 0,
+      attached_personas: data.attachPersonaIds ?? [],
+      permission,
+    });
+    return { count: inserted?.length ?? 0 };
+  });
+
+export const listAssetAudit = createServerFn({ method: "POST" })
+  .validator((d: { assetId: string }) => d)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    // Verify caller owns this asset before returning the log.
+    const { data: asset, error: aerr } = await supabase
+      .from("content_assets").select("id, creator_id, title, created_at")
+      .eq("id", data.assetId).maybeSingle();
+    if (aerr) throw aerr;
+    if (!asset) throw new Error("Asset not found.");
+
+    // audit_logs is admin-RLS; ownership was just verified via user-scoped read.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: entries, error } = await supabaseAdmin
+      .from("audit_logs")
+      .select("id, action, metadata, created_at, actor_user_id")
+      .eq("subject_type", "asset")
+      .eq("subject_id", data.assetId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    return { entries: entries ?? [], asset };
+  });
