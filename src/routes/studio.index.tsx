@@ -71,6 +71,16 @@ function StudioHome() {
         <Stat label="Revenue (MTD)" value="—" hint="Coming soon" />
       </div>
 
+      <div className="mb-6">
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Analytics (placeholders)</div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Stat label="Profile views (7d)" value="—" />
+          <Stat label="Chats started (7d)" value="—" />
+          <Stat label="Avg session (min)" value="—" />
+          <Stat label="Vault views (7d)" value="—" />
+        </div>
+      </div>
+
       <div className="grid gap-3 md:grid-cols-2">
         <Tile to="/creators/$handle" params={{ handle: creator.handle }} icon={<BadgeCheck className="size-5 text-brand-glow" />} title="Public profile" desc="See what fans see." />
         <Tile to="/studio/personas" icon={<Sparkles className="size-5 text-brand-glow" />} title="Persona studio" desc="Create, edit, publish, reorder personas." />
