@@ -52,7 +52,10 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
 
     // Look up creator + persona (public read via admin — cheap and RLS-agnostic)
     const { data: creator } = await supabaseAdmin
-      .from("creators").select("id").eq("handle", data.creatorHandle).maybeSingle();
+      .from("creators")
+      .select("id, away_mode, away_message, away_auto_reply_enabled, away_allow_ai_personas")
+      .eq("handle", data.creatorHandle)
+      .maybeSingle();
     if (!creator) throw new Error("Creator not found");
 
     const { data: persona } = await supabaseAdmin
@@ -86,8 +89,33 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
     let assistantText: string | null = null;
     let isSynthetic = false;
     let assistantVoiceUrl: string | null = null;
+    let awayAutoReply = false;
+
+    // Away routing: Real Me while creator is away → auto-reply from system.
+    if (persona.kind === "real_me" && creator.away_mode && creator.away_auto_reply_enabled) {
+      awayAutoReply = true;
+      assistantText = creator.away_message || "The creator is away right now — they'll reply personally when back.";
+      await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        sender_type: "system",
+        body: assistantText,
+        ai_generated: false,
+        persona_id: persona.id,
+      });
+    }
 
     if (persona.kind === "ai") {
+      if (creator.away_mode && !creator.away_allow_ai_personas) {
+        awayAutoReply = true;
+        assistantText = creator.away_message || "The creator is away and has paused AI personas.";
+        await supabase.from("messages").insert({
+          conversation_id: conversationId,
+          sender_type: "system",
+          body: assistantText,
+          ai_generated: false,
+          persona_id: persona.id,
+        });
+      } else {
       isSynthetic = true;
       const promptText = hasVoice ? (data.transcript || "(voice note)") : data.content;
       // Pull saved few-shot examples for this persona (best-effort)
@@ -129,6 +157,7 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
         attachment_kind: assistantVoiceUrl ? "audio" : null,
         transcript: assistantVoiceUrl ? assistantText : null,
       });
+      }
     }
 
     await supabase
@@ -140,9 +169,10 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
       persona_kind: persona.kind,
       severity,
       voice: hasVoice,
+      away_auto_reply: awayAutoReply,
     });
 
-    return { conversationId, assistantText, assistantVoiceUrl, isSynthetic, kind: persona.kind };
+    return { conversationId, assistantText, assistantVoiceUrl, isSynthetic, kind: persona.kind, awayAutoReply };
   });
 
 async function generateAiReply(persona: any, userMessage: string, fewshot: Array<{ label: string; body: string | null }> = []): Promise<string> {

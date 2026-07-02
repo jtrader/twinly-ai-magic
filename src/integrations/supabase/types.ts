@@ -508,6 +508,11 @@ export type Database = {
         Row: {
           agency_id: string | null
           avatar_url: string | null
+          away_allow_ai_personas: boolean
+          away_auto_reply_enabled: boolean
+          away_message: string
+          away_mode: boolean
+          away_started_at: string | null
           bio: string | null
           cover_url: string | null
           created_at: string
@@ -525,6 +530,11 @@ export type Database = {
         Insert: {
           agency_id?: string | null
           avatar_url?: string | null
+          away_allow_ai_personas?: boolean
+          away_auto_reply_enabled?: boolean
+          away_message?: string
+          away_mode?: boolean
+          away_started_at?: string | null
           bio?: string | null
           cover_url?: string | null
           created_at?: string
@@ -542,6 +552,11 @@ export type Database = {
         Update: {
           agency_id?: string | null
           avatar_url?: string | null
+          away_allow_ai_personas?: boolean
+          away_auto_reply_enabled?: boolean
+          away_message?: string
+          away_mode?: boolean
+          away_started_at?: string | null
           bio?: string | null
           cover_url?: string | null
           created_at?: string
