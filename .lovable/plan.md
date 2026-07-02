@@ -1,100 +1,57 @@
-# Twinly Create — Audit Report
+# OAuth Sign-in + Admin Seeding
 
-## Verdict per requirement
+## Heads up on Microsoft
+Lovable Cloud managed auth natively supports **Google** and **Apple** only. **Microsoft is not available** as a managed provider. Options:
+- **A (recommended):** Ship Google + Apple now, defer Microsoft.
+- **B:** Migrate off Lovable Cloud managed auth to a self-configured Supabase project so Azure AD/Microsoft can be wired via the Supabase dashboard (larger change, affects existing auth wiring).
 
-| # | Requirement | Status |
-|---|---|---|
-| 1 | Dynamic personas (4 seeded defaults) | ✅ Works — but seeded as `draft`, no publish nudge |
-| 2 | Custom personas + attach to packs | ✅ Works — no pack-type ↔ persona-kind guard |
-| 3 | Packs assigned to 1+ personas (M:N) | ✅ Fully implemented |
-| 4 | Real vs synthetic clearly separated | ⚠️ Schema ✅, UI ✅, but `saveGeneratedImage` / `generateVoiceNote` / `queueTalkingHead` inserts **omit** `source_type`, `internal_label`, `ai_disclosure_required` → assets land labelled `real_upload` |
-| 5 | Synthetic can't publish without approval | ✅ Queue path enforced; ⚠️ direct-generate path bypasses twin/policy checks |
-| 6 | Digital Twin Profile per creator | ✅ Fully implemented |
-| 7 | Consent gates generation | 🔴 Queue path ✅; `saveGeneratedImage` + `generateVoiceNote` do **not** call `assertTwinPolicy` |
-| 8 | Revoked consent blocks new work | 🔴 Same bypass as REQ 7 for image/voice |
-| 9 | Restricted / Do Not Use hidden from fans | ✅ `fan-feed.functions.ts` filters correctly |
-| 10 | Creators only see own data | ✅ RLS + `requireCreator`; ⚠️ `getTwinRefSignedUrl` accepts arbitrary path |
-| 11 | Admins manage all | ✅ Implemented |
-| 12 | Fans can't reach `/studio/*` | ⚠️ Client-side redirect only, no `beforeLoad` role gate |
-| 13 | Assets tie to creator/persona/pack/status | ✅ via queue; ⚠️ no `generation_request_id` FK on `content_assets` |
-| 14 | Approved assets publish to persona libraries | ✅ Works; edge case: inherits `restricted` silently |
-| 15 | Mobile-first, dark, PWA | ⚠️ Dark/mobile ✅; **no 192/512 PNG icons, no service worker** |
+Plan below assumes **Option A**. Tell me if you want B instead.
 
-## Critical bugs (block the whole Create flow)
+## 1. Enable providers
+- Call `supabase--configure_social_auth` with `providers: ["google", "apple"]`. Keep email/password enabled (already in use for demo magic links + existing signups).
+- Google uses Lovable-managed credentials by default — no keys needed.
+- Apple uses Lovable-managed credentials by default. If you later want your own Apple Developer branding, we can switch to BYOC.
 
-1. **Enum mismatch — `digital_twin_status`.** `assertTwinPolicy` checks `!== "ready"` but the enum is `none|pending|approved|revoked` (`generate-requests.functions.ts:53`). No creator can ever pass → entire queue is dead.
-2. **Enum mismatch — `persona.visibility`.** Checks `!== "published"` but enum is `draft|public|subscribers|vip|hidden` (`generate-requests.functions.ts:93`). Also always throws.
-3. **Direct-generate path bypasses consent.** `ai-generate.functions.ts:66-206` — `saveGeneratedImage` and `generateVoiceNote` never call `assertTwinPolicy`. Revoked creators can still generate + save. `queueTalkingHead` correctly gates.
-4. **Missing synthetic-labelling columns on direct-generate inserts.** Assets land as `source_type='real_upload'`, `internal_label='real_upload'`, `ai_disclosure_required=false`. Breaks fan-feed restricted filter and disclosure banner.
+## 2. Auth UI updates (`src/routes/auth.tsx`)
+- Add "Continue with Google" and "Continue with Apple" buttons above the email form on both Sign in and Sign up tabs.
+- Wire both to `lovable.auth.signInWithOAuth("<provider>", { redirect_uri: window.location.origin + "/auth/callback" })` using `@/integrations/lovable`.
+- Preserve any `redirect` search param (e.g. consent flows, protected route hand-off) via `sessionStorage` and consume it on the callback route.
+- Handle `result.error` with existing toast pattern; return early on `result.redirected`.
+- Apple button uses Apple's brand styling (black bg, white Apple glyph); Google button uses neutral bordered style with color G mark. Both full-width, matching existing button sizing.
 
-## Security / schema issues
+## 3. Post-OAuth callback (`src/routes/auth.callback.tsx` — new)
+- Public route (no auth gate).
+- Waits for `supabase.auth.getSession()` / `onAuthStateChange` to confirm session.
+- Reads sanitized same-origin path from `sessionStorage` and navigates there (default `/discover`).
+- Renders a lightweight "Signing you in…" state with an error fallback.
 
-- No storage RLS / path-prefix check on `getTwinRefSignedUrl` (`twin.functions.ts:301`).
-- `/studio/*` routes have no server-side creator role gate — only `useEffect` redirects.
-- `content_assets` has no `generation_request_id` FK — traceability gap.
-- `upsertTwinConsent` doesn't require `signed_at` when `*_ok` flags flip true.
-- No pack-type ↔ persona-kind compatibility guard.
+## 4. Profile auto-provisioning
+`handle_new_user()` trigger already creates a `profiles` row + `fan` role for any new `auth.users` insert (including OAuth signups). Confirmed — no schema change needed. Google `full_name`/`avatar_url` and Apple's name (first sign-in only) flow into `raw_user_meta_data` and populate `display_name`/`avatar_url`.
 
-## UX gaps
+## 5. Admin seeding — support@lovekey.com.au
+Because the account doesn't exist yet, we can't grant the role directly today. Two-layer approach so it works whether they sign up via OAuth or email:
 
-- `window.prompt()` for rejection reason (`studio.create.tsx:292`) — bad on mobile.
-- No skeleton on `studio.create.tsx`; no per-route error boundaries.
-- Seeded personas land as `draft` with no onboarding CTA → empty fan feed.
-- Publish button on image tab disabled until stream final, no explainer copy.
-- PWA: only favicon.ico in manifest, no maskable icons, no service worker → not installable.
+**Layer A — Migration (idempotent):**
+- If a user with that email already exists in `auth.users`, insert `(user_id, 'admin')` into `user_roles` (`ON CONFLICT DO NOTHING`). No-op on first run since the account doesn't exist yet.
 
----
+**Layer B — Trigger for future signup:**
+- Extend `handle_new_user()` (or add a companion `AFTER INSERT` trigger on `auth.users`) to check `NEW.email = 'support@lovekey.com.au'` and, when true, insert an `admin` role in addition to the default `fan` role.
+- Also handle the `email_confirmed_at` update path (mirrors the verified-domain pattern in the security knowledge) so an admin role isn't granted before the mailbox is verified.
 
-# Recommended fix order
+Result: whenever support@lovekey.com.au completes signup + email verification (via Google, Apple, or email/password), they automatically become admin and can access `/admin`.
 
-**Phase A — Unblock Create (critical, must ship first)**
+## 6. Verification
+- Typecheck.
+- Manual: click Google button in preview → confirm session lands on `/discover`; click Apple button → same.
+- SQL check post-signup: `select role from user_roles where user_id = (select id from auth.users where email = 'support@lovekey.com.au')` returns `admin` + `fan`.
 
-1. Fix `assertTwinPolicy` enum checks:
-   - `digital_twin_status !== "ready"` → `!== "approved"`
-   - `visibility !== "published"` → `!["public","subscribers","vip"].includes(visibility)`
-2. Add `assertTwinPolicy(kind, personaId, packId?)` calls to `saveGeneratedImage` (kind `image`) and `generateVoiceNote` (kind `voice`).
-3. Backfill missing insert fields on all three direct-generate paths: `source_type: 'ai_generated'`, `internal_label: 'ai_draft'`, `ai_disclosure_required: true`.
+## Files touched
+- `src/routes/auth.tsx` (add OAuth buttons)
+- `src/routes/auth.callback.tsx` (new)
+- One migration: extend `handle_new_user()` + backfill admin role if user exists
+- Tool call: `supabase--configure_social_auth`
 
-**Phase B — Harden**
-
-4. Add `beforeLoad` creator-role gate on the `_authenticated/studio` layout (redirect fans to `/` with a toast).
-5. Path-prefix check in `getTwinRefSignedUrl`: reject unless path starts with `${creator.id}/`.
-6. Migration: `content_assets.generation_request_id uuid REFERENCES generation_requests(id) ON DELETE SET NULL`, index it, backfill from `produced_asset_ids`. Update `publishRequestPlaceholders` + direct-generate paths to set it.
-7. `upsertTwinConsent`: require `signed_at` when any `*_ok` flag is true.
-8. Guard pack↔persona attach by kind (e.g. block `wicked` pack on `real_me` persona) in `attachPackToPersona`.
-
-**Phase C — UX & PWA**
-
-9. Replace `window.prompt` rejection with a proper `<Dialog>` + textarea.
-10. Add per-route `errorComponent` + `pendingComponent` to every `studio.*.tsx`.
-11. Onboarding banner in `studio.personas.tsx` when any default persona is still `draft`, with one-click publish.
-12. PWA icons: generate 192, 512, and 512 maskable PNGs; wire them in `public/manifest.webmanifest`. Add a minimal service worker (offline shell + cache-first for static assets).
-
----
-
-# Build prompt (to hand to the build agent after approval)
-
-> Fix the Twinly Create audit findings in this order. Do not add new features.
->
-> **A. Critical (in one migration-free code change):**
-> 1. In `src/lib/generate-requests.functions.ts`, in `assertTwinPolicy`: change the `digital_twin_status` check from `"ready"` to `"approved"`, and change the persona visibility check to allow `visibility in ("public","subscribers","vip")` (reject the rest with the current error message).
-> 2. In `src/lib/ai-generate.functions.ts`:
->    - Import `assertTwinPolicy` (export it from `generate-requests.functions.ts` if not exported yet, as an internal server-only helper — do not expose it as a `createServerFn`).
->    - Call `await assertTwinPolicy({ supabase, creatorId: creator.id, kind: "image", personaId, packId })` at the top of `saveGeneratedImage` handler, and `kind: "voice"` at the top of `generateVoiceNote`.
->    - On the insert payloads in `saveGeneratedImage`, `generateVoiceNote`, and `queueTalkingHead`, add: `source_type: "ai_generated"`, `internal_label: "ai_draft"`, `ai_disclosure_required: true`.
->
-> **B. Harden:**
-> 3. Create `src/routes/_authenticated/studio.tsx` (or update existing) with a `beforeLoad` that calls a server fn returning whether the user has a `creators` row (or `has_role` `creator`/`admin`); if not, `throw redirect({ to: "/", search: { toast: "creator-only" } })`.
-> 4. In `src/lib/twin.functions.ts` `getTwinRefSignedUrl`, reject when `storagePath` does not start with `${creator.id}/`.
-> 5. Migration `content_assets_generation_request_link`: add nullable `generation_request_id uuid references public.generation_requests(id) on delete set null`, index it, backfill from `generation_requests.produced_asset_ids`. Set it in `publishRequestPlaceholders`, `saveGeneratedImage`, `generateVoiceNote`, `queueTalkingHead`.
-> 6. In `upsertTwinConsent`, if any of the `*_ok` flags in the payload is `true`, require `signed_at`; otherwise throw.
-> 7. In `content-packs.functions.ts::attachPackToPersona`, reject when `pack.pack_type === "wicked"` and `persona.kind === "real_me"`.
->
-> **C. UX & PWA:**
-> 8. Replace the `window.prompt` in `src/routes/studio.create.tsx` rejection flow with a shadcn `Dialog` + `Textarea` + confirm button. Pass the reason to the existing server fn.
-> 9. Add `errorComponent` and `pendingComponent` to every `src/routes/studio.*.tsx` route (spinner + retry that calls `router.invalidate()` and `reset()`).
-> 10. In `src/routes/studio.personas.tsx`, if any persona has `is_default_seed && visibility === 'draft'`, render a top banner "Publish your default personas to appear in Discover" with a one-click publish action.
-> 11. Generate 192×192, 512×512, and 512×512 maskable PNG icons for the Twin-T logo into `public/icons/`. Update `public/manifest.webmanifest` `icons` array to reference them (`purpose: "any"` and `purpose: "maskable"`).
-> 12. Add a Vite PWA plugin config (or a minimal `public/sw.js` + registration in `__root.tsx`) that caches the app shell and lets Twinly install on iOS/Android.
->
-> Verify with `tsgo` after each phase and take a Playwright screenshot of `/studio/create` and `/studio/generate` after Phase A to confirm the queue is no longer permanently blocked. Do not touch auto-generated files under `src/integrations/supabase/` or `src/routeTree.gen.ts`.
+## Not in scope
+- Microsoft/Azure AD (blocked by managed auth; needs decision above)
+- Apple BYOC credentials (using managed default)
+- Changes to existing email/password or magic-link flows
