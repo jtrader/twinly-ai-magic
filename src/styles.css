@@ -11,7 +11,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Twinly.ai — dark premium AI-native design system.
+ * Twinly.life — dark premium AI-native design system.
  * Deep navy background, electric indigo primary, sharp typography.
  * All colors are oklch. Never hard-code color utilities in components.
  */
@@ -70,7 +70,7 @@
 }
 
 :root {
-  /* Twinly.ai is dark-only for MVP; :root carries the dark palette. */
+  /* Twinly.life is dark-only for MVP; :root carries the dark palette. */
   --radius: 0.75rem;
   --background: oklch(0.156 0.032 294);
   --foreground: oklch(0.987 0 0);

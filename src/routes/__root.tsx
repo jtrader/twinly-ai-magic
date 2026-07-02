@@ -82,7 +82,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "theme-color", content: "#0a0a1a" },
       { title: "Twinly.life — Verified creators. Official AI personas." },
       { name: "description", content: "The creator-owned digital twin platform. Real when it matters, AI when you want the fantasy — with clear disclosure on every persona." },
-      { name: "author", content: "Twinly.ai" },
+      { name: "author", content: "Twinly.life" },
       { property: "og:title", content: "Twinly.life — Verified creators. Official AI personas." },
       { property: "og:description", content: "The creator-owned digital twin platform. Real when it matters, AI when you want the fantasy — with clear disclosure on every persona." },
       { property: "og:type", content: "website" },

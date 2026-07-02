@@ -53,7 +53,7 @@ function Hero() {
           <span className="text-brand-glow">AI when you want the fantasy.</span>
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground md:text-lg">
-          Twinly.ai lets verified creators launch official AI twins and unlimited personas — every AI clearly disclosed, every experience creator-controlled.
+          Twinly.life lets verified creators launch official AI twins and unlimited personas — every AI clearly disclosed, every experience creator-controlled.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link to="/discover"><Button size="lg" className="w-full sm:w-auto">Explore creators</Button></Link>
@@ -148,7 +148,7 @@ function ForCreators() {
 function Footer() {
   return (
     <footer className="border-t border-border/60 py-8 text-center text-xs text-muted-foreground">
-      <div>© {new Date().getFullYear()} Twinly.ai · 18+ · <Link to="/legal/terms" className="underline">Terms</Link> · <Link to="/legal/privacy" className="underline">Privacy</Link> · <Link to="/legal/ai-disclosure" className="underline">AI disclosure</Link></div>
+      <div>© {new Date().getFullYear()} Twinly.life · 18+ · <Link to="/legal/terms" className="underline">Terms</Link> · <Link to="/legal/privacy" className="underline">Privacy</Link> · <Link to="/legal/ai-disclosure" className="underline">AI disclosure</Link></div>
     </footer>
   );
 }

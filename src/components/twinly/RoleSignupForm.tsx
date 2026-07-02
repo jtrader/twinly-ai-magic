@@ -30,7 +30,7 @@ export function RoleSignupForm() {
         if (role !== "fan" && data.user) {
           await supabase.from("user_roles").insert({ user_id: data.user.id, role });
         }
-        toast.success("Welcome to Twinly.ai");
+        toast.success("Welcome to Twinly.life");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
