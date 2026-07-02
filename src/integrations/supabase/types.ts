@@ -235,6 +235,144 @@ export type Database = {
           },
         ]
       }
+      content_pack_items: {
+        Row: {
+          added_at: string
+          asset_id: string
+          pack_id: string
+          position: number
+        }
+        Insert: {
+          added_at?: string
+          asset_id: string
+          pack_id: string
+          position?: number
+        }
+        Update: {
+          added_at?: string
+          asset_id?: string
+          pack_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_pack_items_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_pack_items_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "content_packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_pack_personas: {
+        Row: {
+          attached_at: string
+          pack_id: string
+          permission_type: string
+          persona_id: string
+        }
+        Insert: {
+          attached_at?: string
+          pack_id: string
+          permission_type?: string
+          persona_id: string
+        }
+        Update: {
+          attached_at?: string
+          pack_id?: string
+          permission_type?: string
+          persona_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_pack_personas_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "content_packs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_pack_personas_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_packs: {
+        Row: {
+          cover_asset_id: string | null
+          created_at: string
+          creator_id: string
+          description: string | null
+          ends_at: string | null
+          id: string
+          name: string
+          pack_type: string
+          review_note: string | null
+          slug: string
+          sort_order: number
+          starts_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cover_asset_id?: string | null
+          created_at?: string
+          creator_id: string
+          description?: string | null
+          ends_at?: string | null
+          id?: string
+          name: string
+          pack_type?: string
+          review_note?: string | null
+          slug: string
+          sort_order?: number
+          starts_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cover_asset_id?: string | null
+          created_at?: string
+          creator_id?: string
+          description?: string | null
+          ends_at?: string | null
+          id?: string
+          name?: string
+          pack_type?: string
+          review_note?: string | null
+          slug?: string
+          sort_order?: number
+          starts_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_packs_cover_asset_id_fkey"
+            columns: ["cover_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_packs_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           creator_id: string
