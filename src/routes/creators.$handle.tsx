@@ -75,7 +75,7 @@ function CreatorProfile() {
             kind={p.kind}
             disclosureLabel={p.disclosure_label}
             priceCents={p.price_cents ?? 0}
-            href={`/chat/${creator.handle}/${p.slug}`}
+            href={`/creators/${creator.handle}/${p.slug}`}
           />
         ))}
       </div>
