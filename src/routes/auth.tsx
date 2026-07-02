@@ -30,7 +30,7 @@ function AuthPage() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
         <Link to="/" className="mb-8 text-center font-display text-2xl font-bold">
-          Twinly<span className="text-brand-glow">.ai</span>
+          Twinly<span className="text-brand-glow">.life</span>
         </Link>
         <div className="rounded-2xl border border-border bg-surface p-6">
           <h1 className="font-display text-2xl font-bold">Enter Twinly.life</h1>
