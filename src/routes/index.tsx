@@ -5,10 +5,34 @@ import { AgeGateDialog } from "@/components/twinly/AgeGateDialog";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
 import { ShieldCheck, Sparkles, Bot, User2, Lock } from "lucide-react";
 import heroReal from "@/assets/hero-real.png.asset.json";
-import heroAi from "@/assets/hero-ai.png";
+import heroAi from "@/assets/hero-ai.png.asset.json";
+import brandIcon from "@/assets/brand-icon.png.asset.json";
 
 export const Route = createFileRoute("/")({
   component: Index,
+  head: () => {
+    const site = "https://twinly-ai-magic.lovable.app";
+    const title = "Twinly.life — Verified creators. Official AI twins & personas.";
+    const description =
+      "The creator-owned digital twin platform. Chat with the real creator or their official AI personas — every AI clearly disclosed, every experience creator-controlled. 18+.";
+    const image = `${site}${heroAi.url}`;
+    return {
+      meta: [
+        { title },
+        { name: "description", content: description },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:url", content: `${site}/` },
+        { property: "og:image", content: image },
+        { property: "og:image:width", content: "1024" },
+        { property: "og:image:height", content: "1024" },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+        { name: "twitter:image", content: image },
+      ],
+      links: [{ rel: "canonical", href: `${site}/` }],
+    };
+  },
 });
 
 function Index() {
@@ -29,8 +53,15 @@ function TopNav() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link to="/" className="font-display text-lg font-bold tracking-tight">
-          Twinly<span className="text-brand-glow">.life</span>
+        <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold tracking-tight">
+          <img
+            src={brandIcon.url}
+            alt="Twinly.life logo"
+            width={28}
+            height={28}
+            className="h-7 w-7 rounded-md"
+          />
+          <span>Twinly<span className="text-brand-glow">.life</span></span>
         </Link>
         <div className="flex items-center gap-2">
           <Link to="/discover" className="hidden text-sm text-muted-foreground hover:text-foreground md:block">Discover</Link>
@@ -78,8 +109,8 @@ function HeroCompare() {
       badgeClass: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
       caption: "Verified creator · human-shot",
     },
-    {
-      src: heroAi,
+      {
+        src: heroAi.url,
       badge: "AI persona",
       badgeClass: "border-brand/40 bg-brand/15 text-brand-glow",
       caption: "AI-rendered fantasy · always disclosed",
