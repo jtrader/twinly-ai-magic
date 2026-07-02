@@ -1,40 +1,30 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-function yearsBetween(dob: Date, now: Date) {
-  let y = now.getFullYear() - dob.getFullYear();
-  const m = now.getMonth() - dob.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) y--;
-  return y;
-}
-
-/** Fan submits DOB; stores it and stamps age_verified_at when ≥18. */
+/** Fan self-attests they are 18+. Stamps age_verified_at on the profile. */
 export const verifyAge = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { dob: string }) => d)
+  .validator((d: { attested: boolean }) => d)
   .handler(async ({ data, context }) => {
-    const dob = new Date(data.dob);
-    if (Number.isNaN(dob.getTime())) throw new Error("Invalid date of birth");
-    const age = yearsBetween(dob, new Date());
-    if (age < 18) throw new Error("You must be 18 or older to use Twinly.life");
+    if (!data.attested) throw new Error("You must confirm you are 18 or older");
 
     const { error } = await context.supabase
       .from("profiles")
-      .update({ date_of_birth: data.dob, age_verified_at: new Date().toISOString() })
+      .update({ age_verified_at: new Date().toISOString() })
       .eq("id", context.userId);
     if (error) throw error;
 
     await context.supabase.from("age_gate_events").insert({
       user_id: context.userId,
-      method: "self_attest_dob",
+      method: "self_attest",
     });
     await context.supabase.rpc("log_audit", {
       _action: "age.verified",
       _subject_type: "profile",
       _subject_id: context.userId,
-      _metadata: { age },
+      _metadata: { method: "self_attest" },
     });
-    return { ok: true, age };
+    return { ok: true };
   });
 
 /** Server-side guard callable from other server fns. Throws 403-ish if not adult. */
