@@ -28,6 +28,13 @@ const loadPersonaChat = createServerFn({ method: "GET" })
       .select("id, slug, display_name, description, kind, disclosure_label")
       .eq("creator_id", creator.id).eq("slug", data.persona).maybeSingle();
     if (!persona) return null;
+    const { data: aiPersonas } = await supabaseAdmin.from("personas")
+      .select("slug, display_name, kind, disclosure_label")
+      .eq("creator_id", creator.id)
+      .eq("kind", "ai")
+      .in("visibility", ["public", "subscribers", "vip"])
+      .neq("slug", data.persona)
+      .order("sort_order", { ascending: true });
     const { data: convo } = await supabase.from("conversations")
       .select("id").eq("fan_id", userId).eq("persona_id", persona.id).maybeSingle();
     let messages: any[] = [];
@@ -36,7 +43,7 @@ const loadPersonaChat = createServerFn({ method: "GET" })
       messages = m ?? [];
     }
     const availability = await getCreatorAvailability({ data: { handle: data.handle } });
-    return { creator, persona, conversationId: convo?.id ?? null, messages, availability };
+    return { creator, persona, conversationId: convo?.id ?? null, messages, availability, aiPersonas: aiPersonas ?? [] };
   });
 
 export const Route = createFileRoute("/chat/$handle/$persona")({
@@ -66,7 +73,7 @@ function ChatPage() {
   }, [messages.length]);
 
   if (!initial) return <AppShell><div className="py-20 text-center text-muted-foreground">Persona not found.</div></AppShell>;
-  const { creator, persona, availability } = initial;
+  const { creator, persona, availability, aiPersonas } = initial;
   const isAway = !!availability?.away_mode;
   const aiPaused = isAway && persona.kind === "ai" && !availability?.away_allow_ai_personas;
 
@@ -149,7 +156,21 @@ function ChatPage() {
           <div className="mb-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
             <span className="font-semibold">{creator.stage_name} is away.</span>{" "}
             {availability?.away_auto_reply_enabled ? "You'll get an auto-reply on Real Me. " : "Real Me replies are paused. "}
-            {availability?.away_allow_ai_personas && "Try one of their AI personas in the meantime."}
+            {availability?.away_allow_ai_personas && aiPersonas.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <span className="self-center">Chat with an AI persona instead:</span>
+                {aiPersonas.map((p: any) => (
+                  <Link
+                    key={p.slug}
+                    to="/chat/$handle/$persona"
+                    params={{ handle: creator.handle, persona: p.slug }}
+                    className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold text-amber-50 hover:bg-amber-400/20"
+                  >
+                    {p.display_name}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {aiPaused && (
