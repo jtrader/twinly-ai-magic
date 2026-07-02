@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   ArrowLeft, Upload, Trash2, ShieldCheck, ShieldAlert, User, Mic, Palette,
-  Sparkles, X, Loader2, Image as ImageIcon,
+  Sparkles, X, Loader2, Image as ImageIcon, RotateCcw, Send, History, Archive,
 } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { useSession } from "@/lib/session";
 import {
   getTwinProfile, addTwinReference, updateTwinReference, removeTwinReference,
   upsertTwinConsent, revokeTwinConsent, upsertStyleNotes, getTwinRefSignedUrl,
+  restoreTwinReference, hardDeleteTwinReference, submitTwinReferencesForReview,
 } from "@/lib/twin.functions";
 
 export const Route = createFileRoute("/studio/twin")({
@@ -120,6 +121,7 @@ function TwinProfilePage() {
       </nav>
 
       <div className="grid gap-6">
+        <SummaryCard data={data} />
         <ReferencesSection
           id="identity" title="Identity references" icon={<User className="size-4" />}
           hint="Upload 5+ clear photos: face front, 3/4 profile, side, body, expressions. Used to anchor likeness."
@@ -155,6 +157,7 @@ function TwinProfilePage() {
         <ConsentSection data={data} onChanged={refresh} />
         <AllowedUsesSection data={data} onChanged={refresh} />
         <ForbiddenUsesSection data={data} onChanged={refresh} />
+        <VersionHistorySection archived={(data as any).archivedRefs ?? []} onChanged={refresh} />
 
         <div className="rounded-2xl border border-brand/20 bg-brand/5 p-4 text-sm">
           <div className="flex items-center gap-2 font-semibold text-brand-glow">
