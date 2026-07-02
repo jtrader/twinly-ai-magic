@@ -11,11 +11,13 @@ import { lovable } from "@/integrations/lovable/index";
 const POST_AUTH_REDIRECT_KEY = "twinly:postAuthRedirect";
 const CREATOR_PERSONA_SETUP_PATH = "/secure/personas";
 
-function isCreatorRole(role: "fan" | "creator" | "agency") {
+type SignupRole = "fan" | "creator" | "agency";
+
+function isCreatorRole(role: SignupRole) {
   return role === "creator" || role === "agency";
 }
 
-function postAuthPathForRole(role: "fan" | "creator" | "agency") {
+function postAuthPathForRole(role: SignupRole) {
   return isCreatorRole(role) ? CREATOR_PERSONA_SETUP_PATH : "/app";
 }
 
@@ -28,7 +30,7 @@ export function RoleSignupForm() {
   const [mode, setMode] = useState<"signup" | "signin">("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"fan" | "creator" | "agency">("fan");
+  const [role, setRole] = useState<SignupRole>("fan");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const postAuthPath = postAuthPathForRole(role);
@@ -54,7 +56,7 @@ export function RoleSignupForm() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-      navigate({ to: postAuthPath });
+      navigate({ to: postAuthPath as any });
     } catch (err: any) {
       toast.error(err.message ?? "Sign-in failed");
     } finally { setLoading(false); }
@@ -118,7 +120,7 @@ export function RoleSignupForm() {
         {mode === "signup" && (
           <div>
             <Label>I am a...</Label>
-            <RadioGroup value={role} onValueChange={(v) => setRole(v as any)} className="mt-2 grid grid-cols-3 gap-2">
+            <RadioGroup value={role} onValueChange={(v) => setRole(v as SignupRole)} className="mt-2 grid grid-cols-3 gap-2">
               {(["fan","creator","agency"] as const).map(r => (
                 <label key={r} className={"cursor-pointer rounded-lg border p-3 text-center text-xs font-semibold uppercase tracking-widest " + (role === r ? "border-brand bg-brand/10 text-brand-glow" : "border-border text-muted-foreground")}>
                   <RadioGroupItem value={r} className="sr-only" />
@@ -134,7 +136,7 @@ export function RoleSignupForm() {
             <p className="mt-1">
               Continue as a {role} and you will be routed to the protected persona setup hub for default personas, custom persona creation, training inputs, and content-pack setup.
             </p>
-            <Link to={CREATOR_PERSONA_SETUP_PATH} className="mt-2 inline-block text-brand-glow underline underline-offset-4">
+            <Link to="/secure/personas" className="mt-2 inline-block text-brand-glow underline underline-offset-4">
               Preview secure persona setup
             </Link>
           </div>
