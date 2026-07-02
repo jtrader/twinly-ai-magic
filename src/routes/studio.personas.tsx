@@ -30,6 +30,9 @@ import {
   listPacks, attachPackToPersona, detachPackFromPersona,
 } from "@/lib/content-packs.functions";
 import { getTwinProfile } from "@/lib/twin.functions";
+import {
+  listSavedMessages, createSavedMessage, updateSavedMessage, deleteSavedMessage,
+} from "@/lib/saved-messages.functions";
 
 export const Route = createFileRoute("/studio/personas")({ component: PersonaStudioPage });
 
@@ -346,7 +349,61 @@ function EditPersonaDialog({
   const [donts, setDonts] = useState("");
   const [samplePhrasings, setSamplePhrasings] = useState("");
   const [voiceRefUrl, setVoiceRefUrl] = useState("");
-  const [tab, setTab] = useState<"basics" | "training" | "packs" | "twin">("basics");
+  const [tab, setTab] = useState<"basics" | "training" | "packs" | "twin" | "saved">("basics");
+  const [savedItems, setSavedItems] = useState<any[] | null>(null);
+  const [savedLoading, setSavedLoading] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newBody, setNewBody] = useState("");
+  const [newFewShot, setNewFewShot] = useState(false);
+  const [savedBusy, setSavedBusy] = useState<string | null>(null);
+
+  const refreshSaved = useCallback(async () => {
+    if (!persona) return;
+    setSavedLoading(true);
+    try {
+      const res = await listSavedMessages({ data: { personaId: persona.id } });
+      setSavedItems(res.items ?? []);
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not load saved replies");
+    } finally { setSavedLoading(false); }
+  }, [persona]);
+
+  useEffect(() => {
+    if (persona && tab === "saved" && savedItems === null) refreshSaved();
+  }, [persona, tab, savedItems, refreshSaved]);
+
+  async function addSaved() {
+    if (!persona || !newLabel.trim()) return;
+    setSavedBusy("new");
+    try {
+      await createSavedMessage({ data: {
+        personaId: persona.id,
+        label: newLabel.trim(),
+        body: newBody.trim() || undefined,
+        useAsFewShot: newFewShot,
+      }});
+      setNewLabel(""); setNewBody(""); setNewFewShot(false);
+      setSavedItems(null); refreshSaved();
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not save reply");
+    } finally { setSavedBusy(null); }
+  }
+  async function toggleFewShot(item: any, v: boolean) {
+    setSavedBusy(item.id);
+    try {
+      await updateSavedMessage({ data: { id: item.id, useAsFewShot: v } });
+      setSavedItems((s) => s?.map((r) => r.id === item.id ? { ...r, use_as_few_shot: v } : r) ?? null);
+    } catch (e: any) { toast.error(e.message ?? "Update failed"); }
+    finally { setSavedBusy(null); }
+  }
+  async function removeSaved(id: string) {
+    setSavedBusy(id);
+    try {
+      await deleteSavedMessage({ data: { id } });
+      setSavedItems((s) => s?.filter((r) => r.id !== id) ?? null);
+    } catch (e: any) { toast.error(e.message ?? "Delete failed"); }
+    finally { setSavedBusy(null); }
+  }
 
   // Twin linking
   const [twinLinkMode, setTwinLinkMode] = useState<"all" | "selected" | "none">("all");
@@ -485,13 +542,13 @@ function EditPersonaDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="mb-3 flex gap-1 border-b border-border">
-          {(["basics", "training", "packs", "twin"] as const).map((t) => (
+          {(["basics", "training", "packs", "twin", "saved"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={"px-3 py-1.5 text-xs font-semibold uppercase tracking-widest " + (tab === t ? "border-b-2 border-brand text-foreground" : "text-muted-foreground")}
-            >{t === "basics" ? "Basics" : t === "training" ? "Training" : t === "packs" ? "Packs" : "Twin"}</button>
+            >{t === "basics" ? "Basics" : t === "training" ? "Training" : t === "packs" ? "Packs" : t === "twin" ? "Twin" : "Saved"}</button>
           ))}
         </div>
         {tab === "basics" && (
