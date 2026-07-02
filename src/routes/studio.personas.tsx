@@ -26,6 +26,9 @@ import { listMyPersonas } from "@/lib/onboarding.functions";
 import {
   createPersona, updatePersona, setPersonaVisibility, deletePersona, reorderPersonas,
 } from "@/lib/persona-studio.functions";
+import {
+  listPacks, attachPackToPersona, detachPackFromPersona,
+} from "@/lib/content-packs.functions";
 
 export const Route = createFileRoute("/studio/personas")({ component: PersonaStudioPage });
 
@@ -342,7 +345,33 @@ function EditPersonaDialog({
   const [donts, setDonts] = useState("");
   const [samplePhrasings, setSamplePhrasings] = useState("");
   const [voiceRefUrl, setVoiceRefUrl] = useState("");
-  const [tab, setTab] = useState<"basics" | "training">("basics");
+  const [tab, setTab] = useState<"basics" | "training" | "packs">("basics");
+
+  // Packs state
+  const loadPacks = useServerFn(listPacks);
+  const attachPack = useServerFn(attachPackToPersona);
+  const detachPack = useServerFn(detachPackFromPersona);
+  const [packs, setPacks] = useState<any[]>([]);
+  const [attachRows, setAttachRows] = useState<Array<{ pack_id: string; persona_id: string; permission_type: string }>>([]);
+  const [packsLoading, setPacksLoading] = useState(false);
+  const [packBusy, setPackBusy] = useState<string | null>(null);
+
+  const refreshPacks = useCallback(async () => {
+    setPacksLoading(true);
+    try {
+      const res = await loadPacks();
+      setPacks(res.packs ?? []);
+      setAttachRows(res.attach ?? []);
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not load packs");
+    } finally {
+      setPacksLoading(false);
+    }
+  }, [loadPacks]);
+
+  useEffect(() => {
+    if (persona && tab === "packs") refreshPacks();
+  }, [persona, tab, refreshPacks]);
 
   useEffect(() => {
     if (persona) {
@@ -360,6 +389,42 @@ function EditPersonaDialog({
       setTab("basics");
     }
   }, [persona]);
+
+  async function togglePack(packId: string, attached: boolean, permission: string) {
+    if (!persona) return;
+    setPackBusy(packId);
+    try {
+      if (attached) {
+        await detachPack({ data: { packId, personaId: persona.id } });
+        setAttachRows((s) => s.filter((r) => !(r.pack_id === packId && r.persona_id === persona.id)));
+        toast.success("Pack detached");
+      } else {
+        await attachPack({ data: { packId, personaId: persona.id, permissionType: permission as any } });
+        setAttachRows((s) => [...s, { pack_id: packId, persona_id: persona.id, permission_type: permission }]);
+        toast.success("Pack attached");
+      }
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not update pack");
+    } finally {
+      setPackBusy(null);
+    }
+  }
+
+  async function changePermission(packId: string, permission: string) {
+    if (!persona) return;
+    setPackBusy(packId);
+    try {
+      await attachPack({ data: { packId, personaId: persona.id, permissionType: permission as any } });
+      setAttachRows((s) => s.map((r) =>
+        r.pack_id === packId && r.persona_id === persona.id ? { ...r, permission_type: permission } : r
+      ));
+      toast.success("Access updated");
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not update access");
+    } finally {
+      setPackBusy(null);
+    }
+  }
 
   async function submit() {
     if (!persona) return;
@@ -394,13 +459,13 @@ function EditPersonaDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="mb-3 flex gap-1 border-b border-border">
-          {(["basics", "training"] as const).map((t) => (
+          {(["basics", "training", "packs"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={"px-3 py-1.5 text-xs font-semibold uppercase tracking-widest " + (tab === t ? "border-b-2 border-brand text-foreground" : "text-muted-foreground")}
-            >{t === "basics" ? "Basics" : "Training"}</button>
+            >{t === "basics" ? "Basics" : t === "training" ? "Training" : "Packs"}</button>
           ))}
         </div>
         {tab === "basics" && (
@@ -468,6 +533,74 @@ function EditPersonaDialog({
               placeholder="https://…/voice-sample.mp3" />
             <p className="mt-1 text-xs text-muted-foreground">Placeholder for future voice-clone training input.</p>
           </div>
+        </div>
+        )}
+        {tab === "packs" && (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Attach approved content packs to this persona. Choose how fans access each pack: included with a subscription, pay-per-view, or restricted (locked preview).
+          </p>
+          {packsLoading && <div className="text-sm text-muted-foreground">Loading packs…</div>}
+          {!packsLoading && packs.length === 0 && (
+            <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              No content packs yet.{" "}
+              <Link to="/studio/packs" className="text-brand-glow hover:underline">Create a pack</Link>
+            </div>
+          )}
+          {!packsLoading && packs.length > 0 && (
+            <div className="max-h-[380px] space-y-2 overflow-y-auto pr-1">
+              {packs.map((p) => {
+                const row = attachRows.find((r) => r.pack_id === p.id && r.persona_id === persona!.id);
+                const attached = !!row;
+                const permission = row?.permission_type ?? "included";
+                const canAttach = p.status === "approved";
+                return (
+                  <div key={p.id} className="rounded-lg border border-border bg-surface p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-sm font-medium">{p.name}</span>
+                          <Badge variant="outline" className="text-[10px] uppercase">{p.pack_type}</Badge>
+                          <Badge
+                            variant={p.status === "approved" ? "default" : "outline"}
+                            className="text-[10px] uppercase"
+                          >{p.status.replace("_", " ")}</Badge>
+                        </div>
+                        {p.description && (
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{p.description}</p>
+                        )}
+                        {!canAttach && !attached && (
+                          <p className="mt-1 text-[11px] text-muted-foreground">Only approved packs can be attached.</p>
+                        )}
+                      </div>
+                      <Switch
+                        checked={attached}
+                        disabled={packBusy === p.id || (!canAttach && !attached)}
+                        onCheckedChange={() => togglePack(p.id, attached, permission)}
+                      />
+                    </div>
+                    {attached && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground">Access</Label>
+                        <Select
+                          value={permission}
+                          onValueChange={(v) => changePermission(p.id, v)}
+                          disabled={packBusy === p.id}
+                        >
+                          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="included">Included</SelectItem>
+                            <SelectItem value="ppv">Pay-per-view</SelectItem>
+                            <SelectItem value="restricted">Restricted</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         )}
         <DialogFooter>
