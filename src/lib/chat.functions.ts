@@ -1,5 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAdult } from "./age-gate.functions";
+import { checkRateLimit } from "./rate-limit.server";
+import { screenMessage, recordModerationEvent } from "./moderation.server";
+import { logAudit } from "./audit.server";
 
 /**
  * Send a fan message to a persona. Persists user + assistant turn.
@@ -11,6 +15,25 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
   .validator((d: { conversationId?: string; creatorHandle: string; personaSlug: string; content: string }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    await assertAdult(context);
+
+    const allowed = await checkRateLimit(supabase, "chat", 30, 300);
+    if (!allowed) throw new Error("Too many messages. Please slow down.");
+
+    const severity = await screenMessage(data.content);
+    if (severity === "critical" || severity === "high") {
+      await recordModerationEvent({
+        reporterId: userId,
+        targetType: "message_outbound",
+        category: "chat_screener",
+        severity,
+        notes: `Blocked: ${data.content.slice(0, 200)}`,
+        autoFlagged: true,
+      });
+      await logAudit(userId, "chat.blocked", { type: "message" }, { severity });
+      throw new Error("This message can't be sent. Please rephrase.");
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Look up creator + persona (public read via admin — cheap and RLS-agnostic)
@@ -65,6 +88,11 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
       .from("conversations")
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", conversationId);
+
+    await logAudit(userId, "chat.message_sent", { type: "conversation", id: conversationId }, {
+      persona_kind: persona.kind,
+      severity,
+    });
 
     return { conversationId, assistantText, isSynthetic, kind: persona.kind };
   });

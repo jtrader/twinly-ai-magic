@@ -11,17 +11,22 @@ const loadCreator = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: creator } = await supabaseAdmin
       .from("creators")
-      .select("id, handle, stage_name, bio, verification_status, onboarding_completed_at")
+      .select("id, user_id, handle, stage_name, bio, verification_status, onboarding_completed_at")
       .eq("handle", data.handle)
       .maybeSingle();
     if (!creator) return null;
+    const { data: profile } = await supabaseAdmin
+      .from("profiles_public")
+      .select("id, display_name, avatar_url")
+      .eq("id", creator.user_id)
+      .maybeSingle();
     const { data: personas } = await supabaseAdmin
       .from("personas")
-      .select("id, slug, display_name, description, kind, disclosure_label, price_cents, visibility, starts_at, ends_at, sort_order")
+      .select("id, slug, display_name, description, kind, disclosure_label, price_cents, visibility, starts_at, ends_at, sort_order, is_explicit")
       .eq("creator_id", creator.id)
       .in("visibility", ["public", "subscribers", "vip"])
       .order("sort_order", { ascending: true });
-    return { creator, personas: personas ?? [] };
+    return { creator, profile: profile ?? null, personas: personas ?? [] };
   });
 
 export const Route = createFileRoute("/creators/$handle")({
