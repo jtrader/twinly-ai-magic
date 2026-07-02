@@ -79,7 +79,11 @@ export const updateSavedMessage = createServerFn({ method: "POST" })
     useAsFewShot?: boolean;
   }) => d)
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = {};
+    const patch: {
+      label?: string;
+      body?: string | null;
+      use_as_few_shot?: boolean;
+    } = {};
     if (data.label !== undefined) patch.label = data.label.trim();
     if (data.body !== undefined) patch.body = data.body;
     if (data.useAsFewShot !== undefined) patch.use_as_few_shot = data.useAsFewShot;
