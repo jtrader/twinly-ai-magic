@@ -213,6 +213,46 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
   });
 
 /**
+ * List recent talking-head jobs for the current creator with a derived
+ * UI status ("queued" | "rendering" | "completed" | "approved" | "failed").
+ * The Talking head tab polls this while any job is non-terminal.
+ */
+export const listTalkingHeadJobs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const creator = await requireCreator(supabase, userId);
+    const { data, error } = await supabase
+      .from("content_assets")
+      .select("id, title, created_at, approval_status, category, storage_path")
+      .eq("creator_id", creator.id)
+      .eq("asset_type", "video")
+      .eq("is_synthetic", true)
+      .ilike("category", "ai_talking_head%")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (error) throw error;
+
+    type Status = "queued" | "rendering" | "completed" | "approved" | "failed";
+    const jobs = (data ?? []).map((r: any) => {
+      let status: Status = "queued";
+      if (r.approval_status === "approved") status = "approved";
+      else if (r.approval_status === "rejected" || r.approval_status === "blocked") status = "failed";
+      else if (r.storage_path && r.approval_status === "pending") status = "completed";
+      else if (r.category === "ai_talking_head_rendering") status = "rendering";
+      else if (r.category === "ai_talking_head_queued") status = "queued";
+      return {
+        id: r.id as string,
+        title: r.title as string,
+        created_at: r.created_at as string,
+        approval_status: r.approval_status as string | null,
+        status,
+      };
+    });
+    return { jobs };
+  });
+
+/**
  * List personas + packs for the AI generate picker.
  */
 export const listGenerateTargets = createServerFn({ method: "GET" })
