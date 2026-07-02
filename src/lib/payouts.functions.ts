@@ -49,7 +49,7 @@ export const getPayoutsSummary = createServerFn({ method: "GET" })
       if (t.status === "succeeded") {
         lifetime += amt;
         if (new Date(t.created_at) >= monthStart) mtd += amt;
-      } else if (t.status === "pending") {
+      } else if (t.status === "stub") {
         pending += amt;
       }
     }
