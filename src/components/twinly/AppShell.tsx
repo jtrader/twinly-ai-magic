@@ -2,11 +2,13 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { Home, MessageCircle, LayoutDashboard, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ImpersonationBanner } from "@/components/twinly/ImpersonationBanner";
 
 export function AppShell({ children, mobileNav = true }: { children: ReactNode; mobileNav?: boolean }) {
   return (
     <div className="min-h-screen bg-background">
       <TopBar />
+      <ImpersonationBanner />
       <main className={cn("mx-auto max-w-6xl px-4 pb-24 pt-4 md:pt-8", mobileNav && "pb-24")}>{children}</main>
       {mobileNav && <BottomNav />}
     </div>

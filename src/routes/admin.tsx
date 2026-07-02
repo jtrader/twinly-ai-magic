@@ -11,6 +11,7 @@ import { adminListPendingAssets, adminSetAssetApproval } from "@/lib/admin.funct
 import { adminListPendingPacks, adminSetPackApproval } from "@/lib/admin.functions";
 import { adminListPendingTwinRefs, adminSetTwinRefReview, adminGetTwinRefSignedUrl } from "@/lib/twin.functions";
 import { adminListDemoCreators, adminSeedDemoCreators, adminImpersonateCreator } from "@/lib/demo.functions";
+import { setImpersonationContext } from "@/components/twinly/ImpersonationBanner";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -162,14 +163,14 @@ function AdminPage() {
   }
 
   async function signInAs(creatorId: string, handle: string) {
-    if (!window.confirm(`Sign in as @${handle}?\n\nThis will REPLACE your current admin session in this browser. Open the link in a private/incognito window to keep your admin session.`)) return;
+    if (!window.confirm(`Sign in as @${handle}?\n\nYour admin session will be replaced in this tab. A "Return to admin" banner will appear so you can bounce back with one click.`)) return;
     setBusy(creatorId);
     try {
-      const { url } = await impersonate({ data: { creatorId } });
-      window.open(url, "_blank", "noopener");
-      toast.success(`Impersonation link opened for @${handle}`);
-    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
-    finally { setBusy(null); }
+      const { url, returnUrl, adminEmail } = await impersonate({ data: { creatorId } });
+      setImpersonationContext({ returnUrl, adminEmail, handle });
+      toast.success(`Signing in as @${handle}…`);
+      window.location.href = url;
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); setBusy(null); }
   }
 
   return (
@@ -376,7 +377,7 @@ function AdminPage() {
           </div>
 
           <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100">
-            <span className="font-semibold">Heads up:</span> impersonation replaces your admin session in this browser. Open the link in a private/incognito window to keep your admin session alive.
+            <span className="font-semibold">Heads up:</span> "Sign in as" replaces your admin session in this tab and stores a one-click "Return to admin" link. Prefer an incognito window? Right-click the button and copy the link instead.
           </div>
 
           {demo && (
