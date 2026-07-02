@@ -10,6 +10,7 @@ import { adminListModeration, adminResolveModeration } from "@/lib/moderation.fu
 import { adminListPendingAssets, adminSetAssetApproval } from "@/lib/admin.functions";
 import { adminListPendingPacks, adminSetPackApproval } from "@/lib/admin.functions";
 import { adminListPendingTwinRefs, adminSetTwinRefReview, adminGetTwinRefSignedUrl } from "@/lib/twin.functions";
+import { adminListDemoCreators, adminSeedDemoCreators, adminImpersonateCreator } from "@/lib/demo.functions";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -27,7 +28,7 @@ function AdminPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
-  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit">("overview");
+  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo">("overview");
   const [stats, setStats] = useState<any>(null);
   const [creators, setCreators] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
@@ -37,6 +38,7 @@ function AdminPage() {
   const [pendingTwin, setPendingTwin] = useState<any[]>([]);
   const [twinPreviews, setTwinPreviews] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [demo, setDemo] = useState<{ seeded: any[]; available: any[]; emails: Record<string, string | null> } | null>(null);
 
   const overview = useServerFn(adminOverview);
   const listVer = useServerFn(adminListVerifications);
@@ -51,6 +53,9 @@ function AdminPage() {
   const listPendingTwin = useServerFn(adminListPendingTwinRefs);
   const setTwinReview = useServerFn(adminSetTwinRefReview);
   const signTwin = useServerFn(adminGetTwinRefSignedUrl);
+  const listDemo = useServerFn(adminListDemoCreators);
+  const seedDemo = useServerFn(adminSeedDemoCreators);
+  const impersonate = useServerFn(adminImpersonateCreator);
 
   useEffect(() => {
     if (!user || !roles.includes("admin")) return;
@@ -71,6 +76,7 @@ function AdminPage() {
           }
           setTwinPreviews(Object.fromEntries(entries));
         }
+        if (tab === "demo") setDemo(await listDemo({}));
       } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
     })();
   }, [tab, user, roles.join(",")]);
@@ -141,6 +147,31 @@ function AdminPage() {
     finally { setBusy(null); }
   }
 
+  async function runSeed() {
+    setBusy("seed");
+    try {
+      const { results } = await seedDemo({});
+      const created = results.filter((r: any) => r.status === "created").length;
+      const existed = results.filter((r: any) => r.status === "existed").length;
+      const errored = results.filter((r: any) => r.status === "error");
+      if (errored.length) toast.error(`Some demo creators failed: ${errored.map((e: any) => e.handle).join(", ")}`);
+      toast.success(`Seeded ${created} new · ${existed} already existed`);
+      setDemo(await listDemo({}));
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(null); }
+  }
+
+  async function signInAs(creatorId: string, handle: string) {
+    if (!window.confirm(`Sign in as @${handle}?\n\nThis will REPLACE your current admin session in this browser. Open the link in a private/incognito window to keep your admin session.`)) return;
+    setBusy(creatorId);
+    try {
+      const { url } = await impersonate({ data: { creatorId } });
+      window.open(url, "_blank", "noopener");
+      toast.success(`Impersonation link opened for @${handle}`);
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(null); }
+  }
+
   return (
     <AppShell>
       <div className="mb-4">
@@ -149,7 +180,7 @@ function AdminPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-2">
-        {(["overview","verifications","moderation","synthetic","packs","twin","audit"] as const).map((t) => (
+        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -329,6 +360,57 @@ function AdminPage() {
             ))}
             {audit.length === 0 && <li className="px-4 py-8 text-center text-muted-foreground">No audit events.</li>}
           </ul>
+        </div>
+      )}
+
+      {tab === "demo" && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border bg-surface p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-display text-lg font-bold">Demo creator accounts</div>
+                <div className="text-xs text-muted-foreground">Seed 3 fully-prefilled demo creators (Aurora Vale, Kai Wolf, Luna Marie). Idempotent — safe to re-run.</div>
+              </div>
+              <Button size="sm" onClick={runSeed} disabled={busy === "seed"}>{busy === "seed" ? "Seeding…" : "Seed demo creators"}</Button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100">
+            <span className="font-semibold">Heads up:</span> impersonation replaces your admin session in this browser. Open the link in a private/incognito window to keep your admin session alive.
+          </div>
+
+          {demo && (
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-surface-elevated text-left text-xs uppercase tracking-widest text-muted-foreground">
+                  <tr><th className="px-4 py-2">Creator</th><th className="px-4 py-2">Email</th><th className="px-4 py-2">Status</th><th className="px-4 py-2 text-right">Actions</th></tr>
+                </thead>
+                <tbody>
+                  {demo.seeded.map((c: any) => (
+                    <tr key={c.id} className="border-b border-border/50">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {c.avatar_url && <img src={c.avatar_url} alt="" className="size-9 rounded-full object-cover" />}
+                          <div>
+                            <Link to="/creators/$handle" params={{ handle: c.handle }} className="font-semibold hover:text-brand-glow">{c.stage_name}</Link>
+                            <div className="text-xs text-muted-foreground">@{c.handle}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">{demo.emails[c.id] ?? "—"}</td>
+                      <td className="px-4 py-3"><Pill value={c.verification_status} /></td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="outline" disabled={busy === c.id} onClick={() => signInAs(c.id, c.handle)}>
+                          {busy === c.id ? "Minting…" : "Sign in as"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {demo.seeded.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No demo creators yet — click "Seed demo creators" above.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </AppShell>
