@@ -51,6 +51,27 @@ export function RoleSignupForm() {
     if (res.error) toast.error(res.error.message);
   }
 
+  // Microsoft OAuth (Azure AD) — only available when the project runs against
+  // a self-hosted / BYO Supabase with the `azure` provider configured. Flag
+  // it on with `VITE_ENABLE_MICROSOFT_OAUTH=1`.
+  const microsoftEnabled = import.meta.env.VITE_ENABLE_MICROSOFT_OAUTH === "1"
+    || import.meta.env.VITE_ENABLE_MICROSOFT_OAUTH === "true";
+
+  async function microsoft() {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "azure",
+        options: {
+          redirectTo: window.location.origin + "/auth/callback",
+          scopes: "email openid profile",
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      toast.error(err.message ?? "Microsoft sign-in isn't available on this deployment.");
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 rounded-lg border border-border p-1">
@@ -105,6 +126,27 @@ export function RoleSignupForm() {
         </svg>
         Continue with Apple
       </Button>
+      {microsoftEnabled ? (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={microsoft}
+          className="w-full"
+        >
+          <svg viewBox="0 0 23 23" className="mr-2 h-4 w-4" aria-hidden="true">
+            <rect x="1" y="1" width="10" height="10" fill="#F25022" />
+            <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
+            <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
+            <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
+          </svg>
+          Continue with Microsoft
+        </Button>
+      ) : (
+        <div className="rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">Microsoft sign-in</span> is available on self-hosted deployments.
+          Set <code className="rounded bg-surface px-1 py-0.5 text-[10px]">VITE_ENABLE_MICROSOFT_OAUTH=1</code> and configure the Azure provider in your Supabase project to enable it.
+        </div>
+      )}
     </div>
   );
 }
