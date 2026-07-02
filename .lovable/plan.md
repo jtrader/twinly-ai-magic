@@ -1,46 +1,54 @@
-# Per-item error handling & retry — /studio/generate
+# Talking-head queue status + live polling
 
-Improve failure UX on the three tabs (Images, Voice notes, Talking head) so creators get a specific reason and a one-click retry instead of a toast that disappears.
+Give the Talking head tab a live status panel that shows queued clips with pending/completed states and refreshes automatically until each is resolved.
 
-## Scope
+## Server
 
-Frontend-only changes in `src/routes/studio.generate.tsx`. No schema, server-function, or gateway changes.
+Add a small read-only server function `listTalkingHeadJobs` in `src/lib/ai-generate.functions.ts`:
 
-## Shared error model
+- `.middleware([requireSupabaseAuth])`, `GET`.
+- Resolves current creator via `requireCreator`.
+- Selects the last 20 talking-head placeholder assets: `content_assets` filtered by `creator_id`, `asset_type = 'video'`, `is_synthetic = true`, `category ILIKE 'ai_talking_head%'`, ordered by `created_at desc`.
+- Returns DTOs: `{ id, title, created_at, approval_status, category, storage_path }`.
+- Derives a UI status from the row:
+  - `category = 'ai_talking_head_queued'` and no `storage_path` → `"queued"`
+  - `category = 'ai_talking_head_rendering'` → `"rendering"`
+  - `storage_path` present and `approval_status = 'pending'` → `"completed"` (render finished, awaiting creator approval)
+  - `approval_status = 'approved'` → `"approved"`
+  - `approval_status = 'rejected'` or `'blocked'` → `"failed"`
+  - else fall back to `"queued"`.
 
-Introduce a small local helper used by all three tabs:
+Also update `queueTalkingHead` to return the new DTO shape for the row it just created so the client can prepend it optimistically.
 
-- `type GenError = { code: string; title: string; detail: string; retryable: boolean }`
-- `classifyError(e, kind)` maps common failures → friendly copy:
-  - `validation` — client-side rules failed (prompt too short/long, missing persona/pack, unsupported voice, duration out of range)
-  - `moderation` — gateway returned `content_policy_violation` / `moderation_blocked` → suggest rephrasing, no retry
-  - `rate_limit` — HTTP 429 → "Too many requests, try again in a moment", retryable
-  - `credits` — HTTP 402 → "Workspace out of AI credits", not retryable from UI
-  - `network` — fetch/abort/offline → retryable
-  - `stream_incomplete` — SSE ended without `image_generation.completed` → retryable
-  - `server` — 5xx or unknown → retryable
-- Inline `<ErrorCard />` component (replaces the current plain red div) with title, detail, a **Retry** button (when `retryable`), and a **Dismiss** button.
+No new tables, no schema changes — the existing `content_assets.category` + `approval_status` + `storage_path` fields carry the state until a real renderer is wired in.
 
-## Validation messages (pre-flight)
+## Client — `VideoTab` in `src/routes/studio.generate.tsx`
 
-Replace generic toasts with field-level inline errors under each input, plus focused messages:
+- Wire `listTalkingHeadJobs` via `useServerFn` and TanStack Query with `queryKey: ["talking-head-jobs"]`, `refetchInterval` computed from data:
+  - 4000ms when any job is `queued` or `rendering`
+  - `false` (stop polling) when every job is a terminal state (`completed`, `approved`, `failed`)
+- On successful `queueTalkingHead`, call `queryClient.invalidateQueries` for the same key and reset polling.
+- Render a **Recent renders** panel below the form, showing up to 10 rows. Each row has:
+  - Title + relative time (`Intl.RelativeTimeFormat`)
+  - `<StatusPill>` with icon + color:
+    - queued → amber, `Clock` icon, "Queued"
+    - rendering → brand, spinning `Loader2`, "Rendering…"
+    - completed → emerald, `CheckCircle2`, "Ready for review"
+    - approved → emerald outline, `ShieldCheck`, "Approved"
+    - failed → rose, `AlertTriangle`, "Failed"
+  - Small link "Open in vault" → `/studio/content` for completed/approved rows.
+- Header shows a live indicator: green pulse + "Live" when polling is active; muted "Idle" when no active jobs.
+- Empty state: "No talking-head jobs yet. Queue a clip above to see it here."
+- Preserve the existing amber "Preview integration" notice above the form.
 
-- **Image**: prompt < 8 chars → "Prompts need at least 8 characters so the model has something to work with." Prompt > 2000 → truncate hint. Title > 120 → live counter turns rose.
-- **Voice**: script < 4 chars → "Add a sentence or two — 4+ characters." Script > 4000 → counter turns rose and Generate disables. Voice not in allowlist → "Pick a voice from the list."
-- **Video**: script < 10 chars → "Talking-head scripts need at least 10 characters." Duration outside 5–60 → "Pick a duration between 5 and 60 seconds."
+## Copy + a11y
 
-Generate button stays disabled while any field-level error is active; hovering shows the reason via `title`.
-
-## Per-tab wiring
-
-Each tab keeps its last submitted inputs in a `lastAttempt` ref so **Retry** re-runs the exact same call without the user re-typing.
-
-- **ImageTab**: parse HTTP status + SSE `error` frames through `classifyError`. On `stream_incomplete`, keep any partial frame visible but overlay the error card with Retry. Save button hidden while an error is showing.
-- **VoiceTab**: wrap `generateVoiceNote` call; on failure show `ErrorCard` above the button. Preserve script/title/voice so Retry is one click.
-- **VideoTab**: wrap `queueTalkingHead`; same pattern. Success still clears the form.
+- Status pills carry `aria-label` matching visible text.
+- Polling countdown is not shown (avoids noisy UI); just the "Live" pulse.
+- All timestamps use `<time dateTime={iso}>` for accessibility.
 
 ## Out of scope
 
-- No changes to server functions, RLS, or the `/api/generate-image` route.
-- No new toasts library or global error boundary work.
-- No changes to the vault, packs, or persona flows.
+- No provider integration, no webhook, no simulated render clock.
+- No changes to Images/Voice tabs, vault, or approval flow.
+- No schema migration.
