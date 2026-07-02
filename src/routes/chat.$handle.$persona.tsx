@@ -32,7 +32,7 @@ const loadPersonaChat = createServerFn({ method: "GET" })
       .select("slug, display_name, kind, disclosure_label")
       .eq("creator_id", creator.id)
       .eq("kind", "ai")
-      .eq("visibility", "published")
+      .in("visibility", ["public", "subscribers", "vip"])
       .neq("slug", data.persona)
       .order("sort_order", { ascending: true });
     const { data: convo } = await supabase.from("conversations")
