@@ -686,3 +686,528 @@ function EditDialog({
     </Dialog>
   );
 }
+
+// ---------------- Bulk upload ----------------
+
+type BulkRow = {
+  file: File;
+  title: string;
+  category: string;
+  isSynthetic: boolean;
+  status: "pending" | "uploading" | "uploaded" | "failed";
+  error?: string;
+  storagePath?: string;
+  assetType: AssetType;
+};
+
+function BulkUploadDialog({
+  open, onOpenChange, creatorId, personas, defaultPersonaId, onDone,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  creatorId: string;
+  personas: Persona[];
+  defaultPersonaId: string | null;
+  onDone: () => void;
+}) {
+  const [rows, setRows] = useState<BulkRow[]>([]);
+  const [sharedCategory, setSharedCategory] = useState("");
+  const [sharedSynthetic, setSharedSynthetic] = useState(false);
+  const [selectedPersonas, setSelectedPersonas] = useState<Set<string>>(new Set());
+  const [permission, setPermission] = useState<PermissionType>("included");
+  const [busy, setBusy] = useState(false);
+  const bulkFn = useServerFn(bulkCreateAssets);
+
+  useEffect(() => {
+    if (open) {
+      setRows([]);
+      setSharedCategory("");
+      setSharedSynthetic(false);
+      setSelectedPersonas(defaultPersonaId ? new Set([defaultPersonaId]) : new Set());
+      setPermission("included");
+      setBusy(false);
+    }
+  }, [open, defaultPersonaId]);
+
+  function addFiles(files: FileList | null) {
+    if (!files) return;
+    const next: BulkRow[] = [];
+    for (const f of Array.from(files).slice(0, 50 - rows.length)) {
+      next.push({
+        file: f,
+        title: f.name.replace(/\.[^/.]+$/, ""),
+        category: sharedCategory,
+        isSynthetic: sharedSynthetic,
+        status: "pending",
+        assetType: detectAssetType(f),
+      });
+    }
+    setRows((prev) => [...prev, ...next]);
+  }
+
+  function updateRow(idx: number, patch: Partial<BulkRow>) {
+    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  }
+  function removeRow(idx: number) {
+    setRows((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function toggleP(id: string) {
+    setSelectedPersonas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function submit() {
+    if (rows.length === 0) { toast.error("Add files first."); return; }
+    for (const r of rows) {
+      if (!r.title.trim()) { toast.error("Every file needs a title."); return; }
+    }
+    setBusy(true);
+    let uploaded = 0;
+    try {
+      // Upload files in parallel (capped concurrency = 4)
+      const queue = rows.map((_, i) => i);
+      const worker = async () => {
+        while (queue.length) {
+          const i = queue.shift()!;
+          const r = rows[i];
+          if (r.status === "uploaded") continue;
+          updateRow(i, { status: "uploading", error: undefined });
+          try {
+            const ext = r.file.name.includes(".") ? r.file.name.slice(r.file.name.lastIndexOf(".")) : "";
+            const key = `${creatorId}/${crypto.randomUUID()}${ext}`;
+            const { error: upErr } = await supabase.storage
+              .from("content-assets")
+              .upload(key, r.file, { cacheControl: "3600", upsert: false, contentType: r.file.type || undefined });
+            if (upErr) throw upErr;
+            r.storagePath = key;
+            r.status = "uploaded";
+            uploaded++;
+            updateRow(i, { status: "uploaded", storagePath: key });
+          } catch (err: any) {
+            updateRow(i, { status: "failed", error: err?.message ?? "Upload failed" });
+          }
+        }
+      };
+      await Promise.all([worker(), worker(), worker(), worker()]);
+
+      const goodRows = rows.filter((r) => r.status === "uploaded" && r.storagePath);
+      if (!goodRows.length) throw new Error("No files uploaded successfully.");
+
+      const res = await bulkFn({
+        data: {
+          items: goodRows.map((r) => ({
+            title: r.title.trim(),
+            assetType: r.assetType,
+            storagePath: r.storagePath!,
+            category: r.category.trim() || undefined,
+            isSynthetic: r.isSynthetic,
+          })),
+          attachPersonaIds: Array.from(selectedPersonas),
+          permissionType: permission,
+        },
+      });
+      toast.success(`Imported ${res.count} asset${res.count === 1 ? "" : "s"}`);
+      onOpenChange(false);
+      onDone();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Bulk import failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Bulk import</DialogTitle>
+          <DialogDescription>
+            Drop up to 50 files. Titles come from filenames — edit any before importing. Shared category, disclosure, and persona attachments apply to every file.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface/40 p-6 text-center hover:border-brand/50">
+            <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
+            <span className="text-sm">Click to add files</span>
+            <span className="text-xs text-muted-foreground">image, video, audio, or text — up to 50 total</span>
+            <input
+              type="file"
+              multiple
+              accept="image/*,video/*,audio/*,.txt,.md,.pdf"
+              className="hidden"
+              onChange={(e) => { addFiles(e.target.files); e.currentTarget.value = ""; }}
+            />
+          </label>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Shared category</Label>
+              <Input value={sharedCategory} onChange={(e) => {
+                setSharedCategory(e.target.value);
+                setRows((prev) => prev.map((r) => ({ ...r, category: e.target.value })));
+              }} placeholder="e.g. photoshoot-2026" />
+            </div>
+            <div className="flex items-end justify-between gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+              <div>
+                <div className="text-sm font-medium">Mark all as synthetic</div>
+                <div className="text-xs text-muted-foreground">Adds AI disclosure to every imported asset.</div>
+              </div>
+              <Switch checked={sharedSynthetic} onCheckedChange={(v) => {
+                setSharedSynthetic(v);
+                setRows((prev) => prev.map((r) => ({ ...r, isSynthetic: v })));
+              }} />
+            </div>
+          </div>
+
+          {rows.length > 0 && (
+            <div className="max-h-72 overflow-auto rounded-lg border border-border/60">
+              <table className="w-full text-xs">
+                <thead className="bg-surface-elevated/70 text-left uppercase tracking-widest text-[10px] text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-2">Title</th>
+                    <th className="px-2 py-2">Type</th>
+                    <th className="px-2 py-2">Size</th>
+                    <th className="px-2 py-2">Status</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => (
+                    <tr key={i} className="border-t border-border/40">
+                      <td className="px-2 py-1">
+                        <Input value={r.title} onChange={(e) => updateRow(i, { title: e.target.value })} className="h-7 text-xs" />
+                      </td>
+                      <td className="px-2 py-1">{r.assetType}</td>
+                      <td className="px-2 py-1 text-muted-foreground">{(r.file.size/1024/1024).toFixed(1)} MB</td>
+                      <td className="px-2 py-1">
+                        {r.status === "pending" && <span className="text-muted-foreground">queued</span>}
+                        {r.status === "uploading" && <span className="text-brand-glow">uploading…</span>}
+                        {r.status === "uploaded" && <span className="text-emerald-400">uploaded</span>}
+                        {r.status === "failed" && <span className="text-destructive" title={r.error}>failed</span>}
+                      </td>
+                      <td className="px-2 py-1 text-right">
+                        <button type="button" onClick={() => removeRow(i)} className="text-muted-foreground hover:text-destructive">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Attach to personas</div>
+              <Select value={permission} onValueChange={(v) => setPermission(v as PermissionType)}>
+                <SelectTrigger className="h-7 w-[140px] text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(PERMISSION_LABEL) as PermissionType[]).map((k) => (
+                    <SelectItem key={k} value={k}>{PERMISSION_LABEL[k]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {personas.length === 0 ? (
+              <div className="text-xs text-muted-foreground">Create a persona first to attach assets.</div>
+            ) : (
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                {personas.map((p) => (
+                  <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-surface-elevated">
+                    <input type="checkbox" checked={selectedPersonas.has(p.id)} onChange={() => toggleP(p.id)} className="h-4 w-4 accent-brand" />
+                    <span className="truncate">{p.display_name}</span>
+                    <span className="text-xs text-muted-foreground">{p.kind === "ai" ? "AI" : "Real Me"}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy || rows.length === 0}>
+            {busy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Importing…</> : `Import ${rows.length || ""} file${rows.length === 1 ? "" : "s"}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------- Preview / access testing ----------------
+
+type Audience = "subscriber" | "vip" | "ppv";
+
+const AUDIENCE_LABEL: Record<Audience, string> = {
+  subscriber: "Subscriber",
+  vip: "VIP",
+  ppv: "Pay-per-view viewer",
+};
+
+/**
+ * Access rules used for the preview simulator:
+ *  - included    → visible to Subscribers and VIPs; locked for PPV viewers (they buy à la carte)
+ *  - ppv         → locked (blurred) to Subscribers; unlocked to PPV viewers; locked to VIPs unless they pay
+ *  - restricted  → visible only to VIPs
+ */
+function accessFor(perm: PermissionType, audience: Audience): "visible" | "locked" | "hidden" {
+  if (perm === "included") {
+    if (audience === "ppv") return "locked";
+    return "visible";
+  }
+  if (perm === "ppv") {
+    if (audience === "ppv") return "visible";
+    return "locked";
+  }
+  // restricted
+  if (audience === "vip") return "visible";
+  return "hidden";
+}
+
+function PreviewDialog({
+  open, onOpenChange, personas, assets, permissionsByAsset, initialPersonaId,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  personas: Persona[];
+  assets: Asset[];
+  permissionsByAsset: Map<string, Permission[]>;
+  initialPersonaId: string | null;
+}) {
+  const [personaId, setPersonaId] = useState<string | null>(initialPersonaId);
+  const [audience, setAudience] = useState<Audience>("subscriber");
+
+  useEffect(() => { if (open) setPersonaId(initialPersonaId); }, [open, initialPersonaId]);
+
+  const persona = personas.find((p) => p.id === personaId) ?? null;
+
+  const rows = useMemo(() => {
+    if (!persona) return [] as { asset: Asset; perm: PermissionType; state: "visible" | "locked" | "hidden" }[];
+    const out: { asset: Asset; perm: PermissionType; state: "visible" | "locked" | "hidden" }[] = [];
+    for (const a of assets) {
+      const link = permissionsByAsset.get(a.id)?.find((p) => p.persona_id === persona.id);
+      if (!link) continue;
+      out.push({ asset: a, perm: link.permission_type, state: accessFor(link.permission_type, audience) });
+    }
+    return out;
+  }, [persona, assets, permissionsByAsset, audience]);
+
+  const visible = rows.filter((r) => r.state === "visible");
+  const locked = rows.filter((r) => r.state === "locked");
+  const hidden = rows.filter((r) => r.state === "hidden");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Preview persona access</DialogTitle>
+          <DialogDescription>
+            Simulate what fans see for each persona × audience tier. Access rules mirror the fan-facing feed.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label>Persona</Label>
+            <Select value={personaId ?? ""} onValueChange={(v) => setPersonaId(v)}>
+              <SelectTrigger><SelectValue placeholder="Pick a persona" /></SelectTrigger>
+              <SelectContent>
+                {personas.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.kind === "ai" ? "🤖 " : "👤 "}{p.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Viewing as</Label>
+            <Select value={audience} onValueChange={(v) => setAudience(v as Audience)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(AUDIENCE_LABEL) as Audience[]).map((k) => (
+                  <SelectItem key={k} value={k}>{AUDIENCE_LABEL[k]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {!persona ? (
+          <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+            Pick a persona to run the simulation.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Badge variant="outline"><Check className="mr-1 h-3 w-3 text-emerald-400" />{visible.length} visible</Badge>
+              <Badge variant="outline"><Lock className="mr-1 h-3 w-3 text-amber-400" />{locked.length} locked</Badge>
+              <Badge variant="outline"><X className="mr-1 h-3 w-3 text-muted-foreground" />{hidden.length} hidden</Badge>
+            </div>
+
+            {rows.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No assets are attached to this persona yet.
+              </div>
+            ) : (
+              <div className="max-h-80 overflow-auto rounded-lg border border-border/60">
+                <table className="w-full text-xs">
+                  <thead className="bg-surface-elevated/70 text-left uppercase tracking-widest text-[10px] text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2">Asset</th>
+                      <th className="px-3 py-2">Permission</th>
+                      <th className="px-3 py-2">{AUDIENCE_LABEL[audience]} sees</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(({ asset, perm, state }) => (
+                      <tr key={asset.id} className="border-t border-border/40">
+                        <td className="px-3 py-2">
+                          <div className="font-medium">{asset.title}</div>
+                          <div className="text-muted-foreground">
+                            {asset.asset_type}{asset.is_synthetic && " · synthetic"}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Badge variant="outline">{PERMISSION_LABEL[perm]}</Badge>
+                        </td>
+                        <td className="px-3 py-2">
+                          {state === "visible" && (
+                            <span className="inline-flex items-center gap-1 text-emerald-400">
+                              <Check className="h-3 w-3" />Full access
+                            </span>
+                          )}
+                          {state === "locked" && (
+                            <span className="inline-flex items-center gap-1 text-amber-400">
+                              {perm === "ppv" ? <DollarSign className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                              {perm === "ppv" ? "Locked — buy to unlock" : "Locked"}
+                            </span>
+                          )}
+                          {state === "hidden" && (
+                            <span className="inline-flex items-center gap-1 text-muted-foreground">
+                              <X className="h-3 w-3" />Not shown
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------- Audit trail ----------------
+
+const ACTION_LABEL: Record<string, string> = {
+  "asset.created": "Uploaded",
+  "asset.bulk_created": "Bulk imported",
+  "asset.updated": "Edited",
+  "asset.deleted": "Deleted",
+  "asset.permission_set": "Attached to persona",
+  "asset.permission_removed": "Removed from persona",
+};
+
+function humanizeEntry(action: string, metadata: any, personas: Persona[]): { label: string; detail: string } {
+  const label = ACTION_LABEL[action] ?? action;
+  const personaName = (id: string) => personas.find((p) => p.id === id)?.display_name ?? id.slice(0, 8);
+  if (action === "asset.created") {
+    const bits = [metadata?.type && `type: ${metadata.type}`, metadata?.synthetic && "marked synthetic (AI disclosure applied)"].filter(Boolean);
+    return { label, detail: bits.join(" · ") || "Initial upload" };
+  }
+  if (action === "asset.updated") {
+    const fields: string[] = metadata?.fields ?? [];
+    const nice = fields.map((f) => {
+      if (f === "is_synthetic" || f === "ai_generated_label") return "AI disclosure";
+      if (f === "title") return "title";
+      if (f === "category") return "category";
+      if (f === "price_cents") return "price";
+      return f;
+    });
+    return { label, detail: nice.length ? `Changed ${nice.join(", ")}` : "Edited" };
+  }
+  if (action === "asset.permission_set") {
+    return { label, detail: `${personaName(metadata?.persona)} · ${metadata?.permission ?? "included"}` };
+  }
+  if (action === "asset.permission_removed") {
+    return { label, detail: personaName(metadata?.persona) };
+  }
+  return { label, detail: metadata ? JSON.stringify(metadata) : "" };
+}
+
+function AuditDialog({
+  asset, onClose, personas,
+}: {
+  asset: Asset | null;
+  onClose: () => void;
+  personas: Persona[];
+}) {
+  const [entries, setEntries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const loadFn = useServerFn(listAssetAudit);
+
+  useEffect(() => {
+    if (!asset) return;
+    let alive = true;
+    setLoading(true);
+    loadFn({ data: { assetId: asset.id } })
+      .then((r) => alive && setEntries(r.entries))
+      .catch((err: any) => toast.error(err?.message ?? "Could not load audit trail"))
+      .finally(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, [asset, loadFn]);
+
+  return (
+    <Dialog open={!!asset} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Audit trail</DialogTitle>
+          <DialogDescription>{asset?.title}</DialogDescription>
+        </DialogHeader>
+        {loading ? (
+          <div className="py-6 text-center text-sm text-muted-foreground">
+            <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />Loading…
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+            No audit entries yet.
+          </div>
+        ) : (
+          <ol className="relative max-h-96 space-y-4 overflow-auto border-l border-border/60 pl-4">
+            {entries.map((e) => {
+              const { label, detail } = humanizeEntry(e.action, e.metadata, personas);
+              return (
+                <li key={e.id} className="relative">
+                  <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-brand" />
+                  <div className="text-xs uppercase tracking-widest text-muted-foreground">
+                    {new Date(e.created_at).toLocaleString()}
+                  </div>
+                  <div className="text-sm font-medium">{label}</div>
+                  {detail && <div className="text-xs text-muted-foreground">{detail}</div>}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
