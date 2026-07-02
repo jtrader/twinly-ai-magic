@@ -463,6 +463,41 @@ export type Database = {
           },
         ]
       }
+      creator_follows: {
+        Row: {
+          created_at: string
+          creator_id: string
+          fan_id: string
+          favorite: boolean
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          fan_id: string
+          favorite?: boolean
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          fan_id?: string
+          favorite?: boolean
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_follows_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_voice_profiles: {
         Row: {
           approved_phrases: string[]
