@@ -27,6 +27,7 @@ import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
 import { Route as StudioGenerateRouteImport } from './routes/studio.generate'
 import { Route as StudioCreateRouteImport } from './routes/studio.create'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
+import { Route as StudioAnalyticsRouteImport } from './routes/studio.analytics'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
@@ -127,6 +128,11 @@ const StudioContentRoute = StudioContentRouteImport.update({
   path: '/studio/content',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioAnalyticsRoute = StudioAnalyticsRouteImport.update({
+  id: '/studio/analytics',
+  path: '/studio/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LegalTermsRoute = LegalTermsRouteImport.update({
   id: '/legal/terms',
   path: '/legal/terms',
@@ -188,6 +194,7 @@ export interface FileRoutesByFullPath {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/generate': typeof StudioGenerateRoute
@@ -217,6 +224,7 @@ export interface FileRoutesByTo {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/generate': typeof StudioGenerateRoute
@@ -247,6 +255,7 @@ export interface FileRoutesById {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/generate': typeof StudioGenerateRoute
@@ -278,6 +287,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/studio/analytics'
     | '/studio/content'
     | '/studio/create'
     | '/studio/generate'
@@ -307,6 +317,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/studio/analytics'
     | '/studio/content'
     | '/studio/create'
     | '/studio/generate'
@@ -336,6 +347,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/studio/analytics'
     | '/studio/content'
     | '/studio/create'
     | '/studio/generate'
@@ -366,6 +378,7 @@ export interface RootRouteChildren {
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
+  StudioAnalyticsRoute: typeof StudioAnalyticsRoute
   StudioContentRoute: typeof StudioContentRoute
   StudioCreateRoute: typeof StudioCreateRoute
   StudioGenerateRoute: typeof StudioGenerateRoute
@@ -507,6 +520,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioContentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/analytics': {
+      id: '/studio/analytics'
+      path: '/studio/analytics'
+      fullPath: '/studio/analytics'
+      preLoaderRoute: typeof StudioAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/legal/terms': {
       id: '/legal/terms'
       path: '/legal/terms'
@@ -612,6 +632,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
+  StudioAnalyticsRoute: StudioAnalyticsRoute,
   StudioContentRoute: StudioContentRoute,
   StudioCreateRoute: StudioCreateRoute,
   StudioGenerateRoute: StudioGenerateRoute,

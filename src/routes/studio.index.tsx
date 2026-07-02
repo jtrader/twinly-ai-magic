@@ -4,7 +4,7 @@ import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
-import { Sparkles, Library, ShieldCheck, MessageCircle, Wallet, BadgeCheck, Package, User, Wand2 } from "lucide-react";
+import { Sparkles, Library, ShieldCheck, MessageCircle, Wallet, BadgeCheck, Package, User, Wand2, BarChart3 } from "lucide-react";
 
 export const Route = createFileRoute("/studio/")({
   component: StudioHome,
@@ -90,6 +90,7 @@ function StudioHome() {
         <Tile to="/studio/generate" icon={<Sparkles className="size-5 text-brand-glow" />} title="AI generate (preview)" desc="Prototype live generation — images, voice notes & talking-head clips." />
         <Tile to="/studio/inbox" icon={<MessageCircle className="size-5 text-brand-glow" />} title="Real Me inbox" desc="Reply to fans on your Real Me persona." />
         <Tile to="/studio/payouts" icon={<Wallet className="size-5 text-brand-glow" />} title="Payouts" desc="Payment history, subscribers, next payout." />
+        <Tile to="/studio/analytics" icon={<BarChart3 className="size-5 text-brand-glow" />} title="Analytics" desc="Generation volume, approval rate, chat engagement." />
         <Tile to="/studio/twin" icon={<User className="size-5 text-brand-glow" />} title="Digital twin profile" desc="Identity, voice, style, consent & use rules." />
         <Tile icon={<ShieldCheck className="size-5 text-brand-glow" />} title="Consent & verification" desc="Digital twin consent, ID checks." disabled />
       </div>
