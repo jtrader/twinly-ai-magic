@@ -47,7 +47,7 @@ export const getCreatorAnalytics = createServerFn({ method: "POST" })
         .gte("started_at", since),
       supabase
         .from("subscriptions")
-        .select("id, tier, status, started_at")
+        .select("id, tier, status, created_at")
         .eq("creator_id", creator.id),
       supabase
         .from("transactions")
@@ -126,10 +126,10 @@ export const getCreatorAnalytics = createServerFn({ method: "POST" })
     const activeSubs = subRows.filter((s) => s.status === "active");
     const subsByTier: Record<string, number> = {};
     for (const s of activeSubs) subsByTier[s.tier] = (subsByTier[s.tier] ?? 0) + 1;
-    const newSubs = subRows.filter((s) => s.started_at && new Date(s.started_at).toISOString() >= since).length;
+    const newSubs = subRows.filter((s) => s.created_at && new Date(s.created_at).toISOString() >= since).length;
 
     // Revenue
-    const successful = txRows.filter((t) => t.status === "succeeded" || t.status === "paid");
+    const successful = txRows.filter((t) => t.status === "succeeded");
     const revenueCents = successful.reduce((a, t) => a + (t.amount_cents ?? 0), 0);
     const revenueByKind: Record<string, number> = {};
     for (const t of successful) revenueByKind[t.kind] = (revenueByKind[t.kind] ?? 0) + (t.amount_cents ?? 0);
