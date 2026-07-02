@@ -1,0 +1,2 @@
+ALTER TABLE public.content_assets ADD COLUMN IF NOT EXISTS cost_cents INTEGER;
+COMMENT ON COLUMN public.content_assets.cost_cents IS 'Provider-reported or estimated generation cost in USD cents for this asset. NULL for non-generated (real_upload) assets.';

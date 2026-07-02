@@ -181,6 +181,7 @@ export type Database = {
           asset_type: Database["public"]["Enums"]["asset_type"]
           category: string | null
           consent_status: Database["public"]["Enums"]["consent_status"]
+          cost_cents: number | null
           created_at: string
           creator_id: string
           external_url: string | null
@@ -210,6 +211,7 @@ export type Database = {
           asset_type: Database["public"]["Enums"]["asset_type"]
           category?: string | null
           consent_status?: Database["public"]["Enums"]["consent_status"]
+          cost_cents?: number | null
           created_at?: string
           creator_id: string
           external_url?: string | null
@@ -239,6 +241,7 @@ export type Database = {
           asset_type?: Database["public"]["Enums"]["asset_type"]
           category?: string | null
           consent_status?: Database["public"]["Enums"]["consent_status"]
+          cost_cents?: number | null
           created_at?: string
           creator_id?: string
           external_url?: string | null
