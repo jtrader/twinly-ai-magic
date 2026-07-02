@@ -107,7 +107,7 @@ function CreatePage() {
       await create({ data: {
         personaId: personaId || undefined,
         packId: packId || undefined,
-        outputType,
+        outputType: outputType as any,
         stylePreset,
         promptNotes,
         quantity,
