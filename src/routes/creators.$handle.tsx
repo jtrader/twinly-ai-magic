@@ -4,6 +4,7 @@ import { AppShell } from "@/components/twinly/AppShell";
 import { PersonaCard } from "@/components/twinly/PersonaCard";
 import { AiDisclosureBanner } from "@/components/twinly/AiDisclosureBanner";
 import { ReportDialog } from "@/components/twinly/ReportDialog";
+import { FollowButton } from "@/components/twinly/FollowButton";
 import { ShieldCheck } from "lucide-react";
 
 const loadCreator = createServerFn({ method: "GET" })
@@ -57,7 +58,10 @@ function CreatorProfile() {
               </span>
             )}
           </div>
-          <ReportDialog targetType="creator" targetId={creator.id} label="Report creator" variant="outline" />
+          <div className="flex items-center gap-2">
+            <FollowButton creatorId={creator.id} compact />
+            <ReportDialog targetType="creator" targetId={creator.id} label="Report creator" variant="outline" />
+          </div>
         </div>
         <div className="text-sm text-muted-foreground">@{creator.handle}</div>
         {creator.bio && <p className="text-sm text-muted-foreground">{creator.bio}</p>}
