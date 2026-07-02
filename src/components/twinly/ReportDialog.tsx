@@ -65,7 +65,8 @@ export function ReportDialog({
       toast.success("Report submitted", { description: "Our safety team will review it." });
       setNotes("");
       setView("confirmed");
-      if (res?.report) setReports((prev) => [res.report, ...prev.filter((r) => r.id !== res.report.id)]);
+      const rep = res?.report;
+      if (rep) setReports((prev) => [rep, ...prev.filter((r) => r.id !== rep.id)]);
       else refresh();
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to submit report");
