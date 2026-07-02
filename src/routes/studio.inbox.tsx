@@ -5,8 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/lib/session";
 import { listInboxConversations, loadInboxThread, sendCreatorReply } from "@/lib/inbox.functions";
+import { transcribeVoiceObject } from "@/lib/chat.functions";
+import { listSavedMessagesForConversation } from "@/lib/saved-messages.functions";
+import { VoiceRecorder } from "@/components/twinly/VoiceRecorder";
+import { VoicePlayer } from "@/components/twinly/VoicePlayer";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, MessageCircle, Send, User } from "lucide-react";
+import { ArrowLeft, BookmarkCheck, MessageCircle, Send, User } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/studio/inbox")({
@@ -125,7 +130,13 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
   const [state, setState] = useState<Awaited<ReturnType<typeof loadInboxThread>> | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [saved, setSaved] = useState<any[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setUserId(data.session?.user?.id ?? null));
+  }, []);
 
   const load = async () => {
     try {
@@ -137,6 +148,12 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
     }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [conversationId]);
+
+  useEffect(() => {
+    listSavedMessagesForConversation({ data: { conversationId } })
+      .then((r) => setSaved(r.items ?? []))
+      .catch(() => setSaved([]));
+  }, [conversationId]);
 
   // Realtime: refresh on new messages in this conversation
   useEffect(() => {
@@ -163,6 +180,25 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
       onReplied();
     } catch (e: any) {
       toast.error(e.message ?? "Send failed");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const sendVoice = async ({ blob, durationMs, mimeType }: { blob: Blob; durationMs: number; mimeType: string }) => {
+    if (!userId || sending) return;
+    setSending(true);
+    try {
+      const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("mpeg") ? "mp3" : mimeType.includes("wav") ? "wav" : "webm";
+      const path = `${conversationId}/${userId}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from("voice-messages").upload(path, blob, { contentType: mimeType, upsert: false });
+      if (error) throw error;
+      const { transcript } = await transcribeVoiceObject({ data: { conversationId, path, mimeType } });
+      await sendCreatorReply({ data: { conversationId, content: "", attachmentUrl: path, attachmentDurationMs: durationMs, transcript } });
+      await load();
+      onReplied();
+    } catch (e: any) {
+      toast.error(e.message ?? "Voice reply failed");
     } finally {
       setSending(false);
     }
@@ -206,7 +242,11 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
                     : "bg-surface-elevated")
                 }
               >
-                <div className="whitespace-pre-wrap break-words">{m.body}</div>
+                {m.attachment_kind === "audio" && m.attachment_url ? (
+                  <VoicePlayer conversationId={conversationId} path={m.attachment_url} transcript={m.transcript} durationMs={m.attachment_duration_ms} />
+                ) : (
+                  <div className="whitespace-pre-wrap break-words">{m.body}</div>
+                )}
                 <div className={"mt-1 text-[10px] " + (mine ? "text-brand-foreground/70" : "text-muted-foreground")}>
                   {m.sender_type === "fan" ? "Fan" : m.sender_type === "ai" ? "AI persona" : "You"} ·{" "}
                   {new Date(m.created_at).toLocaleString()}
@@ -231,6 +271,39 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
               }
             }}
           />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" title="Saved replies" disabled={saved.length === 0}>
+                <BookmarkCheck className="size-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 p-2" align="end">
+              <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Saved replies
+              </div>
+              {saved.length === 0 ? (
+                <div className="p-3 text-xs text-muted-foreground">
+                  No saved replies yet. Add some in <Link to="/studio/personas" className="underline">Persona Studio</Link>.
+                </div>
+              ) : (
+                <ul className="max-h-64 overflow-y-auto">
+                  {saved.map((s: any) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        className="w-full rounded-md px-2 py-2 text-left text-sm hover:bg-surface-elevated"
+                        onClick={() => setText((t) => (t ? `${t}\n${s.body ?? ""}` : (s.body ?? "")))}
+                      >
+                        <div className="text-xs font-semibold">{s.label}</div>
+                        {s.body && <div className="line-clamp-2 text-[11px] text-muted-foreground">{s.body}</div>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </PopoverContent>
+          </Popover>
+          <VoiceRecorder disabled={sending || !userId} onSend={sendVoice} />
           <Button onClick={send} disabled={sending || !text.trim()}>
             <Send className="size-4" />
           </Button>
