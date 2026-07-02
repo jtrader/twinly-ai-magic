@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   FileText, Image as ImageIcon, Music, Trash2, Upload, Video, Sparkles, Link2, Loader2,
+  History, Eye, Layers, Lock, DollarSign, Check, X,
 } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import { useSession } from "@/lib/session";
 import {
   listVault, createAsset, updateAsset, deleteAsset,
   setAssetPersonaPermission, removeAssetFromPersona, getAssetSignedUrl,
+  bulkCreateAssets, listAssetAudit,
 } from "@/lib/content-vault.functions";
 
 export const Route = createFileRoute("/studio/content")({ component: ContentVaultPage });
@@ -63,8 +65,11 @@ function ContentVaultPage() {
   const [ready, setReady] = useState(false);
   const [selectedPersonaId, setSelectedPersonaId] = useState<string | "all">("all");
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [deleting, setDeleting] = useState<Asset | null>(null);
   const [editing, setEditing] = useState<Asset | null>(null);
+  const [auditing, setAuditing] = useState<Asset | null>(null);
 
   const load = useServerFn(listVault);
   const remove = useServerFn(deleteAsset);
@@ -132,6 +137,12 @@ function ContentVaultPage() {
         </div>
         <div className="flex gap-2">
           <Link to="/studio/personas"><Button variant="ghost">Personas</Button></Link>
+          <Button variant="ghost" onClick={() => setPreviewOpen(true)}>
+            <Eye className="mr-2 h-4 w-4" />Preview
+          </Button>
+          <Button variant="outline" onClick={() => setBulkOpen(true)}>
+            <Layers className="mr-2 h-4 w-4" />Bulk import
+          </Button>
           <Button onClick={() => setUploadOpen(true)}><Upload className="mr-2 h-4 w-4" />New upload</Button>
         </div>
       </div>
@@ -157,6 +168,7 @@ function ContentVaultPage() {
               onChanged={refresh}
               onDelete={() => setDeleting(asset)}
               onEdit={() => setEditing(asset)}
+              onAudit={() => setAuditing(asset)}
             />
           ))}
         </div>
@@ -170,6 +182,23 @@ function ContentVaultPage() {
         defaultPersonaId={selectedPersonaId === "all" ? null : selectedPersonaId}
         onDone={refresh}
       />
+      <BulkUploadDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        creatorId={vault.creator.id}
+        personas={vault.personas}
+        defaultPersonaId={selectedPersonaId === "all" ? null : selectedPersonaId}
+        onDone={refresh}
+      />
+      <PreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        personas={vault.personas}
+        assets={vault.assets}
+        permissionsByAsset={permissionsByAsset}
+        initialPersonaId={selectedPersonaId === "all" ? vault.personas[0]?.id ?? null : selectedPersonaId}
+      />
+      <AuditDialog asset={auditing} onClose={() => setAuditing(null)} personas={vault.personas} />
       <EditDialog
         asset={editing}
         onClose={() => setEditing(null)}
