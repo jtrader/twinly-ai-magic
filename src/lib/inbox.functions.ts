@@ -98,12 +98,22 @@ export const loadInboxThread = createServerFn({ method: "GET" })
 
 export const sendCreatorReply = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { conversationId: string; content: string }) => d)
+  .validator((d: {
+    conversationId: string;
+    content: string;
+    attachmentUrl?: string;
+    attachmentDurationMs?: number;
+    transcript?: string;
+  }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const content = data.content.trim();
-    if (!content) throw new Error("Message is empty.");
+    const hasVoice = !!data.attachmentUrl;
+    const content = (data.content ?? "").trim();
+    if (!hasVoice && !content) throw new Error("Message is empty.");
     if (content.length > 4000) throw new Error("Message too long.");
+    if (hasVoice && (data.attachmentDurationMs ?? 0) > 60_000) {
+      throw new Error("Voice notes are limited to 60 seconds.");
+    }
 
     const { data: convo, error: convoErr } = await supabase
       .from("conversations")
@@ -113,14 +123,15 @@ export const sendCreatorReply = createServerFn({ method: "POST" })
     if (convoErr) throw convoErr;
     if (!convo) throw new Error("Conversation not found");
 
-    const severity = await screenMessage(content);
+    const screenText = hasVoice ? (data.transcript ?? "") : content;
+    const severity = await screenMessage(screenText);
     if (severity === "critical" || severity === "high") {
       await recordModerationEvent({
         reporterId: userId,
         targetType: "message_outbound",
         category: "creator_reply_screener",
         severity,
-        notes: `Blocked: ${content.slice(0, 200)}`,
+        notes: `Blocked: ${(screenText || content).slice(0, 200)}`,
         autoFlagged: true,
       });
       throw new Error("This reply can't be sent. Please rephrase.");
@@ -129,9 +140,13 @@ export const sendCreatorReply = createServerFn({ method: "POST" })
     const { error: insErr } = await supabase.from("messages").insert({
       conversation_id: data.conversationId,
       sender_type: "creator",
-      body: content,
+      body: hasVoice ? (data.transcript ?? "") : content,
       persona_id: (convo as any).persona_id,
       ai_generated: false,
+      attachment_url: data.attachmentUrl ?? null,
+      attachment_kind: hasVoice ? "audio" : null,
+      attachment_duration_ms: data.attachmentDurationMs ?? null,
+      transcript: hasVoice ? (data.transcript ?? null) : null,
     });
     if (insErr) throw insErr;
 
@@ -140,7 +155,7 @@ export const sendCreatorReply = createServerFn({ method: "POST" })
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", data.conversationId);
 
-    await logAudit(userId, "inbox.reply_sent", { type: "conversation", id: data.conversationId }, { severity });
+    await logAudit(userId, "inbox.reply_sent", { type: "conversation", id: data.conversationId }, { severity, voice: hasVoice });
 
     return { ok: true };
   });

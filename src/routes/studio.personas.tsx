@@ -30,6 +30,9 @@ import {
   listPacks, attachPackToPersona, detachPackFromPersona,
 } from "@/lib/content-packs.functions";
 import { getTwinProfile } from "@/lib/twin.functions";
+import {
+  listSavedMessages, createSavedMessage, updateSavedMessage, deleteSavedMessage,
+} from "@/lib/saved-messages.functions";
 
 export const Route = createFileRoute("/studio/personas")({ component: PersonaStudioPage });
 
@@ -346,7 +349,61 @@ function EditPersonaDialog({
   const [donts, setDonts] = useState("");
   const [samplePhrasings, setSamplePhrasings] = useState("");
   const [voiceRefUrl, setVoiceRefUrl] = useState("");
-  const [tab, setTab] = useState<"basics" | "training" | "packs" | "twin">("basics");
+  const [tab, setTab] = useState<"basics" | "training" | "packs" | "twin" | "saved">("basics");
+  const [savedItems, setSavedItems] = useState<any[] | null>(null);
+  const [savedLoading, setSavedLoading] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newBody, setNewBody] = useState("");
+  const [newFewShot, setNewFewShot] = useState(false);
+  const [savedBusy, setSavedBusy] = useState<string | null>(null);
+
+  const refreshSaved = useCallback(async () => {
+    if (!persona) return;
+    setSavedLoading(true);
+    try {
+      const res = await listSavedMessages({ data: { personaId: persona.id } });
+      setSavedItems(res.items ?? []);
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not load saved replies");
+    } finally { setSavedLoading(false); }
+  }, [persona]);
+
+  useEffect(() => {
+    if (persona && tab === "saved" && savedItems === null) refreshSaved();
+  }, [persona, tab, savedItems, refreshSaved]);
+
+  async function addSaved() {
+    if (!persona || !newLabel.trim()) return;
+    setSavedBusy("new");
+    try {
+      await createSavedMessage({ data: {
+        personaId: persona.id,
+        label: newLabel.trim(),
+        body: newBody.trim() || undefined,
+        useAsFewShot: newFewShot,
+      }});
+      setNewLabel(""); setNewBody(""); setNewFewShot(false);
+      setSavedItems(null); refreshSaved();
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not save reply");
+    } finally { setSavedBusy(null); }
+  }
+  async function toggleFewShot(item: any, v: boolean) {
+    setSavedBusy(item.id);
+    try {
+      await updateSavedMessage({ data: { id: item.id, useAsFewShot: v } });
+      setSavedItems((s) => s?.map((r) => r.id === item.id ? { ...r, use_as_few_shot: v } : r) ?? null);
+    } catch (e: any) { toast.error(e.message ?? "Update failed"); }
+    finally { setSavedBusy(null); }
+  }
+  async function removeSaved(id: string) {
+    setSavedBusy(id);
+    try {
+      await deleteSavedMessage({ data: { id } });
+      setSavedItems((s) => s?.filter((r) => r.id !== id) ?? null);
+    } catch (e: any) { toast.error(e.message ?? "Delete failed"); }
+    finally { setSavedBusy(null); }
+  }
 
   // Twin linking
   const [twinLinkMode, setTwinLinkMode] = useState<"all" | "selected" | "none">("all");
@@ -408,6 +465,7 @@ function EditPersonaDialog({
       setHeygenAvatarId(((persona as any).heygen_avatar_id as string | null) ?? "");
       setHeygenVoiceId(((persona as any).heygen_voice_id as string | null) ?? "");
       setTwinRefs(null);
+      setSavedItems(null);
       setTab("basics");
     }
   }, [persona]);
@@ -485,13 +543,13 @@ function EditPersonaDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="mb-3 flex gap-1 border-b border-border">
-          {(["basics", "training", "packs", "twin"] as const).map((t) => (
+          {(["basics", "training", "packs", "twin", "saved"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={"px-3 py-1.5 text-xs font-semibold uppercase tracking-widest " + (tab === t ? "border-b-2 border-brand text-foreground" : "text-muted-foreground")}
-            >{t === "basics" ? "Basics" : t === "training" ? "Training" : t === "packs" ? "Packs" : "Twin"}</button>
+            >{t === "basics" ? "Basics" : t === "training" ? "Training" : t === "packs" ? "Packs" : t === "twin" ? "Twin" : "Saved"}</button>
           ))}
         </div>
         {tab === "basics" && (
@@ -710,6 +768,54 @@ function EditPersonaDialog({
               </div>
             </div>
           </div>
+        </div>
+        )}
+        {tab === "saved" && (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Reusable replies for this persona. Available in the Real Me inbox composer. Mark items as “Few-shot examples” to also feed them into the AI persona's tone at chat time.
+          </p>
+          <div className="rounded-lg border border-border bg-surface p-3">
+            <div className="mb-1 text-xs font-semibold">New saved reply</div>
+            <Input placeholder="Label (e.g. Welcome DM)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} maxLength={120} />
+            <Textarea className="mt-2" rows={3} maxLength={4000} placeholder="Body — the reply text" value={newBody} onChange={(e) => setNewBody(e.target.value)} />
+            <label className="mt-2 flex items-center justify-between rounded-md border border-border/60 bg-background/40 px-2 py-1.5 text-xs">
+              <span>Use as few-shot example for AI persona</span>
+              <Switch checked={newFewShot} onCheckedChange={setNewFewShot} />
+            </label>
+            <div className="mt-2 flex justify-end">
+              <Button size="sm" onClick={addSaved} disabled={!newLabel.trim() || savedBusy === "new"}>
+                <Plus className="mr-1 size-3" /> Add
+              </Button>
+            </div>
+          </div>
+          {savedLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
+          {!savedLoading && savedItems && savedItems.length === 0 && (
+            <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              No saved replies yet.
+            </div>
+          )}
+          {!savedLoading && savedItems && savedItems.length > 0 && (
+            <div className="max-h-[280px] space-y-2 overflow-y-auto pr-1">
+              {savedItems.map((s: any) => (
+                <div key={s.id} className="rounded-lg border border-border bg-surface p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold">{s.label}</div>
+                      {s.body && <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">{s.body}</div>}
+                    </div>
+                    <Button size="icon" variant="ghost" onClick={() => removeSaved(s.id)} disabled={savedBusy === s.id} title="Delete">
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                  <label className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Few-shot example for AI</span>
+                    <Switch checked={!!s.use_as_few_shot} onCheckedChange={(v) => toggleFewShot(s, v)} disabled={savedBusy === s.id} />
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         )}
         <DialogFooter>
