@@ -29,6 +29,7 @@ import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
+import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$packId'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 
@@ -132,6 +133,11 @@ const CreatorsHandleRoute = CreatorsHandleRouteImport.update({
   path: '/creators/$handle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
+  id: '/api/generate-image',
+  path: '/api/generate-image',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioPacksPackIdRoute = StudioPacksPackIdRouteImport.update({
   id: '/$packId',
   path: '/$packId',
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
+  '/api/generate-image': typeof ApiGenerateImageRoute
   '/creators/$handle': typeof CreatorsHandleRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -177,6 +184,7 @@ export interface FileRoutesByTo {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
+  '/api/generate-image': typeof ApiGenerateImageRoute
   '/creators/$handle': typeof CreatorsHandleRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRoute
   '/onboarding': typeof OnboardingRoute
+  '/api/generate-image': typeof ApiGenerateImageRoute
   '/creators/$handle': typeof CreatorsHandleRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -228,6 +237,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/api/generate-image'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -252,6 +262,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/api/generate-image'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -276,6 +287,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/api/generate-image'
     | '/creators/$handle'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -301,6 +313,7 @@ export interface RootRouteChildren {
   DiscoverRoute: typeof DiscoverRoute
   FanRoute: typeof FanRoute
   OnboardingRoute: typeof OnboardingRoute
+  ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   CreatorsHandleRoute: typeof CreatorsHandleRoute
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
@@ -457,6 +470,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreatorsHandleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/generate-image': {
+      id: '/api/generate-image'
+      path: '/api/generate-image'
+      fullPath: '/api/generate-image'
+      preLoaderRoute: typeof ApiGenerateImageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/packs/$packId': {
       id: '/studio/packs/$packId'
       path: '/$packId'
@@ -496,6 +516,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiscoverRoute: DiscoverRoute,
   FanRoute: FanRoute,
   OnboardingRoute: OnboardingRoute,
+  ApiGenerateImageRoute: ApiGenerateImageRoute,
   CreatorsHandleRoute: CreatorsHandleRoute,
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
