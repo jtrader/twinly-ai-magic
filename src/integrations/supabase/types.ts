@@ -188,6 +188,7 @@ export type Database = {
           moderation_status: Database["public"]["Enums"]["moderation_status"]
           price_cents: number
           storage_path: string | null
+          tags: string[]
           title: string
           updated_at: string
         }
@@ -205,6 +206,7 @@ export type Database = {
           moderation_status?: Database["public"]["Enums"]["moderation_status"]
           price_cents?: number
           storage_path?: string | null
+          tags?: string[]
           title: string
           updated_at?: string
         }
@@ -222,6 +224,7 @@ export type Database = {
           moderation_status?: Database["public"]["Enums"]["moderation_status"]
           price_cents?: number
           storage_path?: string | null
+          tags?: string[]
           title?: string
           updated_at?: string
         }
@@ -317,11 +320,14 @@ export type Database = {
           id: string
           name: string
           pack_type: string
+          review_feedback: string | null
           review_note: string | null
+          reviewed_at: string | null
           slug: string
           sort_order: number
           starts_at: string | null
           status: string
+          tags: string[]
           updated_at: string
         }
         Insert: {
@@ -333,11 +339,14 @@ export type Database = {
           id?: string
           name: string
           pack_type?: string
+          review_feedback?: string | null
           review_note?: string | null
+          reviewed_at?: string | null
           slug: string
           sort_order?: number
           starts_at?: string | null
           status?: string
+          tags?: string[]
           updated_at?: string
         }
         Update: {
@@ -349,11 +358,14 @@ export type Database = {
           id?: string
           name?: string
           pack_type?: string
+          review_feedback?: string | null
           review_note?: string | null
+          reviewed_at?: string | null
           slug?: string
           sort_order?: number
           starts_at?: string | null
           status?: string
+          tags?: string[]
           updated_at?: string
         }
         Relationships: [

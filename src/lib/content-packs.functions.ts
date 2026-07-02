@@ -23,6 +23,14 @@ function slugify(name: string) {
     .slice(0, 60) || "pack";
 }
 
+function normalizeTags(tags?: string[] | null): string[] {
+  if (!tags?.length) return [];
+  const cleaned = tags
+    .map((t) => `${t ?? ""}`.trim().toLowerCase().replace(/\s+/g, "-").slice(0, 32))
+    .filter((t) => t.length > 0 && /^[a-z0-9][a-z0-9-]*$/.test(t));
+  return Array.from(new Set(cleaned)).slice(0, 20);
+}
+
 export const listPacks = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -31,7 +39,7 @@ export const listPacks = createServerFn({ method: "GET" })
 
     const { data: packs, error } = await supabase
       .from("content_packs")
-      .select("id, name, slug, pack_type, description, cover_asset_id, status, starts_at, ends_at, sort_order, review_note, created_at, updated_at")
+      .select("id, name, slug, pack_type, description, cover_asset_id, status, starts_at, ends_at, sort_order, review_note, review_feedback, reviewed_at, tags, created_at, updated_at")
       .eq("creator_id", creator.id)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false });
@@ -54,7 +62,10 @@ export const listPacks = createServerFn({ method: "GET" })
       .eq("creator_id", creator.id)
       .order("sort_order", { ascending: true });
 
-    return { creator, packs: packs ?? [], items, attach, personas: personas ?? [] };
+    // Also surface asset tags in the summary so filter chips work across packs
+    const { data: assetTagRows } = await supabase
+      .from("content_assets").select("id, tags").eq("creator_id", creator.id);
+    return { creator, packs: packs ?? [], items, attach, personas: personas ?? [], assetTags: assetTagRows ?? [] };
   });
 
 export const getPack = createServerFn({ method: "POST" })
@@ -77,7 +88,7 @@ export const getPack = createServerFn({ method: "POST" })
       supabase.from("content_pack_items").select("asset_id, position, added_at").eq("pack_id", pack.id).order("position", { ascending: true }),
       supabase.from("content_pack_personas").select("persona_id, permission_type, attached_at").eq("pack_id", pack.id),
       supabase.from("personas").select("id, slug, display_name, kind, sort_order").eq("creator_id", creator.id).order("sort_order"),
-      supabase.from("content_assets").select("id, title, asset_type, storage_path, external_url, is_synthetic, ai_generated_label, approval_status, moderation_status, category, created_at").eq("creator_id", creator.id).order("created_at", { ascending: false }),
+      supabase.from("content_assets").select("id, title, asset_type, storage_path, external_url, is_synthetic, ai_generated_label, approval_status, moderation_status, category, tags, created_at").eq("creator_id", creator.id).order("created_at", { ascending: false }),
     ]);
     if (itemsRes.error) throw itemsRes.error;
     if (attachRes.error) throw attachRes.error;
@@ -94,7 +105,7 @@ export const getPack = createServerFn({ method: "POST" })
   });
 
 export const createPack = createServerFn({ method: "POST" })
-  .validator((d: { name: string; packType: PackType; description?: string; startsAt?: string | null; endsAt?: string | null }) => d)
+  .validator((d: { name: string; packType: PackType; description?: string; startsAt?: string | null; endsAt?: string | null; tags?: string[] }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -123,6 +134,7 @@ export const createPack = createServerFn({ method: "POST" })
         description: data.description?.trim() || null,
         starts_at: data.startsAt || null,
         ends_at: data.endsAt || null,
+        tags: normalizeTags(data.tags),
       })
       .select("*").single();
     if (error) throw error;
@@ -140,6 +152,7 @@ export const updatePack = createServerFn({ method: "POST" })
     coverAssetId?: string | null;
     startsAt?: string | null;
     endsAt?: string | null;
+    tags?: string[];
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -154,6 +167,7 @@ export const updatePack = createServerFn({ method: "POST" })
     if (data.coverAssetId !== undefined) patch.cover_asset_id = data.coverAssetId || null;
     if (data.startsAt !== undefined) patch.starts_at = data.startsAt || null;
     if (data.endsAt !== undefined) patch.ends_at = data.endsAt || null;
+    if (data.tags !== undefined) patch.tags = normalizeTags(data.tags);
     if (!Object.keys(patch).length) return { ok: true };
 
     const { error } = await context.supabase.from("content_packs").update(patch).eq("id", data.packId);
@@ -320,6 +334,7 @@ type BulkPackItem = {
   storagePath: string;
   category?: string;
   isSynthetic?: boolean;
+  tags?: string[];
 };
 
 // Create assets in the vault and add them all to a pack in one call.
@@ -350,6 +365,7 @@ export const bulkUploadToPack = createServerFn({ method: "POST" })
         category: it.category?.trim() || null,
         is_synthetic: !!it.isSynthetic,
         ai_generated_label: !!it.isSynthetic,
+        tags: normalizeTags(it.tags),
       };
     });
 
