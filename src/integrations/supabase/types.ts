@@ -92,6 +92,36 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          subject_id: string | null
+          subject_type: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          subject_id?: string | null
+          subject_type?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          subject_id?: string | null
+          subject_type?: string | null
+        }
+        Relationships: []
+      }
       consent_records: {
         Row: {
           asset_id: string | null
@@ -441,6 +471,7 @@ export type Database = {
       }
       moderation_events: {
         Row: {
+          auto_flagged: boolean
           category: string
           created_at: string
           id: string
@@ -453,6 +484,7 @@ export type Database = {
           target_type: string
         }
         Insert: {
+          auto_flagged?: boolean
           category: string
           created_at?: string
           id?: string
@@ -465,6 +497,7 @@ export type Database = {
           target_type: string
         }
         Update: {
+          auto_flagged?: boolean
           category?: string
           created_at?: string
           id?: string
@@ -526,6 +559,7 @@ export type Database = {
           ends_at: string | null
           id: string
           is_default_seed: boolean
+          is_explicit: boolean
           kind: Database["public"]["Enums"]["persona_kind"]
           price_cents: number
           slug: string
@@ -547,6 +581,7 @@ export type Database = {
           ends_at?: string | null
           id?: string
           is_default_seed?: boolean
+          is_explicit?: boolean
           kind: Database["public"]["Enums"]["persona_kind"]
           price_cents?: number
           slug: string
@@ -568,6 +603,7 @@ export type Database = {
           ends_at?: string | null
           id?: string
           is_default_seed?: boolean
+          is_explicit?: boolean
           kind?: Database["public"]["Enums"]["persona_kind"]
           price_cents?: number
           slug?: string
@@ -590,34 +626,64 @@ export type Database = {
       }
       profiles: {
         Row: {
+          age_verified_at: string | null
           avatar_url: string | null
           country: string | null
           created_at: string
+          date_of_birth: string | null
           display_name: string | null
           dob_attested_at: string | null
+          explicit_content_opt_in: boolean
           handle: string | null
           id: string
           updated_at: string
         }
         Insert: {
+          age_verified_at?: string | null
           avatar_url?: string | null
           country?: string | null
           created_at?: string
+          date_of_birth?: string | null
           display_name?: string | null
           dob_attested_at?: string | null
+          explicit_content_opt_in?: boolean
           handle?: string | null
           id: string
           updated_at?: string
         }
         Update: {
+          age_verified_at?: string | null
           avatar_url?: string | null
           country?: string | null
           created_at?: string
+          date_of_birth?: string | null
           display_name?: string | null
           dob_attested_at?: string | null
+          explicit_content_opt_in?: boolean
           handle?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          bucket: string
+          count: number
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          count?: number
+          user_id: string
+          window_start: string
+        }
+        Update: {
+          bucket?: string
+          count?: number
+          user_id?: string
+          window_start?: string
         }
         Relationships: []
       }
@@ -743,10 +809,31 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      profiles_public: {
+        Row: {
+          avatar_url: string | null
+          display_name: string | null
+          id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          display_name?: string | null
+          id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          display_name?: string | null
+          id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       can_manage_creator: { Args: { _creator_id: string }; Returns: boolean }
+      check_rate_limit: {
+        Args: { _bucket: string; _limit: number; _window_seconds: number }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -754,6 +841,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_adult: { Args: { _user_id?: string }; Returns: boolean }
+      is_creator_owner: { Args: { _creator_id: string }; Returns: boolean }
+      log_audit: {
+        Args: {
+          _action: string
+          _metadata?: Json
+          _subject_id?: string
+          _subject_type?: string
+        }
+        Returns: undefined
+      }
+      screen_message: { Args: { _text: string }; Returns: string }
     }
     Enums: {
       app_role: "fan" | "creator" | "agency" | "admin"
