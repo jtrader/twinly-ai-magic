@@ -10,6 +10,7 @@ import { adminListModeration, adminResolveModeration } from "@/lib/moderation.fu
 import { adminListPendingAssets, adminSetAssetApproval } from "@/lib/admin.functions";
 import { adminListPendingPacks, adminSetPackApproval } from "@/lib/admin.functions";
 import { adminListPendingTwinRefs, adminSetTwinRefReview, adminGetTwinRefSignedUrl } from "@/lib/twin.functions";
+import { adminListDemoCreators, adminSeedDemoCreators, adminImpersonateCreator } from "@/lib/demo.functions";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -27,7 +28,7 @@ function AdminPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
-  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit">("overview");
+  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo">("overview");
   const [stats, setStats] = useState<any>(null);
   const [creators, setCreators] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
@@ -37,6 +38,7 @@ function AdminPage() {
   const [pendingTwin, setPendingTwin] = useState<any[]>([]);
   const [twinPreviews, setTwinPreviews] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [demo, setDemo] = useState<{ seeded: any[]; available: any[]; emails: Record<string, string | null> } | null>(null);
 
   const overview = useServerFn(adminOverview);
   const listVer = useServerFn(adminListVerifications);
@@ -51,6 +53,9 @@ function AdminPage() {
   const listPendingTwin = useServerFn(adminListPendingTwinRefs);
   const setTwinReview = useServerFn(adminSetTwinRefReview);
   const signTwin = useServerFn(adminGetTwinRefSignedUrl);
+  const listDemo = useServerFn(adminListDemoCreators);
+  const seedDemo = useServerFn(adminSeedDemoCreators);
+  const impersonate = useServerFn(adminImpersonateCreator);
 
   useEffect(() => {
     if (!user || !roles.includes("admin")) return;
@@ -71,6 +76,7 @@ function AdminPage() {
           }
           setTwinPreviews(Object.fromEntries(entries));
         }
+        if (tab === "demo") setDemo(await listDemo({}));
       } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
     })();
   }, [tab, user, roles.join(",")]);
@@ -141,6 +147,31 @@ function AdminPage() {
     finally { setBusy(null); }
   }
 
+  async function runSeed() {
+    setBusy("seed");
+    try {
+      const { results } = await seedDemo({});
+      const created = results.filter((r: any) => r.status === "created").length;
+      const existed = results.filter((r: any) => r.status === "existed").length;
+      const errored = results.filter((r: any) => r.status === "error");
+      if (errored.length) toast.error(`Some demo creators failed: ${errored.map((e: any) => e.handle).join(", ")}`);
+      toast.success(`Seeded ${created} new · ${existed} already existed`);
+      setDemo(await listDemo({}));
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(null); }
+  }
+
+  async function signInAs(creatorId: string, handle: string) {
+    if (!window.confirm(`Sign in as @${handle}?\n\nThis will REPLACE your current admin session in this browser. Open the link in a private/incognito window to keep your admin session.`)) return;
+    setBusy(creatorId);
+    try {
+      const { url } = await impersonate({ data: { creatorId } });
+      window.open(url, "_blank", "noopener");
+      toast.success(`Impersonation link opened for @${handle}`);
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(null); }
+  }
+
   return (
     <AppShell>
       <div className="mb-4">
@@ -149,7 +180,7 @@ function AdminPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-2">
-        {(["overview","verifications","moderation","synthetic","packs","twin","audit"] as const).map((t) => (
+        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
