@@ -53,6 +53,8 @@ function PacksPage() {
   const [openNew, setOpenNew] = useState(false);
   const [filterType, setFilterType] = useState<"all" | PackType>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | PackStatus>("all");
+  const [query, setQuery] = useState("");
+  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   const load = useServerFn(listPacks);
 
@@ -85,11 +87,41 @@ function PacksPage() {
 
   const personaById = useMemo(() => new Map((data?.personas ?? []).map((p) => [p.id, p])), [data]);
 
-  const filtered = useMemo(() => (data?.packs ?? []).filter((p) => {
+  // Map pack -> asset tags (union of asset-level tags for assets in the pack)
+  const assetTagsById = useMemo(() => new Map(((data as any)?.assetTags ?? []).map((r: any) => [r.id, (r.tags ?? []) as string[]])), [data]);
+  const packAssetTags = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const it of data?.items ?? []) {
+      const tags = assetTagsById.get(it.asset_id) ?? [];
+      if (!tags.length) continue;
+      if (!m.has(it.pack_id)) m.set(it.pack_id, new Set());
+      for (const t of tags) m.get(it.pack_id)!.add(t);
+    }
+    return m;
+  }, [data, assetTagsById]);
+
+  const allTags = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of (data?.packs ?? []) as any[]) for (const t of (p.tags ?? [])) s.add(t);
+    for (const tags of packAssetTags.values()) for (const t of tags) s.add(t);
+    return Array.from(s).sort();
+  }, [data, packAssetTags]);
+
+  const filtered = useMemo(() => ((data?.packs ?? []) as any[]).filter((p) => {
     if (filterType !== "all" && p.pack_type !== filterType) return false;
     if (filterStatus !== "all" && p.status !== filterStatus) return false;
+    if (activeTag) {
+      const packTags: string[] = p.tags ?? [];
+      const assetTags = packAssetTags.get(p.id);
+      if (!packTags.includes(activeTag) && !(assetTags && assetTags.has(activeTag))) return false;
+    }
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      const hay = `${p.name} ${p.description ?? ""} ${(p.tags ?? []).join(" ")}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
     return true;
-  }), [data, filterType, filterStatus]);
+  }), [data, filterType, filterStatus, activeTag, query, packAssetTags]);
 
   if (loading || !ready) {
     return <AppShell><div className="py-16 text-center text-sm text-muted-foreground">Loading packs…</div></AppShell>;
@@ -123,6 +155,33 @@ function PacksPage() {
           <Chip key={s} active={filterStatus === s} onClick={() => setFilterStatus(s)}>{s.replace("_"," ")}</Chip>
         ))}
       </div>
+
+      <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by name, description, or tag…"
+          className="h-9"
+        />
+        {activeTag && (
+          <Button variant="ghost" size="sm" onClick={() => setActiveTag(null)}>Clear tag: #{activeTag}</Button>
+        )}
+      </div>
+      {allTags.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground self-center mr-1">Tags</span>
+          {allTags.slice(0, 40).map((t) => (
+            <button
+              key={t}
+              onClick={() => setActiveTag(activeTag === t ? null : t)}
+              className={"rounded-full border px-2 py-0.5 text-[11px] transition " +
+                (activeTag === t
+                  ? "border-brand bg-brand/15 text-brand-glow"
+                  : "border-border bg-surface/60 text-muted-foreground hover:border-brand/40 hover:text-foreground")}
+            >#{t}</button>
+          ))}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-border bg-surface/40 p-10 text-center">
