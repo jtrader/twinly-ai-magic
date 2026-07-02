@@ -304,7 +304,7 @@ function PackAssetCard({ asset, isCover, onRemove, onSetCover }: any) {
 
   useEffect(() => {
     let alive = true;
-    if (asset.asset_type === "image" && asset.storage_path) {
+    if (["image", "video", "audio"].includes(asset.asset_type) && asset.storage_path) {
       signUrl({ data: { storagePath: asset.storage_path, expiresIn: 900 } })
         .then((r) => alive && setPreview(r.url)).catch(() => {});
     }
@@ -314,8 +314,15 @@ function PackAssetCard({ asset, isCover, onRemove, onSetCover }: any) {
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-surface">
       <div className="relative aspect-video w-full overflow-hidden bg-surface-elevated">
-        {preview ? (
+        {preview && asset.asset_type === "image" ? (
           <img src={preview} alt={asset.title} className="h-full w-full object-cover" loading="lazy" />
+        ) : preview && asset.asset_type === "video" ? (
+          <video src={preview} controls preload="metadata" className="h-full w-full bg-black object-contain" />
+        ) : preview && asset.asset_type === "audio" ? (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3">
+            <Music className="h-8 w-8 text-muted-foreground" />
+            <audio src={preview} controls className="w-full" />
+          </div>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground"><Icon className="h-10 w-10" /></div>
         )}
@@ -328,12 +335,68 @@ function PackAssetCard({ asset, isCover, onRemove, onSetCover }: any) {
       <div className="flex flex-1 flex-col gap-2 p-3">
         <div className="line-clamp-1 text-sm font-semibold">{asset.title}</div>
         <div className="text-[11px] text-muted-foreground">{asset.category || "Uncategorised"} · {asset.moderation_status}</div>
+        {asset.tags && asset.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {asset.tags.slice(0, 6).map((t: string) => (
+              <span key={t} className="rounded-full border border-border/60 bg-background/40 px-1.5 py-0.5 text-[10px] text-muted-foreground">#{t}</span>
+            ))}
+          </div>
+        )}
         <div className="mt-auto flex justify-end gap-1">
           {!isCover && <Button variant="ghost" size="sm" onClick={onSetCover} title="Set cover"><Star className="h-4 w-4" /></Button>}
           <Button variant="ghost" size="sm" onClick={onRemove} className="text-destructive hover:text-destructive" title="Remove from pack">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusBanner({ pack, status }: { pack: any; status: PackStatus }) {
+  const reviewedAt = pack.reviewed_at ? new Date(pack.reviewed_at).toLocaleString() : null;
+  if (status === "approved") {
+    return (
+      <div className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">
+        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+        <div className="flex-1">
+          <div className="font-semibold">Approved{reviewedAt ? ` · ${reviewedAt}` : ""}</div>
+          <div className="text-emerald-200/80">This pack is live for attached personas.</div>
+          {pack.review_feedback && <div className="mt-1 text-emerald-100/90">Reviewer: {pack.review_feedback}</div>}
+        </div>
+      </div>
+    );
+  }
+  if (status === "in_review") {
+    return (
+      <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+        <Clock className="mt-0.5 h-5 w-5 shrink-0" />
+        <div className="flex-1">
+          <div className="font-semibold">Pending review</div>
+          <div className="text-amber-200/80">Admins will review shortly. You can't edit until a decision is made.</div>
+        </div>
+      </div>
+    );
+  }
+  if (status === "rejected") {
+    return (
+      <div className="mb-4 flex items-start gap-3 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-100">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+        <div className="flex-1">
+          <div className="font-semibold">Rejected{reviewedAt ? ` · ${reviewedAt}` : ""}</div>
+          {pack.review_note && <div className="mt-1"><strong>Reason:</strong> {pack.review_note}</div>}
+          {pack.review_feedback && <div className="mt-1"><strong>Feedback:</strong> {pack.review_feedback}</div>}
+          <div className="mt-1 text-rose-200/80">Address the notes above, then resubmit.</div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="mb-4 flex items-start gap-3 rounded-xl border border-border bg-surface/60 p-3 text-sm text-muted-foreground">
+      <FileText className="mt-0.5 h-5 w-5 shrink-0" />
+      <div className="flex-1">
+        <div className="font-semibold text-foreground">Draft</div>
+        <div>Add assets, tag them, then submit for admin approval.</div>
       </div>
     </div>
   );
