@@ -7,7 +7,9 @@ import { ReportDialog } from "@/components/twinly/ReportDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { sendPersonaMessage } from "@/lib/chat.functions";
+import { sendPersonaMessage, ensurePersonaConversation, transcribeVoiceObject } from "@/lib/chat.functions";
+import { VoiceRecorder } from "@/components/twinly/VoiceRecorder";
+import { VoicePlayer } from "@/components/twinly/VoicePlayer";
 import { toast } from "sonner";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -47,10 +49,14 @@ function ChatPage() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setAuthed(!!data.session));
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthed(!!data.session);
+      setUserId(data.session?.user?.id ?? null);
+    });
   }, []);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -78,6 +84,43 @@ function ChatPage() {
       }
     } catch (err: any) {
       toast.error(err.message ?? "Failed to send");
+    } finally { setSending(false); }
+  }
+
+  async function sendVoice({ blob, durationMs, mimeType }: { blob: Blob; durationMs: number; mimeType: string }) {
+    if (!authed || !userId) { toast.error("Sign in to chat"); return; }
+    if (sending) return;
+    setSending(true);
+    try {
+      let convoId = conversationId;
+      if (!convoId) {
+        const r = await ensurePersonaConversation({ data: { creatorHandle: params.handle, personaSlug: params.persona } });
+        convoId = r.conversationId;
+        setConversationId(convoId);
+      }
+      const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("mpeg") ? "mp3" : mimeType.includes("wav") ? "wav" : "webm";
+      const path = `${convoId}/${userId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("voice-messages").upload(path, blob, { contentType: mimeType, upsert: false });
+      if (upErr) throw upErr;
+      const { transcript } = await transcribeVoiceObject({ data: { conversationId: convoId, path, mimeType } });
+      const optimistic = { id: crypto.randomUUID(), sender_type: "fan", body: transcript ?? "", attachment_url: path, attachment_kind: "audio", attachment_duration_ms: durationMs, transcript, created_at: new Date().toISOString() };
+      setMessages((m) => [...m, optimistic]);
+      const res = await sendPersonaMessage({ data: { conversationId: convoId, creatorHandle: params.handle, personaSlug: params.persona, content: "", attachmentUrl: path, attachmentDurationMs: durationMs, transcript } });
+      setConversationId(res.conversationId);
+      if (res.assistantText) {
+        setMessages((m) => [...m, {
+          id: crypto.randomUUID(),
+          sender_type: "ai",
+          body: res.assistantText,
+          ai_generated: true,
+          attachment_url: res.assistantVoiceUrl ?? null,
+          attachment_kind: res.assistantVoiceUrl ? "audio" : null,
+          transcript: res.assistantVoiceUrl ? res.assistantText : null,
+          created_at: new Date().toISOString(),
+        }]);
+      }
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to send voice note");
     } finally { setSending(false); }
   }
 
@@ -117,7 +160,16 @@ function ChatPage() {
                     {m.sender_type === "ai" ? `${persona.display_name} · AI` : persona.display_name}
                   </div>
                 )}
-                <div className="whitespace-pre-wrap">{m.body}</div>
+                {m.attachment_kind === "audio" && m.attachment_url && conversationId ? (
+                  <VoicePlayer
+                    conversationId={conversationId}
+                    path={m.attachment_url}
+                    transcript={m.transcript}
+                    durationMs={m.attachment_duration_ms}
+                  />
+                ) : (
+                  <div className="whitespace-pre-wrap">{m.body}</div>
+                )}
               </div>
             </div>
           ))}
@@ -125,6 +177,7 @@ function ChatPage() {
 
         <form onSubmit={send} className="mt-3 flex gap-2">
           <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder={authed ? "Type a message..." : "Sign in to chat"} disabled={!authed || sending} />
+          <VoiceRecorder disabled={!authed || sending} onSend={sendVoice} />
           <Button type="submit" disabled={!authed || sending || !input.trim()}>Send</Button>
         </form>
         {authed === false && (
