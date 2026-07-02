@@ -1,0 +1,655 @@
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import {
+  FileText, Image as ImageIcon, Music, Trash2, Upload, Video, Sparkles, Link2, Loader2,
+} from "lucide-react";
+import { AppShell } from "@/components/twinly/AppShell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { useSession } from "@/lib/session";
+import {
+  listVault, createAsset, updateAsset, deleteAsset,
+  setAssetPersonaPermission, removeAssetFromPersona, getAssetSignedUrl,
+} from "@/lib/content-vault.functions";
+
+export const Route = createFileRoute("/studio/content")({ component: ContentVaultPage });
+
+type Vault = Awaited<ReturnType<typeof listVault>>;
+type Asset = Vault["assets"][number];
+type Persona = Vault["personas"][number];
+type Permission = Vault["permissions"][number];
+type AssetType = Asset["asset_type"];
+type PermissionType = Permission["permission_type"];
+
+const ASSET_ICON: Record<AssetType, typeof ImageIcon> = {
+  image: ImageIcon, video: Video, audio: Music, text: FileText,
+};
+
+const PERMISSION_LABEL: Record<PermissionType, string> = {
+  included: "Included",
+  ppv: "Pay-per-view",
+  restricted: "Restricted",
+};
+
+function detectAssetType(file: File): AssetType {
+  const t = file.type;
+  if (t.startsWith("image/")) return "image";
+  if (t.startsWith("video/")) return "video";
+  if (t.startsWith("audio/")) return "audio";
+  return "text";
+}
+
+function ContentVaultPage() {
+  const { user, loading } = useSession();
+  const navigate = useNavigate();
+  const [vault, setVault] = useState<Vault | null>(null);
+  const [ready, setReady] = useState(false);
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string | "all">("all");
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [deleting, setDeleting] = useState<Asset | null>(null);
+  const [editing, setEditing] = useState<Asset | null>(null);
+
+  const load = useServerFn(listVault);
+  const remove = useServerFn(deleteAsset);
+
+  useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await load();
+      setVault(res);
+    } catch (err: any) {
+      if (`${err?.message ?? ""}`.includes("creator profile")) {
+        navigate({ to: "/onboarding" });
+        return;
+      }
+      toast.error(err?.message ?? "Failed to load vault");
+    } finally {
+      setReady(true);
+    }
+  }, [load, navigate]);
+
+  useEffect(() => { if (user) refresh(); }, [user, refresh]);
+
+  const permissionsByAsset = useMemo(() => {
+    const map = new Map<string, Permission[]>();
+    for (const p of vault?.permissions ?? []) {
+      if (!map.has(p.asset_id)) map.set(p.asset_id, []);
+      map.get(p.asset_id)!.push(p);
+    }
+    return map;
+  }, [vault]);
+
+  const filteredAssets = useMemo(() => {
+    if (!vault) return [];
+    if (selectedPersonaId === "all") return vault.assets;
+    return vault.assets.filter((a) => permissionsByAsset.get(a.id)?.some((p) => p.persona_id === selectedPersonaId));
+  }, [vault, selectedPersonaId, permissionsByAsset]);
+
+  async function handleDelete() {
+    if (!deleting) return;
+    try {
+      await remove({ data: { assetId: deleting.id } });
+      toast.success("Asset deleted");
+      setDeleting(null);
+      refresh();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Delete failed");
+    }
+  }
+
+  if (loading || !ready) {
+    return <AppShell><div className="py-16 text-center text-sm text-muted-foreground">Loading vault…</div></AppShell>;
+  }
+  if (!vault) return null;
+
+  return (
+    <AppShell>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Content vault</div>
+          <h1 className="mt-1 font-display text-3xl font-bold">Per-persona library</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Upload assets and control which personas can use them. Synthetic content stays labelled.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link to="/studio/personas"><Button variant="ghost">Personas</Button></Link>
+          <Button onClick={() => setUploadOpen(true)}><Upload className="mr-2 h-4 w-4" />New upload</Button>
+        </div>
+      </div>
+
+      <PersonaFilterBar
+        personas={vault.personas}
+        assets={vault.assets}
+        permissionsByAsset={permissionsByAsset}
+        selected={selectedPersonaId}
+        onSelect={setSelectedPersonaId}
+      />
+
+      {filteredAssets.length === 0 ? (
+        <EmptyState onUpload={() => setUploadOpen(true)} filtered={selectedPersonaId !== "all"} />
+      ) : (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredAssets.map((asset) => (
+            <AssetCard
+              key={asset.id}
+              asset={asset}
+              personas={vault.personas}
+              permissions={permissionsByAsset.get(asset.id) ?? []}
+              onChanged={refresh}
+              onDelete={() => setDeleting(asset)}
+              onEdit={() => setEditing(asset)}
+            />
+          ))}
+        </div>
+      )}
+
+      <UploadDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        creatorId={vault.creator.id}
+        personas={vault.personas}
+        defaultPersonaId={selectedPersonaId === "all" ? null : selectedPersonaId}
+        onDone={refresh}
+      />
+      <EditDialog
+        asset={editing}
+        onClose={() => setEditing(null)}
+        onSaved={refresh}
+      />
+      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete asset?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes “{deleting?.title}” from your vault, the storage file, and every persona it was attached to.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </AppShell>
+  );
+}
+
+function PersonaFilterBar({
+  personas, assets, permissionsByAsset, selected, onSelect,
+}: {
+  personas: Persona[];
+  assets: Asset[];
+  permissionsByAsset: Map<string, Permission[]>;
+  selected: string | "all";
+  onSelect: (id: string | "all") => void;
+}) {
+  const countFor = (personaId: string) =>
+    assets.filter((a) => permissionsByAsset.get(a.id)?.some((p) => p.persona_id === personaId)).length;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <FilterChip active={selected === "all"} onClick={() => onSelect("all")}>
+        All assets <span className="ml-1 text-muted-foreground">· {assets.length}</span>
+      </FilterChip>
+      {personas.map((p) => (
+        <FilterChip key={p.id} active={selected === p.id} onClick={() => onSelect(p.id)}>
+          {p.kind === "ai" ? "🤖 " : "👤 "}{p.display_name}
+          <span className="ml-1 text-muted-foreground">· {countFor(p.id)}</span>
+        </FilterChip>
+      ))}
+    </div>
+  );
+}
+
+function FilterChip({ active, onClick, children }: any) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        "rounded-full border px-3 py-1.5 text-xs font-medium transition " +
+        (active
+          ? "border-brand bg-brand/10 text-brand-glow"
+          : "border-border bg-surface text-muted-foreground hover:border-brand/40 hover:text-foreground")
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+function EmptyState({ onUpload, filtered }: { onUpload: () => void; filtered: boolean }) {
+  return (
+    <div className="mt-8 rounded-2xl border border-dashed border-border bg-surface/40 p-10 text-center">
+      <p className="text-sm text-muted-foreground">
+        {filtered
+          ? "No assets attached to this persona yet."
+          : "Your vault is empty. Upload your first asset to get started."}
+      </p>
+      <Button className="mt-4" onClick={onUpload}><Upload className="mr-2 h-4 w-4" />Upload</Button>
+    </div>
+  );
+}
+
+function AssetCard({
+  asset, personas, permissions, onChanged, onDelete, onEdit,
+}: {
+  asset: Asset;
+  personas: Persona[];
+  permissions: Permission[];
+  onChanged: () => void;
+  onDelete: () => void;
+  onEdit: () => void;
+}) {
+  const Icon = ASSET_ICON[asset.asset_type] ?? FileText;
+  const [preview, setPreview] = useState<string | null>(null);
+  const signUrl = useServerFn(getAssetSignedUrl);
+  const setPerm = useServerFn(setAssetPersonaPermission);
+  const removePerm = useServerFn(removeAssetFromPersona);
+
+  useEffect(() => {
+    let alive = true;
+    if (asset.asset_type === "image" && asset.storage_path) {
+      signUrl({ data: { storagePath: asset.storage_path, expiresIn: 900 } })
+        .then((r) => alive && setPreview(r.url))
+        .catch(() => {});
+    }
+    return () => { alive = false; };
+  }, [asset.storage_path, asset.asset_type, signUrl]);
+
+  const permByPersona = new Map(permissions.map((p) => [p.persona_id, p.permission_type]));
+
+  async function togglePersona(personaId: string, checked: boolean) {
+    try {
+      if (checked) {
+        await setPerm({ data: { assetId: asset.id, personaId, permissionType: "included" } });
+      } else {
+        await removePerm({ data: { assetId: asset.id, personaId } });
+      }
+      onChanged();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Update failed");
+    }
+  }
+
+  async function changePermission(personaId: string, permissionType: PermissionType) {
+    try {
+      await setPerm({ data: { assetId: asset.id, personaId, permissionType } });
+      onChanged();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Update failed");
+    }
+  }
+
+  return (
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-surface">
+      <div className="relative aspect-video w-full overflow-hidden bg-surface-elevated">
+        {preview ? (
+          <img src={preview} alt={asset.title} className="h-full w-full object-cover" loading="lazy" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+            <Icon className="h-10 w-10" />
+          </div>
+        )}
+        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+          <Badge variant="outline" className="bg-background/70 backdrop-blur">{asset.asset_type}</Badge>
+          {asset.is_synthetic && (
+            <Badge className="bg-brand/20 text-brand-glow"><Sparkles className="mr-1 h-3 w-3" />Synthetic</Badge>
+          )}
+          {asset.external_url && !asset.storage_path && (
+            <Badge variant="outline" className="bg-background/70 backdrop-blur"><Link2 className="mr-1 h-3 w-3" />External</Badge>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div>
+          <div className="line-clamp-1 font-display text-base font-semibold">{asset.title}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {asset.category || "Uncategorised"} · {asset.moderation_status} · consent {asset.consent_status.replace("_"," ")}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Persona access
+          </div>
+          {personas.length === 0 ? (
+            <div className="text-xs text-muted-foreground">No personas yet.</div>
+          ) : (
+            <div className="space-y-2">
+              {personas.map((p) => {
+                const attached = permByPersona.has(p.id);
+                const perm = permByPersona.get(p.id);
+                return (
+                  <div key={p.id} className="flex items-center gap-2">
+                    <Switch
+                      checked={attached}
+                      onCheckedChange={(v) => togglePersona(p.id, v)}
+                      aria-label={`Attach ${asset.title} to ${p.display_name}`}
+                    />
+                    <div className="flex-1 truncate text-xs">
+                      <span className="text-foreground">{p.display_name}</span>
+                      <span className="ml-1 text-muted-foreground">· {p.kind === "ai" ? "AI" : "Real Me"}</span>
+                    </div>
+                    {attached && (
+                      <Select value={perm ?? "included"} onValueChange={(v) => changePermission(p.id, v as PermissionType)}>
+                        <SelectTrigger className="h-7 w-[140px] text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(PERMISSION_LABEL) as PermissionType[]).map((k) => (
+                            <SelectItem key={k} value={k}>{PERMISSION_LABEL[k]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-auto flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={onEdit}>Edit</Button>
+          <Button variant="ghost" size="sm" onClick={onDelete} className="text-destructive hover:text-destructive">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UploadDialog({
+  open, onOpenChange, creatorId, personas, defaultPersonaId, onDone,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  creatorId: string;
+  personas: Persona[];
+  defaultPersonaId: string | null;
+  onDone: () => void;
+}) {
+  const [mode, setMode] = useState<"file" | "external">("file");
+  const [file, setFile] = useState<File | null>(null);
+  const [externalUrl, setExternalUrl] = useState("");
+  const [externalType, setExternalType] = useState<AssetType>("image");
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [isSynthetic, setIsSynthetic] = useState(false);
+  const [selectedPersonas, setSelectedPersonas] = useState<Set<string>>(new Set());
+  const [permission, setPermission] = useState<PermissionType>("included");
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const createFn = useServerFn(createAsset);
+
+  useEffect(() => {
+    if (open) {
+      setMode("file"); setFile(null); setExternalUrl(""); setExternalType("image");
+      setTitle(""); setCategory(""); setIsSynthetic(false);
+      setSelectedPersonas(defaultPersonaId ? new Set([defaultPersonaId]) : new Set());
+      setPermission("included"); setBusy(false);
+    }
+  }, [open, defaultPersonaId]);
+
+  function togglePersona(id: string) {
+    setSelectedPersonas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) { toast.error("Give the asset a title."); return; }
+    if (mode === "file" && !file) { toast.error("Pick a file first."); return; }
+    if (mode === "external" && !externalUrl.trim()) { toast.error("Paste an external URL."); return; }
+
+    setBusy(true);
+    try {
+      let storagePath: string | undefined;
+      let assetType: AssetType = externalType;
+
+      if (mode === "file" && file) {
+        assetType = detectAssetType(file);
+        const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
+        const key = `${creatorId}/${crypto.randomUUID()}${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("content-assets")
+          .upload(key, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
+        if (upErr) throw upErr;
+        storagePath = key;
+      }
+
+      await createFn({
+        data: {
+          title: title.trim(),
+          assetType,
+          storagePath,
+          externalUrl: mode === "external" ? externalUrl.trim() : undefined,
+          category: category.trim() || undefined,
+          isSynthetic,
+          aiGeneratedLabel: isSynthetic,
+          attachPersonaIds: Array.from(selectedPersonas),
+          permissionType: permission,
+        },
+      });
+      toast.success("Asset added to vault");
+      onOpenChange(false);
+      onDone();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add asset</DialogTitle>
+          <DialogDescription>
+            Files stay in your private storage bucket. Attach to personas to make them usable in chats.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <div className="flex gap-2">
+            <FilterChip active={mode === "file"} onClick={() => setMode("file")}>Upload file</FilterChip>
+            <FilterChip active={mode === "external"} onClick={() => setMode("external")}>External link</FilterChip>
+          </div>
+
+          {mode === "file" ? (
+            <div>
+              <Label>File</Label>
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/*,video/*,audio/*,.txt,.md,.pdf"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  setFile(f);
+                  if (f && !title) setTitle(f.name.replace(/\.[^/.]+$/, ""));
+                }}
+                className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand-foreground"
+              />
+              {file && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {detectAssetType(file)} · {(file.size / 1024 / 1024).toFixed(1)} MB
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+              <div>
+                <Label htmlFor="ext-url">External URL</Label>
+                <Input id="ext-url" value={externalUrl} onChange={(e) => setExternalUrl(e.target.value)} placeholder="https://…" />
+              </div>
+              <div>
+                <Label>Type</Label>
+                <Select value={externalType} onValueChange={(v) => setExternalType(v as AssetType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="image">Image</SelectItem>
+                    <SelectItem value="video">Video</SelectItem>
+                    <SelectItem value="audio">Audio</SelectItem>
+                    <SelectItem value="text">Text</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <Label htmlFor="title">Title</Label>
+            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} required />
+          </div>
+          <div>
+            <Label htmlFor="category">Category (optional)</Label>
+            <Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. behind-the-scenes" />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+            <div>
+              <div className="text-sm font-medium">Synthetic / AI-generated</div>
+              <div className="text-xs text-muted-foreground">Adds an AI disclosure label whenever this asset is shown.</div>
+            </div>
+            <Switch checked={isSynthetic} onCheckedChange={setIsSynthetic} />
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Attach to personas</div>
+              <Select value={permission} onValueChange={(v) => setPermission(v as PermissionType)}>
+                <SelectTrigger className="h-7 w-[140px] text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(PERMISSION_LABEL) as PermissionType[]).map((k) => (
+                    <SelectItem key={k} value={k}>{PERMISSION_LABEL[k]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {personas.length === 0 ? (
+              <div className="text-xs text-muted-foreground">Create a persona first to attach assets.</div>
+            ) : (
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                {personas.map((p) => (
+                  <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-surface-elevated">
+                    <input
+                      type="checkbox"
+                      checked={selectedPersonas.has(p.id)}
+                      onChange={() => togglePersona(p.id)}
+                      className="h-4 w-4 accent-brand"
+                    />
+                    <span className="truncate">{p.display_name}</span>
+                    <span className="text-xs text-muted-foreground">{p.kind === "ai" ? "AI" : "Real Me"}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Uploading…</> : "Add asset"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditDialog({
+  asset, onClose, onSaved,
+}: {
+  asset: Asset | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [isSynthetic, setIsSynthetic] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const update = useServerFn(updateAsset);
+
+  useEffect(() => {
+    if (asset) {
+      setTitle(asset.title);
+      setCategory(asset.category ?? "");
+      setIsSynthetic(asset.is_synthetic);
+    }
+  }, [asset]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!asset) return;
+    setBusy(true);
+    try {
+      await update({
+        data: {
+          assetId: asset.id, title, category, isSynthetic,
+          aiGeneratedLabel: isSynthetic,
+        },
+      });
+      toast.success("Asset updated");
+      onClose();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Update failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!asset} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit asset</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <Label htmlFor="e-title">Title</Label>
+            <Input id="e-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
+          </div>
+          <div>
+            <Label htmlFor="e-cat">Category</Label>
+            <Input id="e-cat" value={category} onChange={(e) => setCategory(e.target.value)} />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+            <div>
+              <div className="text-sm font-medium">Synthetic / AI-generated</div>
+              <div className="text-xs text-muted-foreground">Keeps this asset labelled in fan-facing surfaces.</div>
+            </div>
+            <Switch checked={isSynthetic} onCheckedChange={setIsSynthetic} />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
+            <Button type="submit" disabled={busy}>{busy ? "Saving…" : "Save changes"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
