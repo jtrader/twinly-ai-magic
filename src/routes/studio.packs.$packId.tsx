@@ -184,11 +184,7 @@ function PackDetailPage() {
         </div>
       </div>
 
-      {p.review_note && status === "rejected" && (
-        <div className="mb-4 rounded-lg border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">
-          <strong>Reviewer note:</strong> {p.review_note}
-        </div>
-      )}
+      <StatusBanner pack={p} status={status} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <section>
