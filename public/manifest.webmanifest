@@ -1,0 +1,12 @@
+{
+  "name": "Twinly.ai",
+  "short_name": "Twinly",
+  "description": "Verified creators. Official AI personas. Choose the real experience or an official AI twin.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a1a",
+  "theme_color": "#0a0a1a",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "any", "type": "image/x-icon" }
+  ]
+}

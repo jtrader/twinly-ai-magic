@@ -9,38 +9,187 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as DiscoverRouteImport } from './routes/discover'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LegalTermsRouteImport } from './routes/legal.terms'
+import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
+import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
+import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
+import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 
+const DiscoverRoute = DiscoverRouteImport.update({
+  id: '/discover',
+  path: '/discover',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LegalTermsRoute = LegalTermsRouteImport.update({
+  id: '/legal/terms',
+  path: '/legal/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalPrivacyRoute = LegalPrivacyRouteImport.update({
+  id: '/legal/privacy',
+  path: '/legal/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalAiDisclosureRoute = LegalAiDisclosureRouteImport.update({
+  id: '/legal/ai-disclosure',
+  path: '/legal/ai-disclosure',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreatorsHandleRoute = CreatorsHandleRouteImport.update({
+  id: '/creators/$handle',
+  path: '/creators/$handle',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChatHandlePersonaRoute = ChatHandlePersonaRouteImport.update({
+  id: '/chat/$handle/$persona',
+  path: '/chat/$handle/$persona',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/app': typeof AppRoute
+  '/auth': typeof AuthRoute
+  '/discover': typeof DiscoverRoute
+  '/creators/$handle': typeof CreatorsHandleRoute
+  '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
+  '/legal/privacy': typeof LegalPrivacyRoute
+  '/legal/terms': typeof LegalTermsRoute
+  '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/app': typeof AppRoute
+  '/auth': typeof AuthRoute
+  '/discover': typeof DiscoverRoute
+  '/creators/$handle': typeof CreatorsHandleRoute
+  '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
+  '/legal/privacy': typeof LegalPrivacyRoute
+  '/legal/terms': typeof LegalTermsRoute
+  '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/app': typeof AppRoute
+  '/auth': typeof AuthRoute
+  '/discover': typeof DiscoverRoute
+  '/creators/$handle': typeof CreatorsHandleRoute
+  '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
+  '/legal/privacy': typeof LegalPrivacyRoute
+  '/legal/terms': typeof LegalTermsRoute
+  '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/account'
+    | '/app'
+    | '/auth'
+    | '/discover'
+    | '/creators/$handle'
+    | '/legal/ai-disclosure'
+    | '/legal/privacy'
+    | '/legal/terms'
+    | '/chat/$handle/$persona'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/account'
+    | '/app'
+    | '/auth'
+    | '/discover'
+    | '/creators/$handle'
+    | '/legal/ai-disclosure'
+    | '/legal/privacy'
+    | '/legal/terms'
+    | '/chat/$handle/$persona'
+  id:
+    | '__root__'
+    | '/'
+    | '/account'
+    | '/app'
+    | '/auth'
+    | '/discover'
+    | '/creators/$handle'
+    | '/legal/ai-disclosure'
+    | '/legal/privacy'
+    | '/legal/terms'
+    | '/chat/$handle/$persona'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountRoute: typeof AccountRoute
+  AppRoute: typeof AppRoute
+  AuthRoute: typeof AuthRoute
+  DiscoverRoute: typeof DiscoverRoute
+  CreatorsHandleRoute: typeof CreatorsHandleRoute
+  LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
+  LegalPrivacyRoute: typeof LegalPrivacyRoute
+  LegalTermsRoute: typeof LegalTermsRoute
+  ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/discover': {
+      id: '/discover'
+      path: '/discover'
+      fullPath: '/discover'
+      preLoaderRoute: typeof DiscoverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +197,56 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/legal/terms': {
+      id: '/legal/terms'
+      path: '/legal/terms'
+      fullPath: '/legal/terms'
+      preLoaderRoute: typeof LegalTermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/privacy': {
+      id: '/legal/privacy'
+      path: '/legal/privacy'
+      fullPath: '/legal/privacy'
+      preLoaderRoute: typeof LegalPrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/ai-disclosure': {
+      id: '/legal/ai-disclosure'
+      path: '/legal/ai-disclosure'
+      fullPath: '/legal/ai-disclosure'
+      preLoaderRoute: typeof LegalAiDisclosureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/creators/$handle': {
+      id: '/creators/$handle'
+      path: '/creators/$handle'
+      fullPath: '/creators/$handle'
+      preLoaderRoute: typeof CreatorsHandleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat/$handle/$persona': {
+      id: '/chat/$handle/$persona'
+      path: '/chat/$handle/$persona'
+      fullPath: '/chat/$handle/$persona'
+      preLoaderRoute: typeof ChatHandlePersonaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountRoute: AccountRoute,
+  AppRoute: AppRoute,
+  AuthRoute: AuthRoute,
+  DiscoverRoute: DiscoverRoute,
+  CreatorsHandleRoute: CreatorsHandleRoute,
+  LegalAiDisclosureRoute: LegalAiDisclosureRoute,
+  LegalPrivacyRoute: LegalPrivacyRoute,
+  LegalTermsRoute: LegalTermsRoute,
+  ChatHandlePersonaRoute: ChatHandlePersonaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
