@@ -542,7 +542,16 @@ function VideoTab({ personaId, packId }: { personaId: string; packId: string }) 
   const [error, setError] = useState<GenError | null>(null);
   const lastAttempt = useLastAttempt<{ script: string; title: string; seconds: number }>();
 
-  type Job = { id: string; title: string; created_at: string; status: "queued" | "rendering" | "completed" | "approved" | "failed" };
+  type Job = {
+    id: string;
+    title: string;
+    created_at: string;
+    status: "queued" | "rendering" | "completed" | "approved" | "failed";
+    provider?: string | null;
+    provider_status?: string | null;
+    provider_error?: string | null;
+    render_started_at?: string | null;
+  };
   const jobsQuery = useQuery({
     queryKey: ["talking-head-jobs"],
     queryFn: async () => (await listJobs()) as { jobs: Job[] },
@@ -595,10 +604,12 @@ function VideoTab({ personaId, packId }: { personaId: string; packId: string }) 
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
-        <strong>Preview integration.</strong> Talking-head render provider isn't wired yet — submitting queues a
-        pending video asset in your vault so you can wire consent, approvals, and delivery end-to-end.
-        The rendered clip attaches automatically when the provider is enabled.
+      <div className="rounded-lg border border-brand/30 bg-brand/5 p-3 text-xs text-muted-foreground">
+        <div className="mb-1 font-semibold text-foreground">Powered by HeyGen</div>
+        Submissions render on HeyGen. Set your persona's <em>Avatar ID</em> in the Persona editor → <strong>Twin</strong> tab.
+        Add this webhook in HeyGen → <strong>Webhooks</strong> so completed renders land back in your vault:
+        <code className="mt-1 block break-all rounded bg-background/60 px-2 py-1 text-[10px] text-foreground">https://twinly.life/api/public/hooks/heygen</code>
+        Signing secret env: <code className="text-[10px]">HEYGEN_WEBHOOK_SECRET</code>.
       </div>
       <div>
         <Label>Script (what the persona says)</Label>
