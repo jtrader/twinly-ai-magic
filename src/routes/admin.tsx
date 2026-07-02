@@ -362,6 +362,57 @@ function AdminPage() {
           </ul>
         </div>
       )}
+
+      {tab === "demo" && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border bg-surface p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-display text-lg font-bold">Demo creator accounts</div>
+                <div className="text-xs text-muted-foreground">Seed 3 fully-prefilled demo creators (Aurora Vale, Kai Wolf, Luna Marie). Idempotent — safe to re-run.</div>
+              </div>
+              <Button size="sm" onClick={runSeed} disabled={busy === "seed"}>{busy === "seed" ? "Seeding…" : "Seed demo creators"}</Button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100">
+            <span className="font-semibold">Heads up:</span> impersonation replaces your admin session in this browser. Open the link in a private/incognito window to keep your admin session alive.
+          </div>
+
+          {demo && (
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-surface-elevated text-left text-xs uppercase tracking-widest text-muted-foreground">
+                  <tr><th className="px-4 py-2">Creator</th><th className="px-4 py-2">Email</th><th className="px-4 py-2">Status</th><th className="px-4 py-2 text-right">Actions</th></tr>
+                </thead>
+                <tbody>
+                  {demo.seeded.map((c: any) => (
+                    <tr key={c.id} className="border-b border-border/50">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {c.avatar_url && <img src={c.avatar_url} alt="" className="size-9 rounded-full object-cover" />}
+                          <div>
+                            <Link to="/creators/$handle" params={{ handle: c.handle }} className="font-semibold hover:text-brand-glow">{c.stage_name}</Link>
+                            <div className="text-xs text-muted-foreground">@{c.handle}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">{demo.emails[c.id] ?? "—"}</td>
+                      <td className="px-4 py-3"><Pill value={c.verification_status} /></td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="outline" disabled={busy === c.id} onClick={() => signInAs(c.id, c.handle)}>
+                          {busy === c.id ? "Minting…" : "Sign in as"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {demo.seeded.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No demo creators yet — click "Seed demo creators" above.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </AppShell>
   );
 }
