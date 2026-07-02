@@ -251,8 +251,7 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
     const title = (data.title?.trim() || `AI talking-head — ${new Date().toISOString().slice(0, 10)}`).slice(0, 120);
 
     // 2) Create the placeholder asset (rendering) so we can correlate the webhook.
-    const { data: asset, error: insErr } = await supabase
-      .from("content_assets").insert({
+    const insertRow: any = {
         creator_id: creator.id,
         title,
         asset_type: "video",
@@ -263,8 +262,10 @@ export const queueTalkingHead = createServerFn({ method: "POST" })
         provider: "heygen",
         provider_status: "submitted",
         render_started_at: new Date().toISOString(),
-        metadata: { tts_path: ttsPath, seconds, avatar_id: avatarId, voice_id: voiceId ?? null } as any,
-      }).select("*").single();
+        metadata: { tts_path: ttsPath, seconds, avatar_id: avatarId, voice_id: voiceId ?? null },
+      };
+    const { data: asset, error: insErr } = await supabase
+      .from("content_assets").insert(insertRow).select("*").single();
     if (insErr) throw insErr;
     await attachPersonaAndPack(supabase, asset.id, data.personaId, data.packId);
 
