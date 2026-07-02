@@ -25,7 +25,7 @@ export const listGenerationRequests = createServerFn({ method: "POST" })
       .eq("creator_id", creator.id)
       .order("created_at", { ascending: false })
       .limit(200);
-    if (data.status) q = q.eq("status", data.status);
+    if (data.status) q = q.eq("status", data.status as any);
     const { data: rows, error } = await (q as any);
     if (error) throw error;
     return { requests: rows ?? [] };
