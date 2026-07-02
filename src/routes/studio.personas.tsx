@@ -465,6 +465,7 @@ function EditPersonaDialog({
       setHeygenAvatarId(((persona as any).heygen_avatar_id as string | null) ?? "");
       setHeygenVoiceId(((persona as any).heygen_voice_id as string | null) ?? "");
       setTwinRefs(null);
+      setSavedItems(null);
       setTab("basics");
     }
   }, [persona]);
