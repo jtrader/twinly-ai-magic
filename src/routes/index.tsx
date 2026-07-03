@@ -5,7 +5,6 @@ import { AgeGateDialog } from "@/components/twinly/AgeGateDialog";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
 import { ShieldCheck, Sparkles, Bot, User2, Lock } from "lucide-react";
 import { ArrowRight, Heart } from "lucide-react";
-import heroReal from "@/assets/hero-real.png.asset.json";
 import heroAi from "@/assets/hero-ai.png.asset.json";
 import brandIcon from "@/assets/brand-icon.png.asset.json";
 
