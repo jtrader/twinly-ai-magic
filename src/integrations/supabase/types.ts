@@ -90,6 +90,13 @@ export type Database = {
             referencedRelation: "creators"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "agency_creators_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       audit_logs: {
@@ -169,6 +176,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consent_records_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
             referencedColumns: ["id"]
           },
         ]
@@ -270,6 +284,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_assets_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
             referencedColumns: ["id"]
           },
         ]
@@ -419,6 +440,13 @@ export type Database = {
             referencedRelation: "creators"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "content_packs_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       conversations: {
@@ -452,6 +480,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
             referencedColumns: ["id"]
           },
           {
@@ -496,6 +531,13 @@ export type Database = {
             referencedRelation: "creators"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "creator_follows_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       creator_voice_profiles: {
@@ -535,6 +577,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: true
             referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_voice_profiles_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
+            referencedRelation: "creators_public"
             referencedColumns: ["id"]
           },
         ]
@@ -661,6 +710,13 @@ export type Database = {
             referencedRelation: "creators"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "digital_twin_consent_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       generation_requests: {
@@ -727,6 +783,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generation_requests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
             referencedColumns: ["id"]
           },
           {
@@ -935,6 +998,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "persona_saved_messages_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "persona_saved_messages_persona_id_fkey"
             columns: ["persona_id"]
             isOneToOne: false
@@ -1037,6 +1107,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personas_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
             referencedColumns: ["id"]
           },
         ]
@@ -1143,6 +1220,13 @@ export type Database = {
             referencedRelation: "creators"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "subscriptions_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       transactions: {
@@ -1192,6 +1276,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
             referencedColumns: ["id"]
           },
           {
@@ -1269,6 +1360,13 @@ export type Database = {
             referencedRelation: "creators"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "twin_reference_assets_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_roles: {
@@ -1294,6 +1392,48 @@ export type Database = {
       }
     }
     Views: {
+      creators_public: {
+        Row: {
+          avatar_url: string | null
+          away_mode: boolean | null
+          bio: string | null
+          cover_url: string | null
+          created_at: string | null
+          handle: string | null
+          id: string | null
+          stage_name: string | null
+          verification_status:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          away_mode?: boolean | null
+          bio?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          handle?: string | null
+          id?: string | null
+          stage_name?: string | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+        }
+        Update: {
+          avatar_url?: string | null
+          away_mode?: boolean | null
+          bio?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          handle?: string | null
+          id?: string | null
+          stage_name?: string | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+        }
+        Relationships: []
+      }
       profiles_public: {
         Row: {
           avatar_url: string | null

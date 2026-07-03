@@ -107,13 +107,7 @@ function Hero() {
 function HeroCompare() {
   const items = [
     {
-      src: heroReal.url,
-      badge: "Real Me",
-      badgeClass: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
-      caption: "Verified creator · human-shot",
-    },
-      {
-        src: heroAi.url,
+      src: heroAi.url,
       badge: "AI persona",
       badgeClass: "border-brand/40 bg-brand/15 text-brand-glow",
       caption: "AI-rendered fantasy · always disclosed",
@@ -121,7 +115,7 @@ function HeroCompare() {
   ];
   return (
     <div className="relative">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4">
         {items.map((it) => (
           <figure
             key={it.badge}
