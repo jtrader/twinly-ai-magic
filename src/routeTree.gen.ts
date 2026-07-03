@@ -29,6 +29,7 @@ import { Route as StudioCreateRouteImport } from './routes/studio.create'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
 import { Route as StudioAwayRouteImport } from './routes/studio.away'
 import { Route as StudioAnalyticsRouteImport } from './routes/studio.analytics'
+import { Route as SecurePersonasRouteImport } from './routes/secure.personas'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
@@ -143,6 +144,11 @@ const StudioAnalyticsRoute = StudioAnalyticsRouteImport.update({
   path: '/studio/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SecurePersonasRoute = SecurePersonasRouteImport.update({
+  id: '/secure/personas',
+  path: '/secure/personas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LegalTermsRoute = LegalTermsRouteImport.update({
   id: '/legal/terms',
   path: '/legal/terms',
@@ -227,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/secure/personas': typeof SecurePersonasRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/away': typeof StudioAwayRoute
   '/studio/content': typeof StudioContentRoute
@@ -262,6 +269,7 @@ export interface FileRoutesByTo {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/secure/personas': typeof SecurePersonasRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/away': typeof StudioAwayRoute
   '/studio/content': typeof StudioContentRoute
@@ -298,6 +306,7 @@ export interface FileRoutesById {
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
+  '/secure/personas': typeof SecurePersonasRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/away': typeof StudioAwayRoute
   '/studio/content': typeof StudioContentRoute
@@ -335,6 +344,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/secure/personas'
     | '/studio/analytics'
     | '/studio/away'
     | '/studio/content'
@@ -370,6 +380,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/secure/personas'
     | '/studio/analytics'
     | '/studio/away'
     | '/studio/content'
@@ -405,6 +416,7 @@ export interface FileRouteTypes {
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/secure/personas'
     | '/studio/analytics'
     | '/studio/away'
     | '/studio/content'
@@ -440,6 +452,7 @@ export interface RootRouteChildren {
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
+  SecurePersonasRoute: typeof SecurePersonasRoute
   StudioAnalyticsRoute: typeof StudioAnalyticsRoute
   StudioAwayRoute: typeof StudioAwayRoute
   StudioContentRoute: typeof StudioContentRoute
@@ -600,6 +613,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioAnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/secure/personas': {
+      id: '/secure/personas'
+      path: '/secure/personas'
+      fullPath: '/secure/personas'
+      preLoaderRoute: typeof SecurePersonasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/legal/terms': {
       id: '/legal/terms'
       path: '/legal/terms'
@@ -743,6 +763,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
+  SecurePersonasRoute: SecurePersonasRoute,
   StudioAnalyticsRoute: StudioAnalyticsRoute,
   StudioAwayRoute: StudioAwayRoute,
   StudioContentRoute: StudioContentRoute,
@@ -763,3 +784,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
