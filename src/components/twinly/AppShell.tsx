@@ -106,6 +106,33 @@ function AccountMenu() {
   );
 }
 
+function BillingPortalMenuItem() {
+  const openPortal = useServerFn(createBillingPortal);
+  const [busy, setBusy] = useState(false);
+  async function handleClick(e: React.MouseEvent) {
+    e.preventDefault();
+    if (!isPaymentsConfigured()) { toast.error("Payments not configured"); return; }
+    setBusy(true);
+    try {
+      const res = await openPortal({
+        data: { returnUrl: window.location.href, environment: getStripeEnvironment() },
+      });
+      if ("error" in res) throw new Error(res.error);
+      window.open(res.url, "_blank", "noopener,noreferrer");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not open billing portal");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <DropdownMenuItem onClick={handleClick} disabled={busy}>
+      <Wallet className="mr-2 size-4" />
+      {busy ? "Opening…" : "Billing portal"}
+    </DropdownMenuItem>
+  );
+}
+
 const NAV = [
   { to: "/discover", label: "Discover", icon: Home },
   { to: "/app", label: "Home", icon: LayoutDashboard },
