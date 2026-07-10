@@ -415,6 +415,7 @@ export type Database = {
           starts_at: string | null
           status: string
           tags: string[]
+          unlock_price_cents: number | null
           updated_at: string
         }
         Insert: {
@@ -434,6 +435,7 @@ export type Database = {
           starts_at?: string | null
           status?: string
           tags?: string[]
+          unlock_price_cents?: number | null
           updated_at?: string
         }
         Update: {
@@ -453,6 +455,7 @@ export type Database = {
           starts_at?: string | null
           status?: string
           tags?: string[]
+          unlock_price_cents?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -472,6 +475,63 @@ export type Database = {
           },
           {
             foreignKeyName: "content_packs_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_unlocks: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          creator_id: string
+          currency: string
+          environment: string
+          id: string
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
+          unlockable_id: string
+          unlockable_type: string
+          user_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          creator_id: string
+          currency?: string
+          environment?: string
+          id?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          unlockable_id: string
+          unlockable_type: string
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          creator_id?: string
+          currency?: string
+          environment?: string
+          id?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          unlockable_id?: string
+          unlockable_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_unlocks_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_unlocks_creator_id_fkey"
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators_public"
@@ -681,6 +741,7 @@ export type Database = {
           linked_pack_id: string | null
           linked_persona_id: string | null
           removed_reason: string | null
+          unlock_price_cents: number | null
           updated_at: string
         }
         Insert: {
@@ -696,6 +757,7 @@ export type Database = {
           linked_pack_id?: string | null
           linked_persona_id?: string | null
           removed_reason?: string | null
+          unlock_price_cents?: number | null
           updated_at?: string
         }
         Update: {
@@ -711,6 +773,7 @@ export type Database = {
           linked_pack_id?: string | null
           linked_persona_id?: string | null
           removed_reason?: string | null
+          unlock_price_cents?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -1604,6 +1667,60 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_subscriptions: {
+        Row: {
+          amount_cents: number | null
+          cancel_at_period_end: boolean
+          created_at: string
+          currency: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          environment: string
+          id: string
+          price_id: string
+          product_id: string | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_cents?: number | null
+          cancel_at_period_end?: boolean
+          created_at?: string
+          currency?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          environment?: string
+          id?: string
+          price_id: string
+          product_id?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number | null
+          cancel_at_period_end?: boolean
+          created_at?: string
+          currency?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          environment?: string
+          id?: string
+          price_id?: string
+          product_id?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_comments: {
         Row: {
           author_user_id: string
@@ -2042,6 +2159,10 @@ export type Database = {
         Args: { _bucket: string; _limit: number; _window_seconds: number }
         Returns: boolean
       }
+      has_creator_access: {
+        Args: { _creator_id: string; _min_tier?: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2049,6 +2170,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_twinly_plus: { Args: { _user_id: string }; Returns: boolean }
       increment_strike_count: { Args: { _user_id: string }; Returns: number }
       is_adult: { Args: { _user_id?: string }; Returns: boolean }
       is_blocked: { Args: { _a: string; _b: string }; Returns: boolean }
