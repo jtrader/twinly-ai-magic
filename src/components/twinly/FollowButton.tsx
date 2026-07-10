@@ -37,10 +37,25 @@ export function FollowButton({ creatorId, compact = false }: { creatorId: string
     setFollowing(nextFollowing);
     if (!nextFollowing) setFavoriteState(false);
     setFollowBusy(true);
+    let undone = false;
     try {
       const r = await toggle({ data: { creatorId, follow: nextFollowing } });
       setFollowing(r.following); setFavoriteState(r.favorite);
-      toast.success(r.following ? "Following" : "Unfollowed");
+      toast.success(r.following ? "Following" : "Unfollowed", {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            if (undone) return;
+            undone = true;
+            setFollowing(prevFollowing);
+            setFavoriteState(prevFavorite);
+            try {
+              await toggle({ data: { creatorId, follow: prevFollowing, favorite: prevFavorite } });
+            } catch { toast.error("Couldn't undo — please refresh"); }
+          },
+        },
+        duration: 5000,
+      });
     } catch (e: any) {
       setFollowing(prevFollowing);
       setFavoriteState(prevFavorite);
@@ -57,10 +72,26 @@ export function FollowButton({ creatorId, compact = false }: { creatorId: string
     setFavoriteState(nextFavorite);
     if (nextFavorite) setFollowing(true);
     setFavBusy(true);
+    let undone = false;
     try {
       const r = await fav({ data: { creatorId, favorite: nextFavorite } });
       setFollowing(r.following); setFavoriteState(r.favorite);
-      toast.success(r.favorite ? "Added to favorites" : "Removed favorite");
+      toast.success(r.favorite ? "Added to favorites" : "Removed favorite", {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            if (undone) return;
+            undone = true;
+            setFavoriteState(prevFavorite);
+            setFollowing(prevFollowing);
+            try {
+              if (prevFollowing) await fav({ data: { creatorId, favorite: prevFavorite } });
+              else await toggle({ data: { creatorId, follow: false } });
+            } catch { toast.error("Couldn't undo — please refresh"); }
+          },
+        },
+        duration: 5000,
+      });
     } catch (e: any) {
       setFavoriteState(prevFavorite);
       setFollowing(prevFollowing);
