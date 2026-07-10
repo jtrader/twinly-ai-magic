@@ -1,6 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, LogOut, Settings, LogIn } from "lucide-react";
+import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, LogOut, Settings, LogIn, Wallet } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { createBillingPortal } from "@/lib/checkout.functions";
+import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ImpersonationBanner } from "@/components/twinly/ImpersonationBanner";
 import { NotificationBell } from "@/components/twinly/NotificationBell";
@@ -75,6 +79,7 @@ function AccountMenu() {
             <DropdownMenuItem asChild>
               <Link to="/account/following"><Heart className="mr-2 size-4" />Following & Favorites</Link>
             </DropdownMenuItem>
+            <BillingPortalMenuItem />
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link to="/account"><Settings className="mr-2 size-4" />Settings</Link>
