@@ -1,7 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { User as UserIcon, Pencil } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -9,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession, useUserRoles } from "@/lib/session";
 import { listMyBlocks, unblockUserId } from "@/lib/blocks.functions";
 import { getMyNotificationPreferences, updateMyNotificationPreferences } from "@/lib/notifications.functions";
+import { getMyProfile } from "@/lib/profile.functions";
+import { useAvatarUrl } from "@/lib/useAvatarUrl";
 
 export const Route = createFileRoute("/account/")({ component: AccountPage });
 
@@ -21,6 +25,7 @@ function AccountPage() {
     <AppShell>
       <h1 className="font-display text-3xl font-bold">Account</h1>
       <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
+      {user && <ProfileSection />}
       <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
         <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Roles</div>
         <div className="mt-2 flex flex-wrap gap-2">
