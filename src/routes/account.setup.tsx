@@ -52,7 +52,10 @@ function AccountSetupPage() {
       params.delete("card");
       const qs = params.toString();
       window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+      return;
     }
+    const s = Number(params.get("step"));
+    if (Number.isFinite(s) && s >= 1 && s <= TOTAL_STEPS) setStep(s);
   }, []);
 
   useEffect(() => {
