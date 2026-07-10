@@ -44,6 +44,17 @@ function AccountSetupPage() {
   }, [loading, user, navigate]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("card") === "saved") {
+      toast.success("Card saved. You're all set for one-tap purchases.");
+      setStep(4);
+      params.delete("card");
+      const qs = params.toString();
+      window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    }
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
     load().then((r) => {
       const p = r.profile;
