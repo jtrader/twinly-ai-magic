@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
 import { Search, ShieldCheck, User2 } from "lucide-react";
+import comingSoon from "@/assets/creator-coming-soon.png.asset.json";
 
 const listCreators = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -70,7 +71,7 @@ function Discover() {
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((c: any) => {
-            const image = c.cover_url || c.avatar_url;
+            const image = c.cover_url || c.avatar_url || comingSoon.url;
             return (
               <Link
                 key={c.id}
@@ -79,18 +80,12 @@ function Discover() {
                 className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-surface transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-brand-glow/60 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-glow"
               >
                 <div className="relative aspect-[4/5] w-full overflow-hidden bg-black/40">
-                  {image ? (
-                    <img
-                      src={image}
-                      alt={`${c.stage_name} cover`}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-surface-elevated to-surface text-muted-foreground">
-                      <User2 className="size-16 opacity-40" aria-hidden="true" />
-                    </div>
-                  )}
+                  <img
+                    src={image}
+                    alt={`${c.stage_name} cover`}
+                    loading="lazy"
+                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+                  />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-95" />
                   {c.verification_status === "verified" && (
                     <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-brand-glow backdrop-blur">
