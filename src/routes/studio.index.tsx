@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
 import { Sparkles, Library, ShieldCheck, MessageCircle, Wallet, BadgeCheck, Package, User, Wand2, BarChart3, Moon, Flag, UserCheck } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { countOpenCreatorFlags } from "@/lib/conversation-flags.functions";
 
 export const Route = createFileRoute("/studio/")({
   component: StudioHome,
@@ -21,6 +23,8 @@ function StudioHome() {
   const navigate = useNavigate();
   const [creator, setCreator] = useState<any>(null);
   const [counts, setCounts] = useState({ personas: 0, assets: 0 });
+  const [openFlags, setOpenFlags] = useState(0);
+  const countFlags = useServerFn(countOpenCreatorFlags);
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
   useEffect(() => {
@@ -34,9 +38,10 @@ function StudioHome() {
           supabase.from("content_assets").select("id", { count: "exact", head: true }).eq("creator_id", c.id),
         ]);
         setCounts({ personas: personas ?? 0, assets: assets ?? 0 });
+        countFlags({}).then((r) => setOpenFlags(r.count)).catch(() => {});
       }
     })();
-  }, [user]);
+  }, [user, countFlags]);
 
   if (!creator) {
     return (
@@ -90,6 +95,7 @@ function StudioHome() {
         <Tile to="/studio/generate" icon={<Sparkles className="size-5 text-brand-glow" />} title="AI generate (preview)" desc="Prototype live generation — images, voice notes & talking-head clips." />
         <Tile to="/studio/inbox" icon={<MessageCircle className="size-5 text-brand-glow" />} title="Real Me inbox" desc="Reply to fans on your Real Me persona." />
         <Tile to="/studio/ai-review" icon={<Flag className="size-5 text-brand-glow" />} title="AI persona review" desc="Review AI chats, flag bad replies, save corrections as training." />
+        <Tile to="/studio/flags" icon={<Flag className="size-5 text-brand-glow" />} title="Flagged AI chats" desc="Supporter-flagged AI conversations for your review or handoff to Real Me." badge={openFlags} />
         <Tile to="/studio/escalations" icon={<UserCheck className="size-5 text-brand-glow" />} title="Real Me requests" desc="Accept or decline supporters asking to talk to you directly." />
         <Tile to="/studio/payouts" icon={<Wallet className="size-5 text-brand-glow" />} title="Payouts" desc="Payment history, subscribers, next payout." />
         <Tile to="/studio/analytics" icon={<BarChart3 className="size-5 text-brand-glow" />} title="Analytics" desc="Generation volume, approval rate, chat engagement." />
@@ -124,10 +130,18 @@ function Stat({ label, value, hint }: { label: string; value: number | string; h
   );
 }
 
-function Tile({ to, params, icon, title, desc, disabled }: any) {
+function Tile({ to, params, icon, title, desc, disabled, badge }: any) {
   const body = (
     <div className={"h-full rounded-2xl border border-border bg-surface p-5 transition " + (disabled ? "opacity-60" : "hover:border-brand/40 hover:bg-surface-elevated")}>
-      <div className="flex items-center gap-2">{icon}<div className="font-display text-lg font-semibold">{title}</div></div>
+      <div className="flex items-center gap-2">
+        {icon}
+        <div className="font-display text-lg font-semibold">{title}</div>
+        {typeof badge === "number" && badge > 0 && (
+          <span className="ml-auto rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">
+            {badge} open
+          </span>
+        )}
+      </div>
       <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
       <div className="mt-4 text-xs font-semibold text-brand-glow">{disabled ? "Coming soon" : "Open →"}</div>
     </div>
