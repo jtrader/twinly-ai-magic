@@ -1,9 +1,20 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { Home, MessageCircle, LayoutDashboard, User } from "lucide-react";
+import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, LogOut, Settings, LogIn } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImpersonationBanner } from "@/components/twinly/ImpersonationBanner";
 import { NotificationBell } from "@/components/twinly/NotificationBell";
+import { supabase } from "@/integrations/supabase/client";
+import { useSession } from "@/lib/session";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useNavigate } from "@tanstack/react-router";
 
 export function AppShell({ children, mobileNav = true }: { children: ReactNode; mobileNav?: boolean }) {
   return (
@@ -28,9 +39,63 @@ function TopBar() {
             Verified · AI disclosed
           </div>
           <NotificationBell />
+          <AccountMenu />
         </div>
       </div>
     </header>
+  );
+}
+
+function AccountMenu() {
+  const { user } = useSession();
+  const navigate = useNavigate();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label="Account menu"
+        className="inline-flex size-9 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      >
+        <Menu className="size-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {user ? (
+          <>
+            <DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">
+              {user.email}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/account"><User className="mr-2 size-4" />Profile</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/account/subscriptions"><CreditCard className="mr-2 size-4" />Subscriptions</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/account/following"><Heart className="mr-2 size-4" />Following & Favorites</Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link to="/account"><Settings className="mr-2 size-4" />Settings</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={async () => { await supabase.auth.signOut(); navigate({ to: "/" }); }}
+              className="text-destructive focus:text-destructive"
+            >
+              <LogOut className="mr-2 size-4" />Sign out
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <>
+            <DropdownMenuItem asChild>
+              <Link to="/auth"><LogIn className="mr-2 size-4" />Log in</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/auth"><User className="mr-2 size-4" />Join Twinly.life</Link>
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
