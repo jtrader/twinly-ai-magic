@@ -63,7 +63,7 @@ export const listMyFollows = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("creator_follows")
-      .select("creator_id, favorite, created_at, creators:creator_id(id, handle, stage_name, bio, verification_status)")
+      .select("creator_id, favorite, created_at, creators:creator_id(id, handle, stage_name, bio, avatar_url, verification_status)")
       .eq("fan_id", context.userId)
       .order("favorite", { ascending: false })
       .order("created_at", { ascending: false });
@@ -75,6 +75,7 @@ export const listMyFollows = createServerFn({ method: "GET" })
       handle: r.creators?.handle,
       stageName: r.creators?.stage_name,
       bio: r.creators?.bio,
+      avatarUrl: r.creators?.avatar_url ?? null,
       verified: r.creators?.verification_status === "verified",
     }));
   });

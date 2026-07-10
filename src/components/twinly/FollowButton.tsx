@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button, type ButtonProps } from "@/components/ui/button";
-import { Heart, HeartOff, UserPlus, UserCheck } from "lucide-react";
+import { Heart, HeartOff, UserPlus, UserCheck, Loader2 } from "lucide-react";
 import { toggleFollow, setFavorite, getFollowState } from "@/lib/follows.functions";
 import { useSession } from "@/lib/session";
 import { toast } from "sonner";
@@ -18,7 +18,8 @@ export function FollowButton({ creatorId, compact = false }: { creatorId: string
   const fav = useServerFn(setFavorite);
   const [following, setFollowing] = useState(false);
   const [favorite, setFavoriteState] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [favBusy, setFavBusy] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -29,24 +30,42 @@ export function FollowButton({ creatorId, compact = false }: { creatorId: string
 
   const onFollow = async () => {
     if (!user) { navigate({ to: "/auth" }); return; }
-    setBusy(true);
+    const prevFollowing = following;
+    const prevFavorite = favorite;
+    const nextFollowing = !following;
+    // Optimistic: apply immediately. Unfollowing also drops favorite.
+    setFollowing(nextFollowing);
+    if (!nextFollowing) setFavoriteState(false);
+    setFollowBusy(true);
     try {
-      const r = await toggle({ data: { creatorId, follow: !following } });
+      const r = await toggle({ data: { creatorId, follow: nextFollowing } });
       setFollowing(r.following); setFavoriteState(r.favorite);
       toast.success(r.following ? "Following" : "Unfollowed");
-    } catch (e: any) { toast.error(e?.message ?? "Try again"); }
-    finally { setBusy(false); }
+    } catch (e: any) {
+      setFollowing(prevFollowing);
+      setFavoriteState(prevFavorite);
+      toast.error(e?.message ?? "Couldn't update follow — try again");
+    } finally { setFollowBusy(false); }
   };
 
   const onFav = async () => {
     if (!user) { navigate({ to: "/auth" }); return; }
-    setBusy(true);
+    const prevFavorite = favorite;
+    const prevFollowing = following;
+    const nextFavorite = !favorite;
+    // Optimistic: favoriting also follows.
+    setFavoriteState(nextFavorite);
+    if (nextFavorite) setFollowing(true);
+    setFavBusy(true);
     try {
-      const r = await fav({ data: { creatorId, favorite: !favorite } });
+      const r = await fav({ data: { creatorId, favorite: nextFavorite } });
       setFollowing(r.following); setFavoriteState(r.favorite);
       toast.success(r.favorite ? "Added to favorites" : "Removed favorite");
-    } catch (e: any) { toast.error(e?.message ?? "Try again"); }
-    finally { setBusy(false); }
+    } catch (e: any) {
+      setFavoriteState(prevFavorite);
+      setFollowing(prevFollowing);
+      toast.error(e?.message ?? "Couldn't update favorite — try again");
+    } finally { setFavBusy(false); }
   };
 
   if (loading) {
@@ -80,22 +99,26 @@ export function FollowButton({ creatorId, compact = false }: { creatorId: string
         size={compact ? "sm" : "default"}
         variant={following ? "outline" : "default"}
         onClick={onFollow}
-        disabled={busy}
+        disabled={followBusy}
       >
-        {following ? <UserCheck className="mr-1 size-4" /> : <UserPlus className="mr-1 size-4" />}
+        {followBusy
+          ? <Loader2 className="mr-1 size-4 animate-spin" />
+          : following ? <UserCheck className="mr-1 size-4" /> : <UserPlus className="mr-1 size-4" />}
         {following ? "Following" : "Follow · Free"}
       </ActionButton>
       <ActionButton
         size={compact ? "sm" : "default"}
         variant={favorite ? "default" : "outline"}
         onClick={onFav}
-        disabled={busy}
+        disabled={favBusy}
         aria-label={favorite ? "Remove favorite" : "Add favorite"}
         title={favorite ? "Remove favorite" : "Add favorite"}
       >
-        {favorite
-          ? <Heart className="size-4 fill-current" />
-          : <HeartOff className="size-4" />}
+        {favBusy
+          ? <Loader2 className="size-4 animate-spin" />
+          : favorite
+            ? <Heart className="size-4 fill-current" />
+            : <HeartOff className="size-4" />}
       </ActionButton>
     </div>
   );
