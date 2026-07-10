@@ -7,6 +7,7 @@ import { AiDisclosureBanner } from "@/components/twinly/AiDisclosureBanner";
 import { ReportDialog } from "@/components/twinly/ReportDialog";
 import { BlockButton } from "@/components/twinly/BlockButton";
 import { FollowButton } from "@/components/twinly/FollowButton";
+import { CreatorSubscribeButtons } from "@/components/twinly/CreatorSubscribeButtons";
 import { ShieldCheck, Rss, Sparkles } from "lucide-react";
 import { PostComposer, PostFeed } from "@/components/twinly/PostFeed";
 import { getCreatorPosts } from "@/lib/posts.functions";
@@ -95,6 +96,9 @@ function CreatorProfile() {
             <ReportDialog targetType="creator" targetId={creator.id} label="Report creator" variant="outline" />
             <BlockButton targetType="creator" targetId={creator.id} variant="outline" />
           </div>
+          {!isOwner && (
+            <CreatorSubscribeButtons creatorId={creator.id} creatorName={creator.stage_name} />
+          )}
         </div>
         {avatarUrl && (
           <div className="relative shrink-0 self-center">
