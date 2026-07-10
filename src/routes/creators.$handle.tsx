@@ -9,10 +9,19 @@ import { BlockButton } from "@/components/twinly/BlockButton";
 import { FollowButton } from "@/components/twinly/FollowButton";
 import { CreatorSubscribeButtons } from "@/components/twinly/CreatorSubscribeButtons";
 import { TipButton } from "@/components/twinly/TipButton";
-import { ShieldCheck, Rss, Sparkles } from "lucide-react";
+import { ShieldCheck, Rss } from "lucide-react";
 import { PostComposer, PostFeed } from "@/components/twinly/PostFeed";
 import { getCreatorPosts } from "@/lib/posts.functions";
 import { useSession } from "@/lib/session";
+import { supabase } from "@/integrations/supabase/client";
+import { Crown, Sparkles, Star } from "lucide-react";
+
+type ActiveTier = "base" | "plus" | "vip";
+const TIER_BADGE: Record<ActiveTier, { label: string; Icon: typeof Star; className: string }> = {
+  base: { label: "Base", Icon: Star, className: "bg-sky-500/15 text-sky-300 border-sky-400/30" },
+  plus: { label: "Plus", Icon: Sparkles, className: "bg-brand/15 text-brand-glow border-brand-glow/30" },
+  vip: { label: "VIP", Icon: Crown, className: "bg-amber-500/15 text-amber-300 border-amber-400/30" },
+};
 
 const loadCreator = createServerFn({ method: "GET" })
   .validator((d: { handle: string }) => d)
@@ -57,6 +66,30 @@ function CreatorProfile() {
   const avatarUrl = profile?.avatar_url ?? null;
   const { user } = useSession();
   const isOwner = !!user && user.id === creator.user_id;
+  const [activeSub, setActiveSub] = useState<{ tier: ActiveTier; cancelAtPeriodEnd: boolean } | null>(null);
+  useEffect(() => {
+    if (!user || isOwner) { setActiveSub(null); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("subscriptions")
+        .select("tier, status, current_period_end, cancel_at_period_end")
+        .eq("fan_id", user.id)
+        .eq("creator_id", creator.id);
+      const now = new Date();
+      const rank: Record<string, number> = { base: 1, plus: 2, vip: 3 };
+      let best: { tier: ActiveTier; cancelAtPeriodEnd: boolean } | null = null;
+      for (const row of (data ?? []) as any[]) {
+        const end = row.current_period_end ? new Date(row.current_period_end) : null;
+        const stillValid = !end || end > now;
+        if ((row.status === "active" || (row.status === "canceled" && stillValid)) && rank[row.tier]) {
+          if (!best || rank[row.tier] > rank[best.tier]) {
+            best = { tier: row.tier as ActiveTier, cancelAtPeriodEnd: !!row.cancel_at_period_end || row.status === "canceled" };
+          }
+        }
+      }
+      setActiveSub(best);
+    })();
+  }, [user, isOwner, creator.id]);
   const navigate = useNavigate();
   const visiblePersonas = (personas as any[]).filter((p) => {
     const now = Date.now();
@@ -89,6 +122,18 @@ function CreatorProfile() {
                 <ShieldCheck className="size-3" /> Verified
               </span>
             )}
+            {activeSub && (() => {
+              const meta = TIER_BADGE[activeSub.tier];
+              const Icon = meta.Icon;
+              return (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${meta.className}`}
+                  title={activeSub.cancelAtPeriodEnd ? "Active until period end" : "Active subscription"}
+                >
+                  <Icon className="size-3" /> {meta.label} {activeSub.cancelAtPeriodEnd ? "· Ending" : "· Active"}
+                </span>
+              );
+            })()}
           </div>
           <div className="mt-1 text-sm text-muted-foreground">@{creator.handle}</div>
           {creator.bio && <p className="mt-2 text-sm text-muted-foreground">{creator.bio}</p>}
