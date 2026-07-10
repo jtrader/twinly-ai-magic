@@ -9,7 +9,7 @@ import { BlockButton } from "@/components/twinly/BlockButton";
 import { FollowButton } from "@/components/twinly/FollowButton";
 import { CreatorSubscribeButtons } from "@/components/twinly/CreatorSubscribeButtons";
 import { TipButton } from "@/components/twinly/TipButton";
-import { ShieldCheck, Rss, Sparkles } from "lucide-react";
+import { ShieldCheck, Rss } from "lucide-react";
 import { PostComposer, PostFeed } from "@/components/twinly/PostFeed";
 import { getCreatorPosts } from "@/lib/posts.functions";
 import { useSession } from "@/lib/session";
