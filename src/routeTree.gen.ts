@@ -49,6 +49,7 @@ import { Route as CreatorsHandlePersonaRouteImport } from './routes/creators.$ha
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 import { Route as ApiPublicBootstrapSupportAdminRouteImport } from './routes/api/public/bootstrap-support-admin'
 import { Route as ApiPublicBootstrapDemoCreatorsRouteImport } from './routes/api/public/bootstrap-demo-creators'
+import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicHooksHeygenRouteImport } from './routes/api/public/hooks/heygen'
 import { Route as ApiPublicCronHeygenPollRouteImport } from './routes/api/public/cron/heygen-poll'
 
@@ -254,6 +255,12 @@ const ApiPublicBootstrapDemoCreatorsRoute =
     path: '/api/public/bootstrap-demo-creators',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPaymentsWebhookRoute =
+  ApiPublicPaymentsWebhookRouteImport.update({
+    id: '/api/public/payments/webhook',
+    path: '/api/public/payments/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksHeygenRoute = ApiPublicHooksHeygenRouteImport.update({
   id: '/api/public/hooks/heygen',
   path: '/api/public/hooks/heygen',
@@ -308,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -351,6 +359,7 @@ export interface FileRoutesByTo {
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -396,6 +405,7 @@ export interface FileRoutesById {
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -442,6 +452,7 @@ export interface FileRouteTypes {
     | '/studio/packs/$packId'
     | '/api/public/cron/heygen-poll'
     | '/api/public/hooks/heygen'
+    | '/api/public/payments/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -485,6 +496,7 @@ export interface FileRouteTypes {
     | '/studio/packs/$packId'
     | '/api/public/cron/heygen-poll'
     | '/api/public/hooks/heygen'
+    | '/api/public/payments/webhook'
   id:
     | '__root__'
     | '/'
@@ -529,6 +541,7 @@ export interface FileRouteTypes {
     | '/studio/packs/$packId'
     | '/api/public/cron/heygen-poll'
     | '/api/public/hooks/heygen'
+    | '/api/public/payments/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -566,6 +579,7 @@ export interface RootRouteChildren {
   ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
   ApiPublicCronHeygenPollRoute: typeof ApiPublicCronHeygenPollRoute
   ApiPublicHooksHeygenRoute: typeof ApiPublicHooksHeygenRoute
+  ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -850,6 +864,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBootstrapDemoCreatorsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/payments/webhook': {
+      id: '/api/public/payments/webhook'
+      path: '/api/public/payments/webhook'
+      fullPath: '/api/public/payments/webhook'
+      preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/heygen': {
       id: '/api/public/hooks/heygen'
       path: '/api/public/hooks/heygen'
@@ -963,6 +984,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChatHandlePersonaRoute: ChatHandlePersonaRoute,
   ApiPublicCronHeygenPollRoute: ApiPublicCronHeygenPollRoute,
   ApiPublicHooksHeygenRoute: ApiPublicHooksHeygenRoute,
+  ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
