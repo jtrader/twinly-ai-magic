@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
-import { Search, ShieldCheck, User2 } from "lucide-react";
+import { Search, ShieldCheck } from "lucide-react";
 import comingSoon from "@/assets/creator-coming-soon.png.asset.json";
 
 const listCreators = createServerFn({ method: "GET" }).handler(async () => {
