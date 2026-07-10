@@ -63,7 +63,7 @@ function ContentVaultPage() {
   const navigate = useNavigate();
   const [vault, setVault] = useState<Vault | null>(null);
   const [ready, setReady] = useState(false);
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string | "all">("all");
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string | "all" | "global">("all");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -105,8 +105,17 @@ function ContentVaultPage() {
   const filteredAssets = useMemo(() => {
     if (!vault) return [];
     if (selectedPersonaId === "all") return vault.assets;
-    return vault.assets.filter((a) => permissionsByAsset.get(a.id)?.some((p) => p.persona_id === selectedPersonaId));
+    if (selectedPersonaId === "global") return vault.assets.filter((a) => (a as any).shared_across_personas);
+    return vault.assets.filter((a) =>
+      (a as any).shared_across_personas ||
+      permissionsByAsset.get(a.id)?.some((p) => p.persona_id === selectedPersonaId));
   }, [vault, selectedPersonaId, permissionsByAsset]);
+
+  const storageByPersona = useMemo(() => {
+    const map = new Map<string, { usedBytes: number; capBytes: number }>();
+    for (const s of (vault as any)?.storageSummary ?? []) map.set(s.personaId, s);
+    return map;
+  }, [vault]);
 
   async function handleDelete() {
     if (!deleting) return;
@@ -152,6 +161,7 @@ function ContentVaultPage() {
         personas={vault.personas}
         assets={vault.assets}
         permissionsByAsset={permissionsByAsset}
+        storageByPersona={storageByPersona}
         selected={selectedPersonaId}
         onSelect={setSelectedPersonaId}
       />
@@ -180,7 +190,8 @@ function ContentVaultPage() {
         onOpenChange={setUploadOpen}
         creatorId={vault.creator.id}
         personas={vault.personas}
-        defaultPersonaId={selectedPersonaId === "all" ? null : selectedPersonaId}
+        defaultPersonaId={selectedPersonaId === "all" || selectedPersonaId === "global" ? null : selectedPersonaId}
+        storageByPersona={storageByPersona}
         onDone={refresh}
       />
       <BulkUploadDialog
@@ -188,7 +199,7 @@ function ContentVaultPage() {
         onOpenChange={setBulkOpen}
         creatorId={vault.creator.id}
         personas={vault.personas}
-        defaultPersonaId={selectedPersonaId === "all" ? null : selectedPersonaId}
+        defaultPersonaId={selectedPersonaId === "all" || selectedPersonaId === "global" ? null : selectedPersonaId}
         onDone={refresh}
       />
       <PreviewDialog
@@ -197,7 +208,7 @@ function ContentVaultPage() {
         personas={vault.personas}
         assets={vault.assets}
         permissionsByAsset={permissionsByAsset}
-        initialPersonaId={selectedPersonaId === "all" ? vault.personas[0]?.id ?? null : selectedPersonaId}
+        initialPersonaId={selectedPersonaId === "all" || selectedPersonaId === "global" ? vault.personas[0]?.id ?? null : selectedPersonaId}
       />
       <AuditDialog asset={auditing} onClose={() => setAuditing(null)} personas={vault.personas} />
       <EditDialog
@@ -223,29 +234,59 @@ function ContentVaultPage() {
   );
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(0)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
 function PersonaFilterBar({
-  personas, assets, permissionsByAsset, selected, onSelect,
+  personas, assets, permissionsByAsset, storageByPersona, selected, onSelect,
 }: {
   personas: Persona[];
   assets: Asset[];
   permissionsByAsset: Map<string, Permission[]>;
-  selected: string | "all";
-  onSelect: (id: string | "all") => void;
+  storageByPersona: Map<string, { usedBytes: number; capBytes: number }>;
+  selected: string | "all" | "global";
+  onSelect: (id: string | "all" | "global") => void;
 }) {
   const countFor = (personaId: string) =>
-    assets.filter((a) => permissionsByAsset.get(a.id)?.some((p) => p.persona_id === personaId)).length;
+    assets.filter((a) =>
+      (a as any).shared_across_personas ||
+      permissionsByAsset.get(a.id)?.some((p) => p.persona_id === personaId)).length;
+  const globalCount = assets.filter((a) => (a as any).shared_across_personas).length;
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-start gap-2">
       <FilterChip active={selected === "all"} onClick={() => onSelect("all")}>
         All assets <span className="ml-1 text-muted-foreground">· {assets.length}</span>
       </FilterChip>
-      {personas.map((p) => (
-        <FilterChip key={p.id} active={selected === p.id} onClick={() => onSelect(p.id)}>
-          {p.kind === "ai" ? "🤖 " : "👤 "}{p.display_name}
-          <span className="ml-1 text-muted-foreground">· {countFor(p.id)}</span>
-        </FilterChip>
-      ))}
+      <FilterChip active={selected === "global"} onClick={() => onSelect("global")}>
+        🌐 Global <span className="ml-1 text-muted-foreground">· {globalCount}</span>
+      </FilterChip>
+      {personas.map((p) => {
+        const usage = storageByPersona.get(p.id);
+        const pct = usage ? Math.min(100, (usage.usedBytes / usage.capBytes) * 100) : 0;
+        return (
+          <div key={p.id} className="flex flex-col items-start gap-1">
+            <FilterChip active={selected === p.id} onClick={() => onSelect(p.id)}>
+              {p.kind === "ai" ? "🤖 " : "👤 "}{p.display_name}
+              <span className="ml-1 text-muted-foreground">· {countFor(p.id)}</span>
+            </FilterChip>
+            {usage && (
+              <div className="w-full px-1" title={`${formatBytes(usage.usedBytes)} of ${formatBytes(usage.capBytes)} used`}>
+                <div className="h-1 w-full overflow-hidden rounded-full bg-surface-elevated">
+                  <div
+                    className={"h-full rounded-full " + (pct >= 90 ? "bg-destructive" : pct >= 75 ? "bg-amber-400" : "bg-brand")}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="mt-0.5 text-[10px] text-muted-foreground">{formatBytes(usage.usedBytes)} / 5 GB</div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -292,9 +333,24 @@ function AssetCard({
 }) {
   const Icon = ASSET_ICON[asset.asset_type] ?? FileText;
   const [preview, setPreview] = useState<string | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
   const signUrl = useServerFn(getAssetSignedUrl);
   const setPerm = useServerFn(setAssetPersonaPermission);
   const removePerm = useServerFn(removeAssetFromPersona);
+  const updateFn = useServerFn(updateAsset);
+  const shared = !!(asset as any).shared_across_personas;
+
+  async function toggleShared(v: boolean) {
+    setShareBusy(true);
+    try {
+      await updateFn({ data: { assetId: asset.id, sharedAcrossPersonas: v } });
+      onChanged();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Update failed");
+    } finally {
+      setShareBusy(false);
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -348,6 +404,9 @@ function AssetCard({
           {asset.external_url && !asset.storage_path && (
             <Badge variant="outline" className="bg-background/70 backdrop-blur"><Link2 className="mr-1 h-3 w-3" />External</Badge>
           )}
+          {shared && (
+            <Badge className="bg-brand/20 text-brand-glow">🌐 Global</Badge>
+          )}
         </div>
       </div>
 
@@ -356,14 +415,23 @@ function AssetCard({
           <div className="line-clamp-1 font-display text-base font-semibold">{asset.title}</div>
           <div className="mt-0.5 text-xs text-muted-foreground">
             {asset.category || "Uncategorised"} · {asset.moderation_status} · consent {asset.consent_status.replace("_"," ")}
+            {(asset as any).byte_size ? ` · ${formatBytes((asset as any).byte_size)}` : ""}
           </div>
         </div>
 
         <div className="rounded-lg border border-border/60 bg-background/40 p-3">
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Persona access
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Persona access
+            </div>
+            <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              🌐 Global
+              <Switch checked={shared} onCheckedChange={toggleShared} disabled={shareBusy} />
+            </label>
           </div>
-          {personas.length === 0 ? (
+          {shared ? (
+            <div className="text-xs text-muted-foreground">Shared globally — visible to every persona.</div>
+          ) : personas.length === 0 ? (
             <div className="text-xs text-muted-foreground">No personas yet.</div>
           ) : (
             <div className="space-y-2">
@@ -413,13 +481,14 @@ function AssetCard({
 }
 
 function UploadDialog({
-  open, onOpenChange, creatorId, personas, defaultPersonaId, onDone,
+  open, onOpenChange, creatorId, personas, defaultPersonaId, storageByPersona, onDone,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   creatorId: string;
   personas: Persona[];
   defaultPersonaId: string | null;
+  storageByPersona?: Map<string, { usedBytes: number; capBytes: number }>;
   onDone: () => void;
 }) {
   const [mode, setMode] = useState<"file" | "external">("file");
@@ -431,6 +500,7 @@ function UploadDialog({
   const [isSynthetic, setIsSynthetic] = useState(false);
   const [selectedPersonas, setSelectedPersonas] = useState<Set<string>>(new Set());
   const [permission, setPermission] = useState<PermissionType>("included");
+  const [sharedGlobally, setSharedGlobally] = useState(false);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const createFn = useServerFn(createAsset);
@@ -440,7 +510,7 @@ function UploadDialog({
       setMode("file"); setFile(null); setExternalUrl(""); setExternalType("image");
       setTitle(""); setCategory(""); setIsSynthetic(false);
       setSelectedPersonas(defaultPersonaId ? new Set([defaultPersonaId]) : new Set());
-      setPermission("included"); setBusy(false);
+      setPermission("included"); setSharedGlobally(false); setBusy(false);
     }
   }, [open, defaultPersonaId]);
 
@@ -483,6 +553,8 @@ function UploadDialog({
           category: category.trim() || undefined,
           isSynthetic,
           aiGeneratedLabel: isSynthetic,
+          byteSize: file?.size,
+          sharedAcrossPersonas: sharedGlobally,
           attachPersonaIds: Array.from(selectedPersonas),
           permissionType: permission,
         },
@@ -570,10 +642,18 @@ function UploadDialog({
             <Switch checked={isSynthetic} onCheckedChange={setIsSynthetic} />
           </div>
 
-          <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+            <div>
+              <div className="text-sm font-medium">🌐 Share globally</div>
+              <div className="text-xs text-muted-foreground">Visible in every persona's library. Doesn't count against any persona's 5 GB cap.</div>
+            </div>
+            <Switch checked={sharedGlobally} onCheckedChange={setSharedGlobally} />
+          </div>
+
+          <div className={"rounded-lg border border-border/60 bg-background/40 p-3" + (sharedGlobally ? " opacity-50" : "")}>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Attach to personas</div>
-              <Select value={permission} onValueChange={(v) => setPermission(v as PermissionType)}>
+              <Select value={permission} onValueChange={(v) => setPermission(v as PermissionType)} disabled={sharedGlobally}>
                 <SelectTrigger className="h-7 w-[140px] text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(Object.keys(PERMISSION_LABEL) as PermissionType[]).map((k) => (
@@ -582,22 +662,29 @@ function UploadDialog({
                 </SelectContent>
               </Select>
             </div>
-            {personas.length === 0 ? (
+            {sharedGlobally ? (
+              <div className="text-xs text-muted-foreground">Shared globally — visible to every persona automatically.</div>
+            ) : personas.length === 0 ? (
               <div className="text-xs text-muted-foreground">Create a persona first to attach assets.</div>
             ) : (
               <div className="grid gap-1.5 sm:grid-cols-2">
-                {personas.map((p) => (
-                  <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-surface-elevated">
-                    <input
-                      type="checkbox"
-                      checked={selectedPersonas.has(p.id)}
-                      onChange={() => togglePersona(p.id)}
-                      className="h-4 w-4 accent-brand"
-                    />
-                    <span className="truncate">{p.display_name}</span>
-                    <span className="text-xs text-muted-foreground">{p.kind === "ai" ? "AI" : "Real Me"}</span>
-                  </label>
-                ))}
+                {personas.map((p) => {
+                  const usage = storageByPersona?.get(p.id);
+                  const nearCap = usage && usage.usedBytes >= usage.capBytes * 0.9;
+                  return (
+                    <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-surface-elevated">
+                      <input
+                        type="checkbox"
+                        checked={selectedPersonas.has(p.id)}
+                        onChange={() => togglePersona(p.id)}
+                        className="h-4 w-4 accent-brand"
+                      />
+                      <span className="truncate">{p.display_name}</span>
+                      <span className="text-xs text-muted-foreground">{p.kind === "ai" ? "AI" : "Real Me"}</span>
+                      {nearCap && <span className="text-[10px] text-amber-400">· near 5GB cap</span>}
+                    </label>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -755,6 +842,7 @@ function BulkUploadDialog({
   const [sharedSynthetic, setSharedSynthetic] = useState(false);
   const [selectedPersonas, setSelectedPersonas] = useState<Set<string>>(new Set());
   const [permission, setPermission] = useState<PermissionType>("included");
+  const [sharedGlobally, setSharedGlobally] = useState(false);
   const [busy, setBusy] = useState(false);
   const bulkFn = useServerFn(bulkCreateAssets);
 
@@ -765,6 +853,7 @@ function BulkUploadDialog({
       setSharedSynthetic(false);
       setSelectedPersonas(defaultPersonaId ? new Set([defaultPersonaId]) : new Set());
       setPermission("included");
+      setSharedGlobally(false);
       setBusy(false);
     }
   }, [open, defaultPersonaId]);
@@ -844,9 +933,11 @@ function BulkUploadDialog({
             storagePath: r.storagePath!,
             category: r.category.trim() || undefined,
             isSynthetic: r.isSynthetic,
+            byteSize: r.file.size,
           })),
           attachPersonaIds: Array.from(selectedPersonas),
           permissionType: permission,
+          sharedAcrossPersonas: sharedGlobally,
         },
       });
       toast.success(`Imported ${res.count} asset${res.count === 1 ? "" : "s"}`);
@@ -941,10 +1032,18 @@ function BulkUploadDialog({
             </div>
           )}
 
-          <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+            <div>
+              <div className="text-sm font-medium">🌐 Share globally</div>
+              <div className="text-xs text-muted-foreground">Visible in every persona's library. Doesn't count against any persona's 5 GB cap.</div>
+            </div>
+            <Switch checked={sharedGlobally} onCheckedChange={setSharedGlobally} />
+          </div>
+
+          <div className={"rounded-lg border border-border/60 bg-background/40 p-3" + (sharedGlobally ? " opacity-50" : "")}>
             <div className="mb-2 flex items-center justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Attach to personas</div>
-              <Select value={permission} onValueChange={(v) => setPermission(v as PermissionType)}>
+              <Select value={permission} onValueChange={(v) => setPermission(v as PermissionType)} disabled={sharedGlobally}>
                 <SelectTrigger className="h-7 w-[140px] text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(Object.keys(PERMISSION_LABEL) as PermissionType[]).map((k) => (
@@ -953,7 +1052,9 @@ function BulkUploadDialog({
                 </SelectContent>
               </Select>
             </div>
-            {personas.length === 0 ? (
+            {sharedGlobally ? (
+              <div className="text-xs text-muted-foreground">Shared globally — visible to every persona automatically.</div>
+            ) : personas.length === 0 ? (
               <div className="text-xs text-muted-foreground">Create a persona first to attach assets.</div>
             ) : (
               <div className="grid gap-1.5 sm:grid-cols-2">
@@ -1167,7 +1268,11 @@ function humanizeEntry(action: string, metadata: any, personas: Persona[]): { la
   const label = ACTION_LABEL[action] ?? action;
   const personaName = (id: string) => personas.find((p) => p.id === id)?.display_name ?? id.slice(0, 8);
   if (action === "asset.created") {
-    const bits = [metadata?.type && `type: ${metadata.type}`, metadata?.synthetic && "marked synthetic (AI disclosure applied)"].filter(Boolean);
+    const bits = [
+      metadata?.type && `type: ${metadata.type}`,
+      metadata?.synthetic && "marked synthetic (AI disclosure applied)",
+      metadata?.shared && "shared globally",
+    ].filter(Boolean);
     return { label, detail: bits.join(" · ") || "Initial upload" };
   }
   if (action === "asset.updated") {

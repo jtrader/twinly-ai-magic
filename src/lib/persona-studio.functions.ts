@@ -4,8 +4,35 @@ import { logAudit } from "./audit.server";
 
 type PersonaKind = "real_me" | "ai";
 type Visibility = "draft" | "public" | "subscribers" | "vip" | "hidden";
+type ExplicitnessLevel = "sfw" | "suggestive" | "explicit";
 
 const SLUG_RE = /^[a-z0-9-]{2,40}$/;
+const FAN_FACING_VISIBILITY: ReadonlySet<Visibility> = new Set(["public", "subscribers", "vip"]);
+const CEILING_RANK: Record<ExplicitnessLevel, number> = { sfw: 0, suggestive: 1, explicit: 2 };
+
+/** A creator's persona ceiling may never exceed the platform-wide maximum — set only via admin settings, never via chat. */
+async function assertCeilingWithinPlatformMax(supabase: any, ceiling: ExplicitnessLevel) {
+  const { data: settings } = await supabase
+    .from("platform_settings").select("max_explicitness_ceiling").eq("id", true).maybeSingle();
+  const max = (settings?.max_explicitness_ceiling ?? "explicit") as ExplicitnessLevel;
+  if (CEILING_RANK[ceiling] > CEILING_RANK[max]) {
+    throw new Error(`This persona's explicitness ceiling ("${ceiling}") exceeds the platform maximum ("${max}").`);
+  }
+}
+
+function sanitizeToneRules(input?: { personality?: string }): { personality: string } {
+  const personality = (input?.personality ?? "").trim().slice(0, 300);
+  return { personality };
+}
+
+function sanitizeBoundaryRules(input?: { hardLimits?: string[] }): { hard_limits: string[] } {
+  const hardLimits = (input?.hardLimits ?? [])
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 20)
+    .map((s) => s.slice(0, 300));
+  return { hard_limits: hardLimits };
+}
 
 function slugify(input: string): string {
   return input
@@ -33,11 +60,16 @@ export const createPersona = createServerFn({ method: "POST" })
     systemPrompt?: string;
     isExplicit?: boolean;
     priceCents?: number;
+    toneRules?: { personality?: string };
+    boundaryRules?: { hardLimits?: string[] };
+    explicitnessCeiling?: ExplicitnessLevel;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const creator = await requireCreator(supabase, userId);
+    const ceiling = data.explicitnessCeiling ?? "sfw";
+    await assertCeilingWithinPlatformMax(supabase, ceiling);
 
     const displayName = data.displayName.trim();
     if (displayName.length < 2 || displayName.length > 60) {
@@ -80,6 +112,9 @@ export const createPersona = createServerFn({ method: "POST" })
         system_prompt: data.systemPrompt?.trim() || null,
         is_explicit: !!data.isExplicit,
         price_cents: Math.max(0, Math.floor(data.priceCents ?? 0)),
+        tone_rules: sanitizeToneRules(data.toneRules),
+        boundary_rules: sanitizeBoundaryRules(data.boundaryRules),
+        explicitness_ceiling: ceiling,
         visibility: "draft" as Visibility,
         sort_order: nextOrder,
       })
@@ -101,6 +136,9 @@ export const updatePersona = createServerFn({ method: "POST" })
     systemPrompt?: string;
     isExplicit?: boolean;
     priceCents?: number;
+    toneRules?: { personality?: string };
+    boundaryRules?: { hardLimits?: string[] };
+    explicitnessCeiling?: ExplicitnessLevel;
     trainingNotes?: {
       tone_examples?: string;
       dos?: string;
@@ -116,6 +154,9 @@ export const updatePersona = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    if (data.explicitnessCeiling !== undefined) {
+      await assertCeilingWithinPlatformMax(supabase, data.explicitnessCeiling);
+    }
     const patch: {
       display_name?: string;
       description?: string | null;
@@ -123,6 +164,9 @@ export const updatePersona = createServerFn({ method: "POST" })
       system_prompt?: string | null;
       is_explicit?: boolean;
       price_cents?: number;
+      tone_rules?: { personality: string };
+      boundary_rules?: { hard_limits: string[] };
+      explicitness_ceiling?: ExplicitnessLevel;
       training_notes?: Record<string, string>;
       twin_link_mode?: "all" | "selected" | "none";
       linked_twin_ref_ids?: string[];
@@ -151,6 +195,9 @@ export const updatePersona = createServerFn({ method: "POST" })
     }
     if (data.isExplicit !== undefined) patch.is_explicit = !!data.isExplicit;
     if (data.priceCents !== undefined) patch.price_cents = Math.max(0, Math.floor(data.priceCents));
+    if (data.toneRules !== undefined) patch.tone_rules = sanitizeToneRules(data.toneRules);
+    if (data.boundaryRules !== undefined) patch.boundary_rules = sanitizeBoundaryRules(data.boundaryRules);
+    if (data.explicitnessCeiling !== undefined) patch.explicitness_ceiling = data.explicitnessCeiling;
     if (data.trainingNotes !== undefined) {
       const t = data.trainingNotes;
       const clean: Record<string, string> = {};
@@ -184,10 +231,35 @@ export const setPersonaVisibility = createServerFn({ method: "POST" })
   .validator((d: { personaId: string; visibility: Visibility }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { supabase, userId } = context;
+
+    if (FAN_FACING_VISIBILITY.has(data.visibility)) {
+      const { data: persona, error: personaErr } = await supabase
+        .from("personas")
+        .select("id, kind, creator_id, boundary_rules")
+        .eq("id", data.personaId).maybeSingle();
+      if (personaErr) throw personaErr;
+      if (!persona) throw new Error("Persona not found.");
+
+      if (persona.kind === "ai") {
+        const hardLimits = ((persona.boundary_rules as any)?.hard_limits ?? []) as string[];
+        if (!hardLimits.length) {
+          throw new Error("Set at least one boundary rule for this AI persona before publishing it.");
+        }
+      }
+
+      const { data: creator, error: creatorErr } = await supabase
+        .from("creators").select("verification_status").eq("id", persona.creator_id).maybeSingle();
+      if (creatorErr) throw creatorErr;
+      if (creator?.verification_status !== "verified") {
+        throw new Error("Your identity must be verified before you can publish personas.");
+      }
+    }
+
+    const { error } = await supabase
       .from("personas").update({ visibility: data.visibility }).eq("id", data.personaId);
     if (error) throw error;
-    await logAudit(context.userId, "persona.visibility_changed", { type: "persona", id: data.personaId }, { visibility: data.visibility });
+    await logAudit(userId, "persona.visibility_changed", { type: "persona", id: data.personaId }, { visibility: data.visibility });
     return { ok: true };
   });
 

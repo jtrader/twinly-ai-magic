@@ -9,6 +9,7 @@ import { transcribeVoiceObject } from "@/lib/chat.functions";
 import { listSavedMessagesForConversation } from "@/lib/saved-messages.functions";
 import { VoiceRecorder } from "@/components/twinly/VoiceRecorder";
 import { VoicePlayer } from "@/components/twinly/VoicePlayer";
+import { BlockButton } from "@/components/twinly/BlockButton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, BookmarkCheck, MessageCircle, Send, User } from "lucide-react";
@@ -216,12 +217,13 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
         <div className="size-9 rounded-full bg-brand/20 grid place-items-center">
           <User className="size-4" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="truncate font-semibold">{fan?.display_name ?? "Fan"}</div>
           <div className="truncate text-[11px] text-muted-foreground">
             {convo.creators?.stage_name} · Real Me — {convo.personas?.display_name}
           </div>
         </div>
+        <BlockButton targetType="fan" targetId={fan?.id} size="sm" variant="ghost" />
       </header>
 
       <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-4">

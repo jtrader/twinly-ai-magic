@@ -531,6 +531,11 @@ function ConsentSection({ data, onChanged }: { data: any; onChanged: () => void 
     catch (err: any) { toast.error(err?.message ?? "Update failed"); }
   }
 
+  async function toggleTraining(value: boolean) {
+    try { await upsert({ data: { trainingConsent: value } }); onChanged(); }
+    catch (err: any) { toast.error(err?.message ?? "Update failed"); }
+  }
+
   const toggles: Array<{ key: any; label: string; on: boolean }> = [
     { key: "likenessOk", label: "Likeness (face & body)", on: !!consent?.likeness_ok },
     { key: "voiceOk",    label: "Voice cloning",          on: !!consent?.voice_ok },
@@ -564,6 +569,23 @@ function ConsentSection({ data, onChanged }: { data: any; onChanged: () => void 
             <Switch checked={t.on} disabled={!!consent?.revoked_at} onCheckedChange={(v) => toggle(t.key, v)} />
           </div>
         ))}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between rounded-lg border border-brand/30 bg-brand/5 px-3 py-2">
+        <div>
+          <div className="text-sm">AI training</div>
+          <div className="text-xs text-muted-foreground">
+            Separate from the above — governs whether your likeness may be used to train/fine-tune a model, not just generate one-off content.
+            {consent?.training_consent_signed_at && !consent?.training_consent_revoked_at && (
+              <> Signed {new Date(consent.training_consent_signed_at).toLocaleDateString()}.</>
+            )}
+          </div>
+        </div>
+        <Switch
+          checked={!!consent?.training_consent_signed_at && !consent?.training_consent_revoked_at}
+          disabled={!!consent?.revoked_at}
+          onCheckedChange={toggleTraining}
+        />
       </div>
 
       <AlertDialog open={revokeOpen} onOpenChange={setRevokeOpen}>

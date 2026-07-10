@@ -25,14 +25,17 @@ import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
 import { Route as StudioPacksRouteImport } from './routes/studio.packs'
 import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
 import { Route as StudioGenerateRouteImport } from './routes/studio.generate'
+import { Route as StudioEscalationsRouteImport } from './routes/studio.escalations'
 import { Route as StudioCreateRouteImport } from './routes/studio.create'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
 import { Route as StudioAwayRouteImport } from './routes/studio.away'
 import { Route as StudioAnalyticsRouteImport } from './routes/studio.analytics'
+import { Route as StudioAiReviewRouteImport } from './routes/studio.ai-review'
 import { Route as SecurePersonasRouteImport } from './routes/secure.personas'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
+import { Route as FanUnlocksRouteImport } from './routes/fan.unlocks'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
@@ -124,6 +127,11 @@ const StudioGenerateRoute = StudioGenerateRouteImport.update({
   path: '/studio/generate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioEscalationsRoute = StudioEscalationsRouteImport.update({
+  id: '/studio/escalations',
+  path: '/studio/escalations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioCreateRoute = StudioCreateRouteImport.update({
   id: '/studio/create',
   path: '/studio/create',
@@ -142,6 +150,11 @@ const StudioAwayRoute = StudioAwayRouteImport.update({
 const StudioAnalyticsRoute = StudioAnalyticsRouteImport.update({
   id: '/studio/analytics',
   path: '/studio/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioAiReviewRoute = StudioAiReviewRouteImport.update({
+  id: '/studio/ai-review',
+  path: '/studio/ai-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SecurePersonasRoute = SecurePersonasRouteImport.update({
@@ -163,6 +176,11 @@ const LegalAiDisclosureRoute = LegalAiDisclosureRouteImport.update({
   id: '/legal/ai-disclosure',
   path: '/legal/ai-disclosure',
   getParentRoute: () => rootRouteImport,
+} as any)
+const FanUnlocksRoute = FanUnlocksRouteImport.update({
+  id: '/unlocks',
+  path: '/unlocks',
+  getParentRoute: () => FanRoute,
 } as any)
 const CreatorsHandleRoute = CreatorsHandleRouteImport.update({
   id: '/creators/$handle',
@@ -225,19 +243,22 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRoute
   '/auth': typeof AuthRouteWithChildren
   '/discover': typeof DiscoverRoute
-  '/fan': typeof FanRoute
+  '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
+  '/fan/unlocks': typeof FanUnlocksRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/secure/personas': typeof SecurePersonasRoute
+  '/studio/ai-review': typeof StudioAiReviewRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/away': typeof StudioAwayRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
+  '/studio/escalations': typeof StudioEscalationsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -261,19 +282,22 @@ export interface FileRoutesByTo {
   '/app': typeof AppRoute
   '/auth': typeof AuthRouteWithChildren
   '/discover': typeof DiscoverRoute
-  '/fan': typeof FanRoute
+  '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
+  '/fan/unlocks': typeof FanUnlocksRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/secure/personas': typeof SecurePersonasRoute
+  '/studio/ai-review': typeof StudioAiReviewRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/away': typeof StudioAwayRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
+  '/studio/escalations': typeof StudioEscalationsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -298,19 +322,22 @@ export interface FileRoutesById {
   '/app': typeof AppRoute
   '/auth': typeof AuthRouteWithChildren
   '/discover': typeof DiscoverRoute
-  '/fan': typeof FanRoute
+  '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
+  '/fan/unlocks': typeof FanUnlocksRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
   '/secure/personas': typeof SecurePersonasRoute
+  '/studio/ai-review': typeof StudioAiReviewRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/away': typeof StudioAwayRoute
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
+  '/studio/escalations': typeof StudioEscalationsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -341,14 +368,17 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
+    | '/fan/unlocks'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
     | '/secure/personas'
+    | '/studio/ai-review'
     | '/studio/analytics'
     | '/studio/away'
     | '/studio/content'
     | '/studio/create'
+    | '/studio/escalations'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -377,14 +407,17 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
+    | '/fan/unlocks'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
     | '/secure/personas'
+    | '/studio/ai-review'
     | '/studio/analytics'
     | '/studio/away'
     | '/studio/content'
     | '/studio/create'
+    | '/studio/escalations'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -413,14 +446,17 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
+    | '/fan/unlocks'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
     | '/secure/personas'
+    | '/studio/ai-review'
     | '/studio/analytics'
     | '/studio/away'
     | '/studio/content'
     | '/studio/create'
+    | '/studio/escalations'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -445,7 +481,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRoute
   AuthRoute: typeof AuthRouteWithChildren
   DiscoverRoute: typeof DiscoverRoute
-  FanRoute: typeof FanRoute
+  FanRoute: typeof FanRouteWithChildren
   OnboardingRoute: typeof OnboardingRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   CreatorsHandleRoute: typeof CreatorsHandleRouteWithChildren
@@ -453,10 +489,12 @@ export interface RootRouteChildren {
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
   SecurePersonasRoute: typeof SecurePersonasRoute
+  StudioAiReviewRoute: typeof StudioAiReviewRoute
   StudioAnalyticsRoute: typeof StudioAnalyticsRoute
   StudioAwayRoute: typeof StudioAwayRoute
   StudioContentRoute: typeof StudioContentRoute
   StudioCreateRoute: typeof StudioCreateRoute
+  StudioEscalationsRoute: typeof StudioEscalationsRoute
   StudioGenerateRoute: typeof StudioGenerateRoute
   StudioInboxRoute: typeof StudioInboxRoute
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
@@ -585,6 +623,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioGenerateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/escalations': {
+      id: '/studio/escalations'
+      path: '/studio/escalations'
+      fullPath: '/studio/escalations'
+      preLoaderRoute: typeof StudioEscalationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/create': {
       id: '/studio/create'
       path: '/studio/create'
@@ -611,6 +656,13 @@ declare module '@tanstack/react-router' {
       path: '/studio/analytics'
       fullPath: '/studio/analytics'
       preLoaderRoute: typeof StudioAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/ai-review': {
+      id: '/studio/ai-review'
+      path: '/studio/ai-review'
+      fullPath: '/studio/ai-review'
+      preLoaderRoute: typeof StudioAiReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/secure/personas': {
@@ -640,6 +692,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/legal/ai-disclosure'
       preLoaderRoute: typeof LegalAiDisclosureRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/fan/unlocks': {
+      id: '/fan/unlocks'
+      path: '/unlocks'
+      fullPath: '/fan/unlocks'
+      preLoaderRoute: typeof FanUnlocksRouteImport
+      parentRoute: typeof FanRoute
     }
     '/creators/$handle': {
       id: '/creators/$handle'
@@ -724,6 +783,16 @@ const AuthRouteChildren: AuthRouteChildren = {
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
+interface FanRouteChildren {
+  FanUnlocksRoute: typeof FanUnlocksRoute
+}
+
+const FanRouteChildren: FanRouteChildren = {
+  FanUnlocksRoute: FanUnlocksRoute,
+}
+
+const FanRouteWithChildren = FanRoute._addFileChildren(FanRouteChildren)
+
 interface CreatorsHandleRouteChildren {
   CreatorsHandlePersonaRoute: typeof CreatorsHandlePersonaRoute
 }
@@ -756,7 +825,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRoute,
   AuthRoute: AuthRouteWithChildren,
   DiscoverRoute: DiscoverRoute,
-  FanRoute: FanRoute,
+  FanRoute: FanRouteWithChildren,
   OnboardingRoute: OnboardingRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   CreatorsHandleRoute: CreatorsHandleRouteWithChildren,
@@ -764,10 +833,12 @@ const rootRouteChildren: RootRouteChildren = {
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
   SecurePersonasRoute: SecurePersonasRoute,
+  StudioAiReviewRoute: StudioAiReviewRoute,
   StudioAnalyticsRoute: StudioAnalyticsRoute,
   StudioAwayRoute: StudioAwayRoute,
   StudioContentRoute: StudioContentRoute,
   StudioCreateRoute: StudioCreateRoute,
+  StudioEscalationsRoute: StudioEscalationsRoute,
   StudioGenerateRoute: StudioGenerateRoute,
   StudioInboxRoute: StudioInboxRoute,
   StudioPacksRoute: StudioPacksRouteWithChildren,
@@ -784,3 +855,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

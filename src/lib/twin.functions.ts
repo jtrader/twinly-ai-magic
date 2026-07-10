@@ -26,7 +26,7 @@ export const getTwinProfile = createServerFn({ method: "GET" })
 
     const [{ data: consent }, { data: voice }, { data: refs }] = await Promise.all([
       supabase.from("digital_twin_consent")
-        .select("creator_id, likeness_ok, voice_ok, image_ok, video_ok, allowed_uses, forbidden_uses, signed_at, revoked_at, updated_at")
+        .select("creator_id, likeness_ok, voice_ok, image_ok, video_ok, allowed_uses, forbidden_uses, signed_at, revoked_at, training_consent_signed_at, training_consent_revoked_at, updated_at")
         .eq("creator_id", creator.id).maybeSingle(),
       supabase.from("creator_voice_profiles")
         .select("tone_summary, sales_style, approved_phrases, banned_phrases")
@@ -246,6 +246,8 @@ export const upsertTwinConsent = createServerFn({ method: "POST" })
     likenessOk?: boolean; voiceOk?: boolean; imageOk?: boolean; videoOk?: boolean;
     allowedUses?: Record<string, boolean>;
     forbiddenUses?: { presets?: Record<string, boolean>; custom?: string[] };
+    /** AI-training consent, tracked independently from likeness use (design doc item 3). */
+    trainingConsent?: boolean;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -258,6 +260,14 @@ export const upsertTwinConsent = createServerFn({ method: "POST" })
     if (data.videoOk !== undefined) patch.video_ok = data.videoOk;
     if (data.allowedUses) patch.allowed_uses = data.allowedUses;
     if (data.forbiddenUses) patch.forbidden_uses = data.forbiddenUses;
+    if (data.trainingConsent !== undefined) {
+      if (data.trainingConsent) {
+        patch.training_consent_signed_at = new Date().toISOString();
+        patch.training_consent_revoked_at = null;
+      } else {
+        patch.training_consent_revoked_at = new Date().toISOString();
+      }
+    }
 
     const { error } = await supabase
       .from("digital_twin_consent")
@@ -277,7 +287,10 @@ export const revokeTwinConsent = createServerFn({ method: "POST" })
     const now = new Date().toISOString();
     const { error: cErr } = await supabase
       .from("digital_twin_consent")
-      .update({ revoked_at: now, likeness_ok: false, voice_ok: false, image_ok: false, video_ok: false })
+      .update({
+        revoked_at: now, likeness_ok: false, voice_ok: false, image_ok: false, video_ok: false,
+        training_consent_revoked_at: now,
+      })
       .eq("creator_id", creator.id);
     if (cErr) throw cErr;
     await supabase.from("creators").update({ digital_twin_status: "revoked" }).eq("id", creator.id);

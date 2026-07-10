@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { logAudit } from "./audit.server";
+import { checkRateLimit } from "./rate-limit.server";
+
+const MAX_REGENERATION_ATTEMPTS = 3;
 
 async function requireCreator(supabase: any, userId: string) {
   const { data, error } = await supabase
@@ -39,6 +42,11 @@ export async function assertTwinPolicy(
   outputType: OutputType,
   personaId: string | null,
   packId: string | null,
+  /** Set true for calls that train/fine-tune on the creator's likeness,
+   * distinct from one-off generation — no such pipeline exists in this repo
+   * yet (design doc item 3, forward-looking). When it's built, it must pass
+   * true here so training consent is checked independently of likeness. */
+  forTraining = false,
 ) {
   if (!personaId) {
     throw new Error("Choose an approved persona before requesting synthetic content.");
@@ -58,7 +66,7 @@ export async function assertTwinPolicy(
 
   const { data: consent, error: kErr } = await supabase
     .from("digital_twin_consent")
-    .select("likeness_ok, image_ok, voice_ok, video_ok, signed_at, revoked_at, forbidden_uses")
+    .select("likeness_ok, image_ok, voice_ok, video_ok, signed_at, revoked_at, training_consent_signed_at, training_consent_revoked_at, forbidden_uses")
     .eq("creator_id", creatorId)
     .maybeSingle();
   if (kErr) throw kErr;
@@ -67,6 +75,9 @@ export async function assertTwinPolicy(
   }
   if (!consent.likeness_ok) {
     throw new Error("Likeness consent has not been granted.");
+  }
+  if (forTraining && (!consent.training_consent_signed_at || consent.training_consent_revoked_at)) {
+    throw new Error("Active AI-training consent is required — likeness consent alone doesn't cover training.");
   }
   const field = CONSENT_FIELD[outputType];
   if (!consent[field]) {
@@ -171,7 +182,7 @@ export const listGenerationRequests = createServerFn({ method: "POST" })
     let q = supabase
       .from("generation_requests")
       .select(
-        "id, persona_id, pack_id, output_type, style_preset, prompt_notes, quantity, status, disclosure_label, produced_asset_ids, reviewer_note, submitted_at, reviewed_at, created_at, personas:persona_id(display_name, slug), content_packs:pack_id(name, slug)",
+        "id, persona_id, pack_id, output_type, style_preset, prompt_notes, quantity, status, disclosure_label, produced_asset_ids, reviewer_note, submitted_at, reviewed_at, created_at, regeneration_count, personas:persona_id(display_name, slug), content_packs:pack_id(name, slug)",
       )
       .eq("creator_id", creator.id)
       .order("created_at", { ascending: false })
@@ -194,6 +205,7 @@ export const createGenerationRequest = createServerFn({ method: "POST" })
       quantity: number;
       disclosureLabel?: string;
       submit?: boolean;
+      regeneratedFromId?: string;
     }) => d,
   )
   .handler(async ({ data, context }) => {
@@ -203,6 +215,36 @@ export const createGenerationRequest = createServerFn({ method: "POST" })
     const qty = Math.max(1, Math.min(12, Math.round(data.quantity || 1)));
     const notes = (data.promptNotes ?? "").trim().slice(0, 2000);
     if (!notes) throw new Error("Add prompt notes so reviewers know what to generate.");
+
+    if (data.submit) {
+      const allowed = await checkRateLimit(supabase, "generation_submit", 20, 3600);
+      if (!allowed) throw new Error("Too many generation requests submitted recently. Please try again later.");
+    }
+
+    // If this is a regeneration attempt, verify lineage/ownership and cap
+    // retries so a request that keeps failing review doesn't spiral cost.
+    let regenerationCount = 0;
+    if (data.regeneratedFromId) {
+      const { data: original, error: origErr } = await supabase
+        .from("generation_requests")
+        .select("id, creator_id, status, regeneration_count")
+        .eq("id", data.regeneratedFromId)
+        .eq("creator_id", creator.id)
+        .maybeSingle();
+      if (origErr) throw origErr;
+      if (!original) throw new Error("Original request not found.");
+      if (!["rejected", "failed"].includes(original.status)) {
+        throw new Error("Only rejected or failed requests can be regenerated.");
+      }
+      regenerationCount = (original.regeneration_count ?? 0) + 1;
+      if (regenerationCount > MAX_REGENERATION_ATTEMPTS) {
+        await supabase
+          .from("generation_requests")
+          .update({ status: "needs_review", reviewer_note: "Escalated: max regeneration attempts reached." })
+          .eq("id", original.id);
+        throw new Error(`Maximum regeneration attempts (${MAX_REGENERATION_ATTEMPTS}) reached — this request has been escalated for manual review.`);
+      }
+    }
 
     // Enforce twin-consent + persona-approval policy at submit time. Drafts
     // may be saved without a persona, but submitting/queueing requires it.
@@ -250,6 +292,8 @@ export const createGenerationRequest = createServerFn({ method: "POST" })
         status,
         disclosure_label: data.disclosureLabel?.slice(0, 120) || null,
         submitted_at: data.submit ? new Date().toISOString() : null,
+        regenerated_from_id: data.regeneratedFromId || null,
+        regeneration_count: regenerationCount,
       })
       .select("*")
       .single();
@@ -364,6 +408,39 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
       .single();
     if (reqErr) throw reqErr;
     if (req.status !== "approved") throw new Error("Only approved requests can be published.");
+
+    const allowed = await checkRateLimit(supabase, "generation_publish", 15, 3600);
+    if (!allowed) throw new Error("Too many generations published recently. Please try again later.");
+
+    const isVeniceImageSpend = req.output_type === "image" || req.output_type === "promo_banner";
+    let spendCapCents: number | null = null;
+    let spentBeforeCents = 0;
+    if (isVeniceImageSpend) {
+      const { data: creatorCap } = await supabase
+        .from("creators")
+        .select("generation_spend_cap_cents")
+        .eq("id", creator.id)
+        .maybeSingle();
+      const cap = creatorCap?.generation_spend_cap_cents;
+      if (typeof cap === "number" && cap > 0) {
+        spendCapCents = cap;
+        const monthStart = new Date();
+        monthStart.setUTCDate(1);
+        monthStart.setUTCHours(0, 0, 0, 0);
+        const { data: spendRows } = await supabase
+          .from("content_assets")
+          .select("cost_cents")
+          .eq("creator_id", creator.id)
+          .gte("created_at", monthStart.toISOString())
+          .not("cost_cents", "is", null);
+        const spentCents = (spendRows ?? []).reduce((sum: number, r: any) => sum + (r.cost_cents ?? 0), 0);
+        if (spentCents >= cap) {
+          throw new Error(`Monthly generation spend cap ($${(cap / 100).toFixed(2)}) reached. Contact support to raise it.`);
+        }
+        spentBeforeCents = spentCents;
+      }
+    }
+
     // Re-verify policy at publish time so a consent revocation or persona
     // unpublish between approval and publish still blocks synthetic writes.
     const policy = await assertTwinPolicy(
@@ -384,6 +461,7 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
 
     const isVeniceImage = req.output_type === "image" || req.output_type === "promo_banner";
     let rows: any[];
+    let spendWarning: string | null = null;
 
     if (isVeniceImage) {
       const { generateVeniceImages } = await import("./venice.server");
@@ -414,6 +492,12 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
         throw new Error(msg);
       }
 
+      if (spendCapCents) {
+        const afterCents = spentBeforeCents + generated.costCents;
+        if (afterCents >= spendCapCents * 0.8) {
+          spendWarning = `You've used $${(afterCents / 100).toFixed(2)} of your $${(spendCapCents / 100).toFixed(2)} monthly generation cap.`;
+        }
+      }
       const perImageCost = Math.round(generated.costCents / generated.images.length);
       const uploaded: { path: string }[] = [];
       for (let i = 0; i < generated.images.length; i++) {
@@ -518,7 +602,7 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
       { type: "generation_request", id: data.id },
       { count: ids.length },
     );
-    return { count: ids.length };
+    return { count: ids.length, spendWarning };
   });
 
 export const listCreateTargets = createServerFn({ method: "POST" })

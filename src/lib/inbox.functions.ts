@@ -117,11 +117,14 @@ export const sendCreatorReply = createServerFn({ method: "POST" })
 
     const { data: convo, error: convoErr } = await supabase
       .from("conversations")
-      .select("id, creator_id, persona_id")
+      .select("id, creator_id, persona_id, fan_id, personas:persona_id(display_name, slug), creators:creator_id(handle)")
       .eq("id", data.conversationId)
       .maybeSingle();
     if (convoErr) throw convoErr;
     if (!convo) throw new Error("Conversation not found");
+
+    const { data: blocked } = await supabase.rpc("is_blocked", { _a: userId, _b: (convo as any).fan_id });
+    if (blocked) throw new Error("Messaging is blocked between you and this fan.");
 
     const screenText = hasVoice ? (data.transcript ?? "") : content;
     const severity = await screenMessage(screenText);
@@ -156,6 +159,20 @@ export const sendCreatorReply = createServerFn({ method: "POST" })
       .eq("id", data.conversationId);
 
     await logAudit(userId, "inbox.reply_sent", { type: "conversation", id: data.conversationId }, { severity, voice: hasVoice });
+
+    const { createNotification } = await import("./notifications.functions");
+    const personaName = (convo as any).personas?.display_name ?? "Real Me";
+    const handle = (convo as any).creators?.handle;
+    const slug = (convo as any).personas?.slug;
+    await createNotification({
+      userId: (convo as any).fan_id,
+      type: "persona_reply",
+      title: `New reply from ${personaName}`,
+      body: hasVoice ? "Sent a voice note" : content.slice(0, 140),
+      linkPath: handle && slug ? `/chat/${handle}/${slug}` : undefined,
+      personaId: (convo as any).persona_id,
+      isAiGenerated: false,
+    }).catch(() => {});
 
     return { ok: true };
   });

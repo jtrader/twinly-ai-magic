@@ -2,8 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { AiDisclosureBanner } from "@/components/twinly/AiDisclosureBanner";
+import { MessageDisclosureTag } from "@/components/twinly/MessageDisclosureTag";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
 import { ReportDialog } from "@/components/twinly/ReportDialog";
+import { BlockButton } from "@/components/twinly/BlockButton";
+import { RequestRealMeButton } from "@/components/twinly/RequestRealMeButton";
+import { PersonaMemoryPanel } from "@/components/twinly/PersonaMemoryPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +64,7 @@ function ChatPage() {
   const [sending, setSending] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [switchedFrom, setSwitchedFrom] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,6 +76,19 @@ function ChatPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length]);
+
+  // Each persona (and Real Me) is a fully separate conversation thread by
+  // design — this doesn't merge histories, it just tells a fan who they're
+  // now looking at when they arrive here from another persona's chat page.
+  useEffect(() => {
+    if (typeof window === "undefined" || !initial) return;
+    const key = `twinly:lastPersona:${initial.creator.handle}`;
+    const prevSlug = window.sessionStorage.getItem(key);
+    if (prevSlug && prevSlug !== initial.persona.slug) {
+      setSwitchedFrom(prevSlug);
+    }
+    window.sessionStorage.setItem(key, initial.persona.slug);
+  }, [initial]);
 
   if (!initial) return <AppShell><div className="py-20 text-center text-muted-foreground">Persona not found.</div></AppShell>;
   const { creator, persona, availability, aiPersonas } = initial;
@@ -148,10 +166,20 @@ function ChatPage() {
           <div className="flex items-center gap-2">
             <AvailabilityPill away={isAway} />
             <PersonaBadge kind={persona.kind as any} />
+            {persona.kind === "ai" && (
+              <RequestRealMeButton creatorHandle={creator.handle} personaSlug={persona.slug} />
+            )}
             <ReportDialog targetType="persona" targetId={persona.id} label="Report" />
+            <BlockButton targetType="creator" targetId={creator.id} />
           </div>
         </div>
-        <AiDisclosureBanner kind={persona.kind as any} label={persona.disclosure_label} className="mb-4" />
+        <AiDisclosureBanner
+          kind={persona.kind as any}
+          label={persona.disclosure_label}
+          personaName={persona.kind === "real_me" ? creator.stage_name : persona.display_name}
+          className="sticky top-2 z-10 mb-4 shadow-lg backdrop-blur"
+        />
+        {persona.kind === "ai" && <PersonaMemoryPanel personaId={persona.id} />}
         {isAway && persona.kind === "real_me" && (
           <div className="mb-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
             <span className="font-semibold">{creator.stage_name} is away.</span>{" "}
@@ -185,31 +213,31 @@ function ChatPage() {
               Say hi to {persona.display_name}.
             </div>
           )}
+          {switchedFrom && (
+            <div className="py-1 text-center text-[11px] uppercase tracking-widest text-muted-foreground">
+              — Now chatting with {persona.display_name} · {persona.kind === "ai" ? "AI persona" : "Real Me"} —
+            </div>
+          )}
           {messages.map((m) => (
             <div key={m.id} className={"flex " + (m.sender_type === "fan" ? "justify-end" : "justify-start")}>
               <div className={"max-w-[80%] rounded-2xl px-4 py-2 text-sm " + (
                 m.sender_type === "fan"
                   ? "bg-brand text-brand-foreground"
                   : m.sender_type === "ai"
-                    ? "bg-surface-elevated border border-brand/20"
+                    ? "bg-surface-elevated border border-ai/20"
                     : m.sender_type === "system"
                       ? "bg-amber-400/5 border border-amber-400/30"
                       : "bg-surface-elevated border border-real/30"
               )}>
                 {m.sender_type !== "fan" && (
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                    {m.sender_type === "ai"
-                      ? `${persona.display_name} · AI`
-                      : m.sender_type === "system"
-                        ? "Away auto-reply"
-                        : persona.display_name}
-                  </div>
+                  <MessageDisclosureTag senderType={m.sender_type} personaName={persona.display_name} />
                 )}
                 {m.attachment_kind === "audio" && m.attachment_url && conversationId ? (
                   <VoicePlayer
                     conversationId={conversationId}
                     path={m.attachment_url}
                     transcript={m.transcript}
+                    isAiGenerated={m.sender_type === "ai"}
                     durationMs={m.attachment_duration_ms}
                   />
                 ) : (

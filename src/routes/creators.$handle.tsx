@@ -4,6 +4,7 @@ import { AppShell } from "@/components/twinly/AppShell";
 import { PersonaCard } from "@/components/twinly/PersonaCard";
 import { AiDisclosureBanner } from "@/components/twinly/AiDisclosureBanner";
 import { ReportDialog } from "@/components/twinly/ReportDialog";
+import { BlockButton } from "@/components/twinly/BlockButton";
 import { FollowButton } from "@/components/twinly/FollowButton";
 import { ShieldCheck } from "lucide-react";
 
@@ -61,6 +62,7 @@ function CreatorProfile() {
           <div className="flex items-center gap-2">
             <FollowButton creatorId={creator.id} compact />
             <ReportDialog targetType="creator" targetId={creator.id} label="Report creator" variant="outline" />
+            <BlockButton targetType="creator" targetId={creator.id} variant="outline" />
           </div>
         </div>
         <div className="text-sm text-muted-foreground">@{creator.handle}</div>

@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Wand2, Sparkles, ImageIcon, Mic, Video, Megaphone, Send, CheckCircle2, XCircle, Package, User, Loader2, ShieldCheck, ListChecks, PlayCircle } from "lucide-react";
+import { Wand2, Sparkles, ImageIcon, Mic, Video, Megaphone, Send, CheckCircle2, XCircle, Package, User, Loader2, ShieldCheck, ListChecks, PlayCircle, RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ type ReqRow = {
   quantity: number; status: string; disclosure_label: string | null;
   produced_asset_ids: string[]; reviewer_note: string | null;
   submitted_at: string | null; reviewed_at: string | null; created_at: string;
+  regeneration_count: number;
   personas?: { display_name: string; slug: string } | null;
   content_packs?: { name: string; slug: string } | null;
 };
@@ -74,6 +75,7 @@ function CreatePage() {
   const [stylePreset, setStylePreset] = useState<string>("cinematic");
   const [promptNotes, setPromptNotes] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(4);
+  const [regeneratingFrom, setRegeneratingFrom] = useState<ReqRow | null>(null);
 
   const loadTargets = useServerFn(listCreateTargets);
   const loadRequests = useServerFn(listGenerationRequests);
@@ -113,13 +115,26 @@ function CreatePage() {
         quantity,
         disclosureLabel,
         submit: !saveDraft,
+        regeneratedFromId: regeneratingFrom?.id,
       } });
       toast.success(saveDraft ? "Draft saved" : "Request submitted");
       setPromptNotes("");
+      setRegeneratingFrom(null);
       await refresh();
       setTab("queue");
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
     finally { setBusy(null); }
+  }
+
+  function startRegenerate(r: ReqRow) {
+    setRegeneratingFrom(r);
+    setPersonaId(r.persona_id ?? "");
+    setPackId(r.pack_id ?? "");
+    setOutputType(r.output_type as any);
+    setStylePreset(r.style_preset ?? "cinematic");
+    setPromptNotes(r.prompt_notes);
+    setQuantity(r.quantity);
+    setTab("new");
   }
 
   async function act(id: string, action: Parameters<typeof update>[0]["data"]["action"], note?: string) {
@@ -134,6 +149,7 @@ function CreatePage() {
     try {
       const res = await publish({ data: { id } });
       toast.success(`Published ${res.count} draft asset${res.count === 1 ? "" : "s"} to your vault`);
+      if ((res as any).spendWarning) toast.warning((res as any).spendWarning);
       await refresh();
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
     finally { setBusy(null); }
@@ -160,6 +176,13 @@ function CreatePage() {
 
       {tab === "new" && (
         <div className="grid gap-4 md:grid-cols-2">
+          {regeneratingFrom && (
+            <div className="md:col-span-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
+              <div className="font-semibold">Regenerating a rejected/failed request{regeneratingFrom.regeneration_count ? ` (attempt ${regeneratingFrom.regeneration_count + 1} of 3)` : ""}.</div>
+              {regeneratingFrom.reviewer_note && <div className="mt-1">Previous note: {regeneratingFrom.reviewer_note}</div>}
+              <button type="button" className="mt-1 underline" onClick={() => setRegeneratingFrom(null)}>Start fresh instead</button>
+            </div>
+          )}
           <section className="rounded-2xl border border-border bg-surface p-4 space-y-3">
             <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Target</div>
             <div className="space-y-2">
@@ -300,6 +323,11 @@ function CreatePage() {
                     )}
                     {r.status !== "published" && r.status !== "rejected" && r.status !== "draft" && (
                       <Button size="sm" variant="ghost" disabled={busy === r.id} onClick={() => act(r.id, "cancel", "Cancelled by creator")}>Cancel</Button>
+                    )}
+                    {(r.status === "rejected" || r.status === "failed") && (r.regeneration_count ?? 0) < 3 && (
+                      <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => startRegenerate(r)}>
+                        <RefreshCw className="mr-1 size-3.5" /> Regenerate
+                      </Button>
                     )}
                   </div>
                 </header>

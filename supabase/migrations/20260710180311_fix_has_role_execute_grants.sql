@@ -1,0 +1,22 @@
+-- Fixes: "permission denied for function has_role" on any authenticated
+-- action that touches a table whose RLS policies reference has_role() or
+-- can_manage_creator() (e.g. creating a creator profile inserts into
+-- `creators`, which combines "Own creator profile management" with
+-- "Admins manage creators" USING (has_role(...)) via OR — Postgres still
+-- evaluates has_role() as part of that combination even when the other
+-- policy alone would authorize the row, and errors if the calling role
+-- lacks EXECUTE on it).
+--
+-- Migration 20260702181941 revoked EXECUTE on these from authenticated/anon
+-- based on the mistaken assumption that SECURITY DEFINER exempts callers
+-- from needing EXECUTE. It doesn't: SECURITY DEFINER only changes which
+-- privileges apply *inside* the function body once it's already running —
+-- the calling role (authenticated/anon via PostgREST) still needs EXECUTE
+-- to invoke the function at all from within a policy expression.
+-- Both roles: `creators` has an anon-readable policy ("Anyone can view
+-- verified creators" USING (true)) combined via OR with the admin policy
+-- ("Admins manage creators" USING (has_role(...))) — Postgres evaluates
+-- every applicable permissive policy for the querying role, so even a
+-- plain anonymous SELECT on `creators` hits has_role() and needs EXECUTE.
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.can_manage_creator(uuid) TO authenticated, anon;

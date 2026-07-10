@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Home, MessageCircle, LayoutDashboard, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImpersonationBanner } from "@/components/twinly/ImpersonationBanner";
+import { NotificationBell } from "@/components/twinly/NotificationBell";
 
 export function AppShell({ children, mobileNav = true }: { children: ReactNode; mobileNav?: boolean }) {
   return (
@@ -20,10 +21,13 @@ function TopBar() {
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <Link to="/" className="flex items-center gap-1 font-display text-lg font-bold tracking-tight">
-          Twinly<span className="text-brand-glow">.ai</span>
+          Twinly<span className="text-brand-glow">.life</span>
         </Link>
-        <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-          Verified · AI disclosed
+        <div className="flex items-center gap-3">
+          <div className="hidden text-[10px] font-semibold uppercase tracking-widest text-muted-foreground sm:block">
+            Verified · AI disclosed
+          </div>
+          <NotificationBell />
         </div>
       </div>
     </header>

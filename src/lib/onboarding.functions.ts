@@ -60,12 +60,12 @@ export const listMyPersonas = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { data: creator } = await supabase
-      .from("creators").select("id, handle, stage_name, onboarding_completed_at")
+      .from("creators").select("id, handle, stage_name, onboarding_completed_at, verification_status")
       .eq("user_id", userId).maybeSingle();
     if (!creator) return { creator: null, personas: [] };
     const { data: personas } = await supabase
       .from("personas")
-      .select("id, slug, display_name, kind, description, disclosure_label, visibility, sort_order, twin_link_mode, linked_twin_ref_ids, training_notes, system_prompt, is_explicit, is_default_seed")
+      .select("id, slug, display_name, kind, description, disclosure_label, visibility, sort_order, twin_link_mode, linked_twin_ref_ids, training_notes, system_prompt, is_explicit, explicitness_ceiling, tone_rules, boundary_rules, price_cents, is_default_seed")
       .eq("creator_id", creator.id)
       .order("sort_order", { ascending: true });
     return { creator, personas: personas ?? [] };

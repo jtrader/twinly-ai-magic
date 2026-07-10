@@ -47,11 +47,20 @@ const VISIBILITY_LABEL: Record<Visibility, string> = {
   hidden: "Hidden",
 };
 
+function centsToDollarsInput(cents: number | null | undefined): string {
+  return cents ? (cents / 100).toFixed(2) : "";
+}
+
+function dollarsInputToCents(input: string): number {
+  const n = Number.parseFloat(input);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
+}
+
 function PersonaStudioPage() {
   const { user, loading } = useSession();
   const navigate = useNavigate();
   const [personas, setPersonas] = useState<Persona[]>([]);
-  const [creator, setCreator] = useState<{ handle: string } | null>(null);
+  const [creator, setCreator] = useState<{ handle: string; verification_status?: string } | null>(null);
   const [ready, setReady] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Persona | null>(null);
@@ -71,7 +80,7 @@ function PersonaStudioPage() {
       navigate({ to: "/onboarding" });
       return;
     }
-    setCreator({ handle: res.creator.handle });
+    setCreator({ handle: res.creator.handle, verification_status: (res.creator as any).verification_status });
     setPersonas(res.personas);
     setReady(true);
   }, [load, navigate]);
@@ -143,6 +152,12 @@ function PersonaStudioPage() {
           </Button>
         </div>
 
+        {creator && creator.verification_status !== "verified" && (
+          <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-200">
+            Your identity isn't verified yet — you can build and edit personas, but publishing them (Public / Subscribers / VIP) is blocked until verification is complete.
+          </div>
+        )}
+
         <div className="mt-6 space-y-3">
           {personas.length === 0 && (
             <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center">
@@ -172,6 +187,14 @@ function PersonaStudioPage() {
                     <PersonaBadge kind={p.kind} />
                     {p.visibility !== "public" && (
                       <Badge variant="outline" className="text-xs">{VISIBILITY_LABEL[p.visibility]}</Badge>
+                    )}
+                    <Badge variant="outline" className="text-xs">
+                      {(p as any).price_cents ? `$${((p as any).price_cents / 100).toFixed(2)}` : "Included"}
+                    </Badge>
+                    {p.kind === "ai" && !((p as any).boundary_rules?.hard_limits ?? []).length && (
+                      <Badge variant="outline" className="border-amber-400/40 text-[10px] text-amber-300">
+                        No boundary rules — can't publish
+                      </Badge>
                     )}
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{p.disclosure_label}</p>
@@ -255,12 +278,16 @@ function CreatePersonaDialog({
   const [kind, setKind] = useState<"real_me" | "ai">("ai");
   const [description, setDescription] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
-  const [isExplicit, setExplicit] = useState(false);
+  const [explicitnessCeiling, setExplicitnessCeiling] = useState<"sfw" | "suggestive" | "explicit">("sfw");
+  const [personality, setPersonality] = useState("");
+  const [hardLimitsText, setHardLimitsText] = useState("");
+  const [priceDollars, setPriceDollars] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setName(""); setKind("ai"); setDescription(""); setSystemPrompt(""); setExplicit(false);
+      setName(""); setKind("ai"); setDescription(""); setSystemPrompt(""); setExplicitnessCeiling("sfw");
+      setPersonality(""); setHardLimitsText(""); setPriceDollars("");
     }
   }, [open]);
 
@@ -268,7 +295,17 @@ function CreatePersonaDialog({
     if (displayName.trim().length < 2) return toast.error("Name must be at least 2 characters.");
     setBusy(true);
     try {
-      await create({ data: { displayName, kind, description, systemPrompt, isExplicit } });
+      const hardLimits = hardLimitsText.split("\n").map((s) => s.trim()).filter(Boolean);
+      await create({
+        data: {
+          displayName, kind, description, systemPrompt,
+          isExplicit: explicitnessCeiling !== "sfw",
+          explicitnessCeiling: kind === "ai" ? explicitnessCeiling : undefined,
+          priceCents: dollarsInputToCents(priceDollars),
+          toneRules: kind === "ai" ? { personality } : undefined,
+          boundaryRules: kind === "ai" ? { hardLimits } : undefined,
+        },
+      });
       toast.success("Persona created — it's in draft.");
       onCreated();
     } catch (e: any) {
@@ -307,6 +344,15 @@ function CreatePersonaDialog({
             <Label>Description</Label>
             <Textarea className="mt-1.5" rows={2} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
+          <div>
+            <Label>Price</Label>
+            <div className="relative mt-1.5">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+              <Input className="pl-6" type="number" min="0" step="0.01" value={priceDollars}
+                onChange={(e) => setPriceDollars(e.target.value)} placeholder="0.00" />
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Shown to fans on this persona's card. Leave blank for "Included".</p>
+          </div>
           {kind === "ai" && (
             <>
               <div>
@@ -315,13 +361,34 @@ function CreatePersonaDialog({
                   onChange={(e) => setSystemPrompt(e.target.value)}
                   placeholder="Define voice, tone, and hard limits." />
               </div>
-              <label className="flex items-center justify-between rounded-lg border border-border p-3">
-                <div>
-                  <div className="text-sm font-medium">Explicit content</div>
-                  <div className="text-xs text-muted-foreground">Requires fan 18+ acknowledgement.</div>
-                </div>
-                <Switch checked={isExplicit} onCheckedChange={setExplicit} />
-              </label>
+              <div>
+                <Label>Personality / tone</Label>
+                <Input className="mt-1.5" maxLength={300} value={personality} onChange={(e) => setPersonality(e.target.value)}
+                  placeholder="e.g. Playful, teasing, warm — never sarcastic." />
+              </div>
+              <div>
+                <Label>Boundary ceiling — one hard limit per line</Label>
+                <Textarea className="mt-1.5" rows={3} maxLength={6000} value={hardLimitsText}
+                  onChange={(e) => setHardLimitsText(e.target.value)}
+                  placeholder={"Never discuss meeting in person\nNever claim to be human"} />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Platform-enforced and non-negotiable — the AI can't be talked past these no matter what a fan says. Required before this persona can be published.
+                </p>
+              </div>
+              <div>
+                <Label>Explicitness level</Label>
+                <Select value={explicitnessCeiling} onValueChange={(v) => setExplicitnessCeiling(v as any)}>
+                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sfw">SFW</SelectItem>
+                    <SelectItem value="suggestive">Suggestive</SelectItem>
+                    <SelectItem value="explicit">Explicit</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Enforced on every reply, independent of what a fan says. Above "SFW" requires fan 18+ acknowledgement. Can't exceed the platform-wide maximum.
+                </p>
+              </div>
             </>
           )}
         </div>
@@ -342,7 +409,10 @@ function EditPersonaDialog({
   const [description, setDescription] = useState("");
   const [disclosureLabel, setDisclosure] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
-  const [isExplicit, setExplicit] = useState(false);
+  const [explicitnessCeiling, setExplicitnessCeiling] = useState<"sfw" | "suggestive" | "explicit">("sfw");
+  const [personality, setPersonality] = useState("");
+  const [hardLimitsText, setHardLimitsText] = useState("");
+  const [priceDollars, setPriceDollars] = useState("");
   const [busy, setBusy] = useState(false);
   const [toneExamples, setToneExamples] = useState("");
   const [dos, setDos] = useState("");
@@ -453,7 +523,10 @@ function EditPersonaDialog({
       setDescription(persona.description ?? "");
       setDisclosure(persona.disclosure_label);
       setSystemPrompt((persona as any).system_prompt ?? "");
-      setExplicit(!!(persona as any).is_explicit);
+      setExplicitnessCeiling(((persona as any).explicitness_ceiling as any) ?? "sfw");
+      setPersonality((persona as any).tone_rules?.personality ?? "");
+      setHardLimitsText((((persona as any).boundary_rules?.hard_limits ?? []) as string[]).join("\n"));
+      setPriceDollars(centsToDollarsInput((persona as any).price_cents));
       const tn = ((persona as any).training_notes ?? {}) as Record<string, string>;
       setToneExamples(tn.tone_examples ?? "");
       setDos(tn.dos ?? "");
@@ -510,11 +583,16 @@ function EditPersonaDialog({
     if (!persona) return;
     setBusy(true);
     try {
+      const hardLimits = hardLimitsText.split("\n").map((s) => s.trim()).filter(Boolean);
       await update({ data: {
         personaId: persona.id,
         displayName, description, disclosureLabel,
+        priceCents: dollarsInputToCents(priceDollars),
         systemPrompt: persona.kind === "ai" ? systemPrompt : undefined,
-        isExplicit: persona.kind === "ai" ? isExplicit : undefined,
+        isExplicit: persona.kind === "ai" ? explicitnessCeiling !== "sfw" : undefined,
+        explicitnessCeiling: persona.kind === "ai" ? explicitnessCeiling : undefined,
+        toneRules: persona.kind === "ai" ? { personality } : undefined,
+        boundaryRules: persona.kind === "ai" ? { hardLimits } : undefined,
         trainingNotes: {
           tone_examples: toneExamples,
           dos, donts,
@@ -567,19 +645,49 @@ function EditPersonaDialog({
             <Input className="mt-1.5" value={disclosureLabel} onChange={(e) => setDisclosure(e.target.value)} maxLength={120} />
             <p className="mt-1 text-xs text-muted-foreground">Shown to every fan before they interact.</p>
           </div>
+          <div>
+            <Label>Price</Label>
+            <div className="relative mt-1.5">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+              <Input className="pl-6" type="number" min="0" step="0.01" value={priceDollars}
+                onChange={(e) => setPriceDollars(e.target.value)} placeholder="0.00" />
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Shown to fans on this persona's card. Leave blank for "Included".</p>
+          </div>
           {persona?.kind === "ai" && (
             <>
               <div>
                 <Label>System prompt</Label>
                 <Textarea className="mt-1.5" rows={5} maxLength={4000} value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} />
               </div>
-              <label className="flex items-center justify-between rounded-lg border border-border p-3">
-                <div>
-                  <div className="text-sm font-medium">Explicit content</div>
-                  <div className="text-xs text-muted-foreground">Requires fan 18+ acknowledgement.</div>
-                </div>
-                <Switch checked={isExplicit} onCheckedChange={setExplicit} />
-              </label>
+              <div>
+                <Label>Personality / tone</Label>
+                <Input className="mt-1.5" maxLength={300} value={personality} onChange={(e) => setPersonality(e.target.value)}
+                  placeholder="e.g. Playful, teasing, warm — never sarcastic." />
+              </div>
+              <div>
+                <Label>Boundary ceiling — one hard limit per line</Label>
+                <Textarea className="mt-1.5" rows={3} maxLength={6000} value={hardLimitsText}
+                  onChange={(e) => setHardLimitsText(e.target.value)}
+                  placeholder={"Never discuss meeting in person\nNever claim to be human"} />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Platform-enforced and non-negotiable. Required before this persona can be published.
+                </p>
+              </div>
+              <div>
+                <Label>Explicitness level</Label>
+                <Select value={explicitnessCeiling} onValueChange={(v) => setExplicitnessCeiling(v as any)}>
+                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sfw">SFW</SelectItem>
+                    <SelectItem value="suggestive">Suggestive</SelectItem>
+                    <SelectItem value="explicit">Explicit</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Enforced on every reply, independent of what a fan says. Above "SFW" requires fan 18+ acknowledgement. Can't exceed the platform-wide maximum.
+                </p>
+              </div>
             </>
           )}
         </div>
