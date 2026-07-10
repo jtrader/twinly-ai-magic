@@ -24,6 +24,17 @@ const listCreators = createServerFn({ method: "GET" }).handler(async () => {
 export const Route = createFileRoute("/discover")({
   loader: () => listCreators(),
   component: Discover,
+  head: () => ({
+    meta: [
+      { title: "Discover creators — Twinly.life" },
+      { name: "description", content: "Browse verified creators on Twinly.life. Real Me and official AI personas — always disclosed." },
+      { property: "og:title", content: "Discover creators — Twinly.life" },
+      { property: "og:description", content: "Browse verified creators on Twinly.life. Real Me and official AI personas — always disclosed." },
+      { property: "og:url", content: "https://twinly.life/discover" },
+      { property: "og:type", content: "website" },
+    ],
+    links: [{ rel: "canonical", href: "https://twinly.life/discover" }],
+  }),
 });
 
 function Discover() {
