@@ -42,6 +42,7 @@ import { Route as FanFlagsRouteImport } from './routes/fan.flags'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
+import { Route as AccountSubscriptionsRouteImport } from './routes/account.subscriptions'
 import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$packId'
 import { Route as CreatorsHandlePersonaRouteImport } from './routes/creators.$handle.$persona'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
@@ -215,6 +216,11 @@ const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
   path: '/api/generate-image',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountSubscriptionsRoute = AccountSubscriptionsRouteImport.update({
+  id: '/subscriptions',
+  path: '/subscriptions',
+  getParentRoute: () => AccountRoute,
+} as any)
 const StudioPacksPackIdRoute = StudioPacksPackIdRouteImport.update({
   id: '/$packId',
   path: '/$packId',
@@ -263,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
+  '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
@@ -304,6 +311,7 @@ export interface FileRoutesByTo {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
+  '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
@@ -347,6 +355,7 @@ export interface FileRoutesById {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
+  '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
@@ -391,6 +400,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
@@ -432,6 +442,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
@@ -474,6 +485,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
@@ -777,6 +789,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGenerateImageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account/subscriptions': {
+      id: '/account/subscriptions'
+      path: '/subscriptions'
+      fullPath: '/account/subscriptions'
+      preLoaderRoute: typeof AccountSubscriptionsRouteImport
+      parentRoute: typeof AccountRoute
+    }
     '/studio/packs/$packId': {
       id: '/studio/packs/$packId'
       path: '/$packId'
@@ -830,10 +849,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AccountRouteChildren {
+  AccountSubscriptionsRoute: typeof AccountSubscriptionsRoute
   AccountIndexRoute: typeof AccountIndexRoute
 }
 
 const AccountRouteChildren: AccountRouteChildren = {
+  AccountSubscriptionsRoute: AccountSubscriptionsRoute,
   AccountIndexRoute: AccountIndexRoute,
 }
 
