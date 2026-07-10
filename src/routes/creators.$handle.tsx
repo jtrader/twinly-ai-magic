@@ -116,6 +116,25 @@ function CreatorProfile() {
       <p className="mt-6 text-xs text-muted-foreground">
         <Link to="/legal/ai-disclosure" className="underline">Learn how AI personas work →</Link>
       </p>
+
+      <section className="mt-10">
+        <div className="mb-3 flex items-center gap-2">
+          <Rss className="size-4 text-brand-glow" />
+          <h2 className="font-display text-xl font-semibold">Latest from {creator.stage_name}</h2>
+        </div>
+        {isOwner && (
+          <div className="mb-4">
+            <PostComposer creatorId={creator.id} onPosted={refreshPosts} />
+          </div>
+        )}
+        <PostFeed
+          posts={posts}
+          emptyText={isOwner
+            ? "You haven't posted yet. Share an update with your supporters."
+            : "No posts yet."}
+          onChanged={refreshPosts}
+        />
+      </section>
     </AppShell>
   );
 }
