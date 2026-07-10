@@ -41,6 +41,25 @@ async function getSupabaseAdmin() {
   return supabaseAdmin;
 }
 
+/** Returns the invoice-default payment method id for a Stripe customer, if any.
+ *  Applied to subscription sessions so renewals & first invoice use the card
+ *  the user picked as default in the setup wizard. */
+async function getDefaultPaymentMethodId(
+  stripe: ReturnType<typeof createStripeClient>,
+  customerId: string,
+): Promise<string | undefined> {
+  try {
+    const c = await stripe.customers.retrieve(customerId);
+    if ((c as any).deleted) return undefined;
+    const pm = (c as any).invoice_settings?.default_payment_method;
+    if (typeof pm === "string" && pm) return pm;
+    if (pm && typeof pm === "object" && typeof pm.id === "string") return pm.id;
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const createCreatorSubscriptionCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: {
