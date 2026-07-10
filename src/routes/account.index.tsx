@@ -10,7 +10,7 @@ import { useSession, useUserRoles } from "@/lib/session";
 import { listMyBlocks, unblockUserId } from "@/lib/blocks.functions";
 import { getMyNotificationPreferences, updateMyNotificationPreferences } from "@/lib/notifications.functions";
 
-export const Route = createFileRoute("/account")({ component: AccountPage });
+export const Route = createFileRoute("/account/")({ component: AccountPage });
 
 function AccountPage() {
   const { user, loading } = useSession();
