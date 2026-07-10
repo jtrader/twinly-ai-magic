@@ -11,6 +11,8 @@ import {
   blockCreator, unblockCreator, isBlockingCreator, blockUserId, unblockUserId, isBlockingUserId,
 } from "@/lib/blocks.functions";
 import { useSession } from "@/lib/session";
+import { AuthPromptDialog } from "@/components/twinly/AuthPromptDialog";
+
 
 type Target = "creator" | "fan";
 
