@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, ExternalLink, Wallet } from "lucide-react";
+import { CreditCard, ExternalLink, Wallet, Loader2 } from "lucide-react";
 import { listMySubscriptions } from "@/lib/subscriptions.functions";
 import { createBillingPortal } from "@/lib/checkout.functions";
 import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
@@ -16,7 +16,7 @@ type Sub = Awaited<ReturnType<typeof listMySubscriptions>>[number];
 function SubscriptionsPage() {
   const [subs, setSubs] = useState<Sub[]>([]);
   const [loading, setLoading] = useState(true);
-  const [portalBusy, setPortalBusy] = useState(false);
+  const [portalBusy, setPortalBusy] = useState<string | "all" | null>(null);
   const load = useServerFn(listMySubscriptions);
   const openPortal = useServerFn(createBillingPortal);
 
@@ -29,17 +29,17 @@ function SubscriptionsPage() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  async function handlePortal() {
+  async function handlePortal(rowId: string | "all" = "all") {
     if (!isPaymentsConfigured()) { toast.error("Payments not configured yet."); return; }
-    setPortalBusy(true);
+    setPortalBusy(rowId);
     try {
       const res = await openPortal({
         data: { returnUrl: window.location.href, environment: getStripeEnvironment() },
       });
       if ("error" in res) throw new Error(res.error);
       window.open(res.url, "_blank", "noopener,noreferrer");
-    } catch (e: any) { toast.error(e?.message ?? "Could not open billing portal"); }
-    finally { setPortalBusy(false); }
+    } catch (e: any) { toast.error(e?.message ?? "Couldn't open billing portal — try again"); }
+    finally { setPortalBusy(null); }
   }
 
   const active = subs.filter((s) => s.status === "active");
@@ -53,14 +53,20 @@ function SubscriptionsPage() {
           <p className="mt-1 text-sm text-muted-foreground">Manage your paid creator subscriptions.</p>
         </div>
         {subs.length > 0 && (
-          <Button variant="outline" size="sm" onClick={handlePortal} disabled={portalBusy}>
-            <Wallet className="mr-2 size-4" />
-            {portalBusy ? "Opening…" : "Billing portal"}
+          <Button variant="outline" size="sm" onClick={() => handlePortal("all")} disabled={portalBusy !== null}>
+            {portalBusy === "all"
+              ? <Loader2 className="mr-2 size-4 animate-spin" />
+              : <Wallet className="mr-2 size-4" />}
+            {portalBusy === "all" ? "Opening…" : "Billing portal"}
           </Button>
         )}
       </header>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {loading && (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" /> Loading…
+        </p>
+      )}
 
       {!loading && subs.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center">
@@ -75,13 +81,13 @@ function SubscriptionsPage() {
 
       {!loading && active.length > 0 && (
         <Section title="Active">
-          {active.map((s) => <SubRow key={s.id} sub={s} onManage={handlePortal} portalBusy={portalBusy} />)}
+          {active.map((s) => <SubRow key={s.id} sub={s} onManage={() => handlePortal(s.id)} busy={portalBusy === s.id || portalBusy === "all"} />)}
         </Section>
       )}
 
       {!loading && inactive.length > 0 && (
         <Section title="Past" muted>
-          {inactive.map((s) => <SubRow key={s.id} sub={s} onManage={handlePortal} portalBusy={portalBusy} />)}
+          {inactive.map((s) => <SubRow key={s.id} sub={s} onManage={() => handlePortal(s.id)} busy={portalBusy === s.id || portalBusy === "all"} />)}
         </Section>
       )}
     </div>
@@ -97,7 +103,7 @@ function Section({ title, muted, children }: { title: string; muted?: boolean; c
   );
 }
 
-function SubRow({ sub, onManage, portalBusy }: { sub: Sub; onManage: () => void; portalBusy: boolean }) {
+function SubRow({ sub, onManage, busy }: { sub: Sub; onManage: () => void; busy: boolean }) {
   const canceled = sub.status !== "active";
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3">
@@ -124,8 +130,9 @@ function SubRow({ sub, onManage, portalBusy }: { sub: Sub; onManage: () => void;
           </Button>
         )}
         {!canceled && (
-          <Button size="sm" variant="outline" disabled={portalBusy} onClick={onManage}>
-            {portalBusy ? "…" : "Manage"}
+          <Button size="sm" variant="outline" disabled={busy} onClick={onManage}>
+            {busy && <Loader2 className="mr-1 size-3.5 animate-spin" />}
+            {busy ? "Opening…" : "Manage"}
           </Button>
         )}
       </div>
