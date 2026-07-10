@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { User as UserIcon, Pencil } from "lucide-react";
+import { User as UserIcon, Pencil, Heart, Users } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -72,46 +72,56 @@ function ProfileSection() {
   const percent = complete ? 100 : Math.round((doneCount / steps.length) * 100);
 
   return (
-    <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
-      <div className="flex items-start gap-4">
-        <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-elevated">
-          {avatarUrl
-            ? <img src={avatarUrl} alt="Your avatar" className="size-full object-cover" />
-            : <UserIcon className="size-7 text-muted-foreground" />}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Profile</div>
-            {!complete && (
-              <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-brand-glow">
-                Setup needed
-              </span>
+    <div className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+          <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-elevated sm:size-16">
+            {avatarUrl
+              ? <img src={avatarUrl} alt="Your avatar" className="size-full object-cover" />
+              : <UserIcon className="size-6 text-muted-foreground sm:size-7" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Profile</div>
+              {!complete && (
+                <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-brand-glow">
+                  Setup needed
+                </span>
+              )}
+            </div>
+            <div className="mt-1 truncate font-display text-base font-semibold sm:text-lg">
+              {profile?.display_name || "No display name yet"}
+            </div>
+            {profile?.full_name && (
+              <div className="text-xs text-muted-foreground">Real name: {profile.full_name}</div>
+            )}
+            {profile?.bio && (
+              <p className="mt-2 text-sm text-muted-foreground line-clamp-3">{profile.bio}</p>
+            )}
+            {profile?.country && (
+              <div className="mt-1 text-xs text-muted-foreground">{profile.country}</div>
             )}
           </div>
-          <div className="mt-1 truncate font-display text-lg font-semibold">
-            {profile?.display_name || "No display name yet"}
-          </div>
-          {profile?.full_name && (
-            <div className="text-xs text-muted-foreground">Real name: {profile.full_name}</div>
-          )}
-          {profile?.bio && (
-            <p className="mt-2 text-sm text-muted-foreground line-clamp-3">{profile.bio}</p>
-          )}
-          {profile?.country && (
-            <div className="mt-1 text-xs text-muted-foreground">{profile.country}</div>
-          )}
         </div>
-        <Button asChild size="sm" variant={complete ? "outline" : "default"}>
-          <Link to="/account/setup"><Pencil className="mr-2 size-3.5" />{complete ? "Edit" : "Complete profile"}</Link>
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start">
+          <Button asChild size="sm" variant={complete ? "outline" : "default"} className="w-full sm:w-auto">
+            <Link to="/account/setup"><Pencil className="mr-2 size-3.5" />{complete ? "Edit" : "Complete profile"}</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+            <Link to="/account/following"><Users className="mr-2 size-3.5" />Following</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+            <Link to="/account/following" search={{ tab: "favorites" } as any}><Heart className="mr-2 size-3.5" />Favorites</Link>
+          </Button>
+        </div>
       </div>
       {!complete && (
         <div className="mt-4 rounded-lg border border-brand/20 bg-brand/10 p-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_auto]">
             <div className="text-xs font-semibold text-brand-glow">
               Profile setup · {doneCount} of {steps.length} done
             </div>
-            <Button asChild size="sm" variant="default">
+            <Button asChild size="sm" variant="default" className="w-full sm:w-auto">
               <Link
                 to="/account/setup"
                 search={{ step: nextStep > 0 ? nextStep : 1 } as any}
@@ -171,27 +181,27 @@ function NotificationPreferencesSection() {
   if (!prefs) return null;
 
   return (
-    <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
+    <div className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:p-5">
       <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Notifications</div>
       <div className="mt-3 space-y-3">
-        <label className="flex items-center justify-between">
-          <div>
+        <label className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
             <div className="text-sm font-medium">In-app notifications</div>
             <div className="text-xs text-muted-foreground">Turn off to silence everything below.</div>
           </div>
-          <Switch checked={prefs.in_app_enabled} disabled={busy} onCheckedChange={(v) => toggle("inAppEnabled", "in_app_enabled", v)} />
+          <Switch checked={prefs.in_app_enabled} disabled={busy} onCheckedChange={(v) => toggle("inAppEnabled", "in_app_enabled", v)} className="shrink-0" />
         </label>
-        <label className="flex items-center justify-between">
-          <div className="text-sm">New content from creators you follow</div>
-          <Switch checked={prefs.new_content} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("newContent", "new_content", v)} />
+        <label className="flex items-start justify-between gap-4">
+          <div className="min-w-0 text-sm">New content from creators you follow</div>
+          <Switch checked={prefs.new_content} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("newContent", "new_content", v)} className="shrink-0" />
         </label>
-        <label className="flex items-center justify-between">
-          <div className="text-sm">Replies from a Real Me creator</div>
-          <Switch checked={prefs.persona_reply} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("personaReply", "persona_reply", v)} />
+        <label className="flex items-start justify-between gap-4">
+          <div className="min-w-0 text-sm">Replies from a Real Me creator</div>
+          <Switch checked={prefs.persona_reply} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("personaReply", "persona_reply", v)} className="shrink-0" />
         </label>
-        <label className="flex items-center justify-between">
-          <div className="text-sm">Real Me request updates</div>
-          <Switch checked={prefs.escalation_updates} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("escalationUpdates", "escalation_updates", v)} />
+        <label className="flex items-start justify-between gap-4">
+          <div className="min-w-0 text-sm">Real Me request updates</div>
+          <Switch checked={prefs.escalation_updates} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("escalationUpdates", "escalation_updates", v)} className="shrink-0" />
         </label>
       </div>
       <p className="mt-3 text-[11px] text-muted-foreground">Email and push aren't wired up yet — in-app is the only channel that actually delivers right now.</p>
@@ -234,7 +244,7 @@ function BlockedUsersSection() {
   }
 
   return (
-    <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
+    <div className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:p-5">
       <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Blocked users</div>
       {loadingList && <p className="mt-2 text-sm text-muted-foreground">Loading…</p>}
       {!loadingList && blocks.length === 0 && (
@@ -243,9 +253,9 @@ function BlockedUsersSection() {
       {!loadingList && blocks.length > 0 && (
         <ul className="mt-2 space-y-2">
           {blocks.map((b) => (
-            <li key={b.userId} className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm">
-              <span>{b.profile?.display_name ?? "Unknown user"}</span>
-              <Button size="sm" variant="ghost" disabled={busyId === b.userId} onClick={() => doUnblock(b.userId)}>
+            <li key={b.userId} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm">
+              <span className="truncate">{b.profile?.display_name ?? "Unknown user"}</span>
+              <Button size="sm" variant="ghost" disabled={busyId === b.userId} onClick={() => doUnblock(b.userId)} className="shrink-0">
                 {busyId === b.userId ? "…" : "Unblock"}
               </Button>
             </li>
