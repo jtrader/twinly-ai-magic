@@ -2,18 +2,20 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Camera, User as UserIcon, Loader2, CreditCard, Wallet, Check } from "lucide-react";
+import { Camera, User as UserIcon, Loader2, CreditCard, Wallet, Check, Trash2, ExternalLink } from "lucide-react";
+import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
 import { useAvatarUrl } from "@/lib/useAvatarUrl";
 import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
-import { createBillingPortal } from "@/lib/checkout.functions";
-import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
+import { createBillingPortal, createSetupIntentCheckout } from "@/lib/checkout.functions";
+import { getStripe, getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 
 export const Route = createFileRoute("/account/setup")({ component: AccountSetupPage });
 
@@ -42,6 +44,17 @@ function AccountSetupPage() {
   }, [loading, user, navigate]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("card") === "saved") {
+      toast.success("Card saved. You're all set for one-tap purchases.");
+      setStep(4);
+      params.delete("card");
+      const qs = params.toString();
+      window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    }
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
     load().then((r) => {
       const p = r.profile;
@@ -58,7 +71,11 @@ function AccountSetupPage() {
 
   async function handleAvatarPick(file: File) {
     if (!user) return;
-    if (!file.type.startsWith("image/")) { toast.error("Please choose an image file"); return; }
+    const allowed = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Please choose a PNG, JPG, WebP or GIF image");
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) { toast.error("Image must be under 5 MB"); return; }
     setBusy(true);
     try {
@@ -73,6 +90,21 @@ function AccountSetupPage() {
       toast.success("Profile picture updated");
     } catch (e: any) {
       toast.error(e?.message ?? "Upload failed");
+    } finally { setBusy(false); }
+  }
+
+  async function handleAvatarRemove() {
+    if (!user || !avatarPath) return;
+    setBusy(true);
+    try {
+      await save({ data: { avatar_url: null } });
+      // Best-effort delete of the storage object; ignore errors.
+      supabase.storage.from("avatars").remove([avatarPath]).catch(() => {});
+      setAvatarPath(null);
+      if (fileRef.current) fileRef.current.value = "";
+      toast.success("Avatar removed");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not remove");
     } finally { setBusy(false); }
   }
 
@@ -91,6 +123,14 @@ function AccountSetupPage() {
       return false;
     } finally { setBusy(false); }
   }
+
+  // Per-step gating for the "Continue" button.
+  const canContinue = (() => {
+    if (step === 1) return !!avatarPath;
+    if (step === 2) return displayName.trim().length >= 2;
+    if (step === 3) return true;
+    return true;
+  })();
 
   async function goNext() {
     const ok = await persistCurrentStep();
@@ -140,11 +180,12 @@ function AccountSetupPage() {
 
         <div className="mt-6 rounded-2xl border border-border bg-surface p-6">
           {step === 1 && (
-            <div className="flex flex-col items-center gap-4">
+            <div className="flex flex-col items-center gap-3">
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 className="group relative flex size-32 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-border bg-surface-elevated"
+                aria-label={avatarPath ? "Change profile picture" : "Upload profile picture"}
               >
                 {avatarUrl
                   ? <img src={avatarUrl} alt="Your avatar" className="size-full object-cover" />
@@ -156,20 +197,34 @@ function AccountSetupPage() {
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/webp,image/gif"
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarPick(f); }}
               />
-              <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={busy}>
-                {busy ? "Uploading…" : avatarPath ? "Change picture" : "Upload picture"}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={busy}>
+                  {busy ? "Uploading…" : avatarPath ? "Change picture" : "Upload picture"}
+                </Button>
+                {avatarPath && (
+                  <Button variant="ghost" size="sm" onClick={handleAvatarRemove} disabled={busy}>
+                    <Trash2 className="mr-1.5 size-4" /> Remove
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">PNG, JPG, WebP or GIF · max 5 MB</p>
+              {!avatarPath && (
+                <p className="text-xs text-muted-foreground">A profile picture is required to continue.</p>
+              )}
             </div>
           )}
 
           {step === 2 && (
             <div className="space-y-4">
-              <Field label="Display name" hint="Public. This is what everyone sees.">
+              <Field label="Display name *" hint="Public. This is what everyone sees. At least 2 characters.">
                 <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={60} placeholder="e.g. Alex" />
+                {displayName.trim().length > 0 && displayName.trim().length < 2 && (
+                  <p className="mt-1 text-xs text-destructive">Display name must be at least 2 characters.</p>
+                )}
               </Field>
               <Field label="Real name" hint="Private. Only visible to you and used for payments.">
                 <Input value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={120} placeholder="e.g. Alex Rivera" />
@@ -196,7 +251,7 @@ function AccountSetupPage() {
               Back
             </Button>
             {step < TOTAL_STEPS ? (
-              <Button onClick={goNext} disabled={busy}>{busy ? "Saving…" : "Continue"}</Button>
+              <Button onClick={goNext} disabled={busy || !canContinue}>{busy ? "Saving…" : "Continue"}</Button>
             ) : (
               <Button onClick={finish} disabled={busy}><Check className="mr-2 size-4" />{busy ? "Saving…" : "Finish"}</Button>
             )}
@@ -219,19 +274,38 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 function PaymentStep() {
   const openPortal = useServerFn(createBillingPortal);
+  const startSetup = useServerFn(createSetupIntentCheckout);
   const [busy, setBusy] = useState(false);
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const configured = isPaymentsConfigured();
+
+  async function handleAddCard() {
+    if (!configured) { toast.error("Payments not configured yet"); return; }
+    setBusy(true);
+    try {
+      const returnUrl = `${window.location.origin}/account/setup?card=saved`;
+      const res = await startSetup({ data: { returnUrl, environment: getStripeEnvironment() } });
+      if ("error" in res) throw new Error(res.error);
+      if (!res.clientSecret) throw new Error("Stripe did not return a client secret");
+      setClientSecret(res.clientSecret);
+      setOpen(true);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not open card entry");
+    } finally { setBusy(false); }
+  }
 
   async function handlePortal() {
     if (!configured) { toast.error("Payments not configured yet"); return; }
-    setBusy(true);
+    setPortalBusy(true);
     try {
       const res = await openPortal({ data: { returnUrl: window.location.href, environment: getStripeEnvironment() } });
       if ("error" in res) throw new Error(res.error);
       window.open(res.url, "_blank", "noopener,noreferrer");
     } catch (e: any) {
       toast.error(e?.message ?? "Could not open billing portal");
-    } finally { setBusy(false); }
+    } finally { setPortalBusy(false); }
   }
 
   return (
@@ -239,22 +313,42 @@ function PaymentStep() {
       <div className="flex items-start gap-3 rounded-xl border border-border bg-surface-elevated p-4">
         <CreditCard className="mt-0.5 size-5 text-brand-glow" />
         <div className="flex-1 text-sm">
-          <div className="font-medium">Add or manage a card via Stripe</div>
+          <div className="font-medium">Save a card for one-tap purchases</div>
           <p className="mt-1 text-muted-foreground">
-            Opens Stripe's secure billing portal in a new tab. Add a payment method now so
-            subscribing to a creator is one click later. You can also skip and do this later.
+            We'll create your billing account with Stripe and save your card securely.
+            No charge is made now — your card is only used when you subscribe or tip.
+            Skipping is fine; you can add one later from your Account.
           </p>
         </div>
       </div>
-      <Button variant="outline" onClick={handlePortal} disabled={busy || !configured} className="w-full">
+      <Button onClick={handleAddCard} disabled={busy || !configured} className="w-full">
         <Wallet className="mr-2 size-4" />
-        {busy ? "Opening…" : "Open billing portal"}
+        {busy ? "Preparing…" : "Add payment method"}
+      </Button>
+      <Button variant="ghost" onClick={handlePortal} disabled={portalBusy || !configured} className="w-full">
+        <ExternalLink className="mr-2 size-4" />
+        {portalBusy ? "Opening…" : "Manage existing cards in Stripe portal"}
       </Button>
       {!configured && (
         <p className="text-xs text-muted-foreground">
           Payments are not configured in this environment yet. You can still finish setup.
         </p>
       )}
+
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setClientSecret(null); }}>
+        <DialogContent className="max-w-lg overflow-hidden p-0">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>Add payment method</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[75vh] overflow-y-auto p-4">
+            {clientSecret && (
+              <EmbeddedCheckoutProvider stripe={getStripe()} options={{ clientSecret }}>
+                <EmbeddedCheckout />
+              </EmbeddedCheckoutProvider>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
