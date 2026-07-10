@@ -1,7 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { User as UserIcon, Pencil } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -9,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession, useUserRoles } from "@/lib/session";
 import { listMyBlocks, unblockUserId } from "@/lib/blocks.functions";
 import { getMyNotificationPreferences, updateMyNotificationPreferences } from "@/lib/notifications.functions";
+import { getMyProfile } from "@/lib/profile.functions";
+import { useAvatarUrl } from "@/lib/useAvatarUrl";
 
 export const Route = createFileRoute("/account/")({ component: AccountPage });
 
@@ -21,6 +25,7 @@ function AccountPage() {
     <AppShell>
       <h1 className="font-display text-3xl font-bold">Account</h1>
       <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
+      {user && <ProfileSection />}
       <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
         <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Roles</div>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -41,6 +46,63 @@ function AccountPage() {
 }
 
 type Prefs = Awaited<ReturnType<typeof getMyNotificationPreferences>>["preferences"];
+
+function ProfileSection() {
+  const load = useServerFn(getMyProfile);
+  const [profile, setProfile] = useState<Awaited<ReturnType<typeof getMyProfile>>["profile"]>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const avatarUrl = useAvatarUrl(profile?.avatar_url ?? null);
+
+  useEffect(() => {
+    load().then((r) => setProfile(r.profile)).finally(() => setLoadingProfile(false));
+  }, [load]);
+
+  if (loadingProfile) return null;
+  const complete = !!profile?.profile_completed_at;
+
+  return (
+    <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
+      <div className="flex items-start gap-4">
+        <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-elevated">
+          {avatarUrl
+            ? <img src={avatarUrl} alt="Your avatar" className="size-full object-cover" />
+            : <UserIcon className="size-7 text-muted-foreground" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Profile</div>
+            {!complete && (
+              <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-brand-glow">
+                Setup needed
+              </span>
+            )}
+          </div>
+          <div className="mt-1 truncate font-display text-lg font-semibold">
+            {profile?.display_name || "No display name yet"}
+          </div>
+          {profile?.full_name && (
+            <div className="text-xs text-muted-foreground">Real name: {profile.full_name}</div>
+          )}
+          {profile?.bio && (
+            <p className="mt-2 text-sm text-muted-foreground line-clamp-3">{profile.bio}</p>
+          )}
+          {profile?.country && (
+            <div className="mt-1 text-xs text-muted-foreground">{profile.country}</div>
+          )}
+        </div>
+        <Button asChild size="sm" variant={complete ? "outline" : "default"}>
+          <Link to="/account/setup"><Pencil className="mr-2 size-3.5" />{complete ? "Edit" : "Complete profile"}</Link>
+        </Button>
+      </div>
+      {!complete && (
+        <p className="mt-4 rounded-lg bg-brand/10 px-3 py-2 text-xs text-brand-glow">
+          Finish setting up your profile — add a picture, name, bio, and payment method — so
+          creators and subscriptions work smoothly.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function NotificationPreferencesSection() {
   const [prefs, setPrefs] = useState<Prefs | null>(null);

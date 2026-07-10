@@ -45,6 +45,7 @@ import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as AccountSubscriptionsRouteImport } from './routes/account.subscriptions'
+import { Route as AccountSetupRouteImport } from './routes/account.setup'
 import { Route as AccountFollowingRouteImport } from './routes/account.following'
 import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$packId'
 import { Route as CreatorsHandlePersonaRouteImport } from './routes/creators.$handle.$persona'
@@ -235,6 +236,11 @@ const AccountSubscriptionsRoute = AccountSubscriptionsRouteImport.update({
   path: '/subscriptions',
   getParentRoute: () => AccountRoute,
 } as any)
+const AccountSetupRoute = AccountSetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => AccountRoute,
+} as any)
 const AccountFollowingRoute = AccountFollowingRouteImport.update({
   id: '/following',
   path: '/following',
@@ -295,6 +301,7 @@ export interface FileRoutesByFullPath {
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
   '/account/following': typeof AccountFollowingRoute
+  '/account/setup': typeof AccountSetupRoute
   '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -341,6 +348,7 @@ export interface FileRoutesByTo {
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
   '/account/following': typeof AccountFollowingRoute
+  '/account/setup': typeof AccountSetupRoute
   '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -389,6 +397,7 @@ export interface FileRoutesById {
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
   '/account/following': typeof AccountFollowingRoute
+  '/account/setup': typeof AccountSetupRoute
   '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -438,6 +447,7 @@ export interface FileRouteTypes {
     | '/fan'
     | '/onboarding'
     | '/account/following'
+    | '/account/setup'
     | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
@@ -484,6 +494,7 @@ export interface FileRouteTypes {
     | '/fan'
     | '/onboarding'
     | '/account/following'
+    | '/account/setup'
     | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
@@ -531,6 +542,7 @@ export interface FileRouteTypes {
     | '/fan'
     | '/onboarding'
     | '/account/following'
+    | '/account/setup'
     | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
@@ -862,6 +874,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountSubscriptionsRouteImport
       parentRoute: typeof AccountRoute
     }
+    '/account/setup': {
+      id: '/account/setup'
+      path: '/setup'
+      fullPath: '/account/setup'
+      preLoaderRoute: typeof AccountSetupRouteImport
+      parentRoute: typeof AccountRoute
+    }
     '/account/following': {
       id: '/account/following'
       path: '/following'
@@ -930,12 +949,14 @@ declare module '@tanstack/react-router' {
 
 interface AccountRouteChildren {
   AccountFollowingRoute: typeof AccountFollowingRoute
+  AccountSetupRoute: typeof AccountSetupRoute
   AccountSubscriptionsRoute: typeof AccountSubscriptionsRoute
   AccountIndexRoute: typeof AccountIndexRoute
 }
 
 const AccountRouteChildren: AccountRouteChildren = {
   AccountFollowingRoute: AccountFollowingRoute,
+  AccountSetupRoute: AccountSetupRoute,
   AccountSubscriptionsRoute: AccountSubscriptionsRoute,
   AccountIndexRoute: AccountIndexRoute,
 }

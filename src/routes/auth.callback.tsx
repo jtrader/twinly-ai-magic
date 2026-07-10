@@ -16,6 +16,21 @@ function sanitizeRedirect(value: string | null): string {
   return value;
 }
 
+async function resolveDestination(fallback: string): Promise<string> {
+  try {
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes.user?.id;
+    if (!uid) return fallback;
+    const { data } = await supabase
+      .from("profiles")
+      .select("profile_completed_at")
+      .eq("id", uid)
+      .maybeSingle();
+    if (!data || !data.profile_completed_at) return "/account/setup";
+  } catch { /* fall through */ }
+  return fallback;
+}
+
 function AuthCallback() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
@@ -29,14 +44,15 @@ function AuthCallback() {
     async function go() {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        navigate({ to: target });
+        const dest = await resolveDestination(target);
+        navigate({ to: dest });
         return;
       }
       const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
         if (cancelled) return;
         if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
           sub.subscription.unsubscribe();
-          navigate({ to: target });
+          resolveDestination(target).then((dest) => navigate({ to: dest }));
         }
       });
       // Fallback timeout

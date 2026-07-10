@@ -19,8 +19,16 @@ function AuthPage() {
   useEffect(() => {
     const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
     const redirectTarget = sanitizeRedirect(params?.get("redirect") ?? null);
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: redirectTarget as any });
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session) return;
+      const uid = data.session.user.id;
+      const { data: p } = await supabase
+        .from("profiles")
+        .select("profile_completed_at")
+        .eq("id", uid)
+        .maybeSingle();
+      const dest = !p || !p.profile_completed_at ? "/account/setup" : redirectTarget;
+      navigate({ to: dest as any });
     });
   }, [navigate]);
 
