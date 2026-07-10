@@ -21,10 +21,10 @@ function AccountLayout() {
 
   return (
     <AppShell>
-      <div className="grid gap-6 md:grid-cols-[220px_1fr]">
-        <aside className="md:sticky md:top-20 md:self-start">
-          <div className="rounded-2xl border border-border bg-surface p-2">
-            <nav className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
+      <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="min-w-0 md:sticky md:top-20 md:self-start">
+          <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface p-2">
+            <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 md:mx-0 md:flex-col md:overflow-visible md:px-0">
               {NAV.map(({ to, label, icon: Icon, exact }) => {
                 const active = exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
                 return (
