@@ -37,7 +37,7 @@ export function useTwinlyPlus(): TwinlyPlusStatus {
       const row = data as any;
       const end = row?.current_period_end ? new Date(row.current_period_end) : null;
       const valid = !end || end > new Date();
-      const hasPlus = !!row && ((row.status === "active" && valid) || (row.status === "canceled" && end && end > new Date()));
+      const hasPlus = !!row && ((row.status === "active" && valid) || (row.status === "canceled" && !!end && end > new Date()));
       setState({
         hasPlus,
         loading: false,
