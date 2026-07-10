@@ -92,7 +92,7 @@ export function ReportDialog({
 
   if (!user) {
     return (
-      <AuthPromptDialog title="Join Twinly to report" description="Sign up or log in to report content and help keep the community safe.">
+      <AuthPromptDialog title="Join Twinly.life to report" description="Sign up or log in to report content and help keep the community safe.">
         <Button type="button" size={size} variant={variant} className="gap-1.5">
           <Flag className="size-3.5" /> {label}
         </Button>

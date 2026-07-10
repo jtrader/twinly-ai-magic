@@ -68,7 +68,7 @@ export function FollowButton({ creatorId, compact = false }: { creatorId: string
     }
     const { onClick, ...rest } = props;
     return (
-      <AuthPromptDialog title="Join Twinly to follow" description="Sign up or log in to follow this creator and save them to your favorites.">
+      <AuthPromptDialog title="Join Twinly.life to follow" description="Sign up or log in to follow this creator and save them to your favorites.">
         <Button {...rest} />
       </AuthPromptDialog>
     );
