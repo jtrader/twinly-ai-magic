@@ -41,6 +41,25 @@ async function getSupabaseAdmin() {
   return supabaseAdmin;
 }
 
+/** Returns the invoice-default payment method id for a Stripe customer, if any.
+ *  Applied to subscription sessions so renewals & first invoice use the card
+ *  the user picked as default in the setup wizard. */
+async function getDefaultPaymentMethodId(
+  stripe: ReturnType<typeof createStripeClient>,
+  customerId: string,
+): Promise<string | undefined> {
+  try {
+    const c = await stripe.customers.retrieve(customerId);
+    if ((c as any).deleted) return undefined;
+    const pm = (c as any).invoice_settings?.default_payment_method;
+    if (typeof pm === "string" && pm) return pm;
+    if (pm && typeof pm === "object" && typeof pm.id === "string") return pm.id;
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const createCreatorSubscriptionCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: {
@@ -81,6 +100,7 @@ export const createCreatorSubscriptionCheckout = createServerFn({ method: "POST"
 
       const tierLabel = data.tier.charAt(0).toUpperCase() + data.tier.slice(1);
       const productName = `${(creator as any).stage_name ?? (creator as any).handle} — ${tierLabel} tier`;
+      const defaultPm = await getDefaultPaymentMethodId(stripe, customerId);
 
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
@@ -98,6 +118,7 @@ export const createCreatorSubscriptionCheckout = createServerFn({ method: "POST"
         }],
         automatic_tax: { enabled: true },
         subscription_data: {
+          ...(defaultPm && { default_payment_method: defaultPm }),
           metadata: {
             userId,
             creatorId: data.creatorId,
@@ -305,6 +326,7 @@ export const createTwinlyPlusCheckout = createServerFn({ method: "POST" })
       const lookupKey = data.interval === "monthly" ? "twinly_plus_monthly" : "twinly_plus_yearly";
       const prices = await stripe.prices.list({ lookup_keys: [lookupKey], expand: ["data.product"] });
       if (!prices.data.length) return { error: "Twinly+ pricing not configured yet." };
+      const defaultPm = await getDefaultPaymentMethodId(stripe, customerId);
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         ui_mode: "embedded_page" as any,
@@ -313,6 +335,7 @@ export const createTwinlyPlusCheckout = createServerFn({ method: "POST" })
         line_items: [{ price: prices.data[0].id, quantity: 1 }],
         automatic_tax: { enabled: true },
         subscription_data: {
+          ...(defaultPm && { default_payment_method: defaultPm }),
           metadata: { userId, kind: "twinly_plus" },
         },
         metadata: { userId, kind: "twinly_plus" },
