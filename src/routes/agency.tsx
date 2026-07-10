@@ -24,14 +24,15 @@ function AgencyPage() {
   const [data, setData] = useState<{ agencies: any[]; creators: any[] } | null>(null);
   const load = useServerFn(listAgencyOverview);
 
+  const canAccess = roles.includes("agency") || roles.includes("admin");
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
   useEffect(() => {
-    if (!user || !roles.includes("agency")) return;
+    if (!user || !canAccess) return;
     load({}).then(setData).catch((e) => toast.error(e?.message ?? "Failed to load"));
   }, [user, roles.join(",")]);
 
   if (loading || !user) return <AppShell><div className="py-20 text-center text-muted-foreground">Loading...</div></AppShell>;
-  if (!roles.includes("agency")) {
+  if (!canAccess) {
     return (
       <AppShell>
         <div className="mx-auto max-w-md rounded-2xl border border-border bg-surface p-6 text-center">
