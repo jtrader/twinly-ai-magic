@@ -282,6 +282,23 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
+function AvatarStatePill({ state }: { state: "unchanged-empty" | "unchanged" | "uploaded" | "replaced" | "removed" }) {
+  const meta: Record<typeof state, { label: string; className: string } | null> = {
+    "unchanged-empty": null,
+    "unchanged": { label: "Current avatar", className: "bg-surface-elevated text-muted-foreground border-border" },
+    "uploaded": { label: "New avatar uploaded — remember to Continue to keep it", className: "bg-emerald-500/15 text-emerald-300 border-emerald-400/30" },
+    "replaced": { label: "Avatar replaced — remember to Continue to keep it", className: "bg-brand/15 text-brand-glow border-brand-glow/30" },
+    "removed": { label: "Avatar removed — add one to continue", className: "bg-amber-500/15 text-amber-300 border-amber-400/30" },
+  };
+  const m = meta[state];
+  if (!m) return null;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium ${m.className}`}>
+      {m.label}
+    </span>
+  );
+}
+
 function PaymentStep() {
   const openPortal = useServerFn(createBillingPortal);
   const startSetup = useServerFn(createSetupIntentCheckout);
