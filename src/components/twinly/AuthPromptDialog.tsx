@@ -15,7 +15,7 @@ import { useSession } from "@/lib/session";
 
 export function AuthPromptDialog({
   children,
-  title = "Join Twinly to connect",
+  title = "Join Twinly.life to connect",
   description = "Sign up or log in to follow creators, save favorites, report content, and more.",
 }: {
   children: React.ReactNode;
