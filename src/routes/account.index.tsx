@@ -73,8 +73,8 @@ function ProfileSection() {
 
   return (
     <div className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 sm:flex sm:flex-row sm:items-start">
+        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
           <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-elevated sm:size-16">
             {avatarUrl
               ? <img src={avatarUrl} alt="Your avatar" className="size-full object-cover" />
@@ -103,17 +103,9 @@ function ProfileSection() {
             )}
           </div>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start">
-          <Button asChild size="sm" variant={complete ? "outline" : "default"} className="w-full sm:w-auto">
-            <Link to="/account/setup"><Pencil className="mr-2 size-3.5" />{complete ? "Edit" : "Complete profile"}</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
-            <Link to="/account/following"><Users className="mr-2 size-3.5" />Following</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
-            <Link to="/account/following" search={{ tab: "favorites" } as any}><Heart className="mr-2 size-3.5" />Favorites</Link>
-          </Button>
-        </div>
+        <Button asChild size="sm" variant={complete ? "outline" : "default"} className="shrink-0">
+          <Link to="/account/setup"><Pencil className="mr-2 size-3.5" />{complete ? "Edit" : "Complete profile"}</Link>
+        </Button>
       </div>
       {!complete && (
         <div className="mt-4 rounded-lg border border-brand/20 bg-brand/10 p-3">
