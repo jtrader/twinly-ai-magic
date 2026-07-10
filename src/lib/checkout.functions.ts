@@ -100,6 +100,7 @@ export const createCreatorSubscriptionCheckout = createServerFn({ method: "POST"
 
       const tierLabel = data.tier.charAt(0).toUpperCase() + data.tier.slice(1);
       const productName = `${(creator as any).stage_name ?? (creator as any).handle} — ${tierLabel} tier`;
+      const defaultPm = await getDefaultPaymentMethodId(stripe, customerId);
 
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
@@ -117,6 +118,7 @@ export const createCreatorSubscriptionCheckout = createServerFn({ method: "POST"
         }],
         automatic_tax: { enabled: true },
         subscription_data: {
+          ...(defaultPm && { default_payment_method: defaultPm }),
           metadata: {
             userId,
             creatorId: data.creatorId,
