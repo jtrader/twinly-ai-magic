@@ -239,12 +239,24 @@ function Footer() {
 function JoinBanner() {
   return (
     <section className="mx-auto max-w-6xl px-4 pb-12 pt-2 md:pb-16">
-      <div className="relative overflow-hidden rounded-3xl border border-brand/40 bg-gradient-to-br from-brand/20 via-surface to-background p-6 md:p-10">
-        <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand/30 blur-3xl" aria-hidden="true" />
-        <div className="absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-brand-glow/20 blur-3xl" aria-hidden="true" />
+      <div className="relative overflow-hidden rounded-3xl border border-brand/40 bg-gradient-to-br from-brand/15 via-surface to-background p-6 md:p-10">
+        {/* Animated aurora backdrop — brav-0.com inspired, palette locked
+            to Twinly brand tokens (brand / brand-glow / ai). */}
+        <div className="pointer-events-none absolute inset-0 opacity-90" aria-hidden="true">
+          <div className="aurora-blob -right-24 -top-24 h-80 w-80 bg-brand" />
+          <div className="aurora-blob-alt -bottom-28 -left-16 h-72 w-72 bg-brand-glow" />
+          <div className="aurora-blob left-1/3 top-1/2 h-64 w-64 -translate-y-1/2 bg-ai" style={{ animationDuration: "26s" }} />
+          <div
+            className="absolute inset-0 mix-blend-overlay opacity-40"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 20% 30%, color-mix(in oklab, var(--brand-glow) 40%, transparent), transparent 45%), radial-gradient(circle at 80% 70%, color-mix(in oklab, var(--brand) 50%, transparent), transparent 50%)",
+            }}
+          />
+        </div>
         <div className="relative flex flex-col items-stretch gap-6 md:flex-row md:items-center md:justify-between">
           <div className="max-w-xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-brand/40 bg-background/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-brand-glow backdrop-blur">
+            <div className="inline-flex items-center gap-2 rounded-full border border-brand/40 bg-background/50 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-brand-glow backdrop-blur">
               <Sparkles className="h-3 w-3" /> Free to join · 18+
             </div>
             <h2 className="mt-4 font-display text-2xl font-bold tracking-tight md:text-4xl">
