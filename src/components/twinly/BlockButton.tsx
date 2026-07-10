@@ -11,6 +11,8 @@ import {
   blockCreator, unblockCreator, isBlockingCreator, blockUserId, unblockUserId, isBlockingUserId,
 } from "@/lib/blocks.functions";
 import { useSession } from "@/lib/session";
+import { AuthPromptDialog } from "@/components/twinly/AuthPromptDialog";
+
 
 type Target = "creator" | "fan";
 
@@ -28,9 +30,10 @@ export function BlockButton({
   const [blocking, setBlocking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
-  const { user } = useSession();
+  const { user, loading } = useSession();
 
   const doBlock = useServerFn(targetType === "creator" ? blockCreator : blockUserId);
+
   const doUnblock = useServerFn(targetType === "creator" ? unblockCreator : unblockUserId);
   const doCheck = useServerFn(targetType === "creator" ? isBlockingCreator : isBlockingUserId);
 
@@ -45,7 +48,26 @@ export function BlockButton({
 
   if (!targetId) return null;
 
+  if (loading) {
+    return (
+      <Button type="button" size={size} variant={variant} className="gap-1.5" disabled>
+        <Ban className="size-3.5" /> Block
+      </Button>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AuthPromptDialog title="Join Twinly to block" description="Sign up or log in to manage who you interact with.">
+        <Button type="button" size={size} variant={variant} className="gap-1.5">
+          <Ban className="size-3.5" /> Block
+        </Button>
+      </AuthPromptDialog>
+    );
+  }
+
   async function confirmBlock() {
+
     if (!user) {
       toast.error("Sign in to block users.");
       return;

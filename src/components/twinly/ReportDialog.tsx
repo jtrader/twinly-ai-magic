@@ -7,6 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { reportSubject, listMyReports } from "@/lib/moderation.functions";
+import { useSession } from "@/lib/session";
+import { AuthPromptDialog } from "@/components/twinly/AuthPromptDialog";
+
 
 type Target = "creator" | "persona" | "message" | "content_asset" | "conversation";
 
@@ -41,6 +44,8 @@ export function ReportDialog({
   const [loadingReports, setLoadingReports] = useState(false);
   const submit = useServerFn(reportSubject);
   const list = useServerFn(listMyReports);
+  const { user, loading } = useSession();
+
 
   async function refresh() {
     if (!targetId) { setReports([]); return; }
@@ -77,7 +82,26 @@ export function ReportDialog({
 
   const hasPrior = reports.length > 0;
 
+  if (loading) {
+    return (
+      <Button type="button" size={size} variant={variant} className="gap-1.5" disabled>
+        <Flag className="size-3.5" /> {label}
+      </Button>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AuthPromptDialog title="Join Twinly to report" description="Sign up or log in to report content and help keep the community safe.">
+        <Button type="button" size={size} variant={variant} className="gap-1.5">
+          <Flag className="size-3.5" /> {label}
+        </Button>
+      </AuthPromptDialog>
+    );
+  }
+
   return (
+
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button type="button" size={size} variant={variant} className="gap-1.5">

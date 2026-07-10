@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import { Heart, HeartOff, UserPlus, UserCheck } from "lucide-react";
 import { toggleFollow, setFavorite, getFollowState } from "@/lib/follows.functions";
 import { useSession } from "@/lib/session";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
+import { AuthPromptDialog } from "@/components/twinly/AuthPromptDialog";
+
+
 
 export function FollowButton({ creatorId, compact = false }: { creatorId: string; compact?: boolean }) {
   const { user, loading } = useSession();
@@ -46,11 +49,34 @@ export function FollowButton({ creatorId, compact = false }: { creatorId: string
     finally { setBusy(false); }
   };
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2">
+        <Button size={compact ? "sm" : "default"} disabled variant="default">
+          <UserPlus className="mr-1 size-4" /> Follow · Free
+        </Button>
+        <Button size={compact ? "sm" : "default"} disabled variant="outline" aria-label="Add favorite" title="Add favorite">
+          <HeartOff className="size-4" />
+        </Button>
+      </div>
+    );
+  }
+
+  function ActionButton(props: ButtonProps) {
+    if (user) {
+      return <Button {...props} />;
+    }
+    const { onClick, ...rest } = props;
+    return (
+      <AuthPromptDialog title="Join Twinly to follow" description="Sign up or log in to follow this creator and save them to your favorites.">
+        <Button {...rest} />
+      </AuthPromptDialog>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2">
-      <Button
+      <ActionButton
         size={compact ? "sm" : "default"}
         variant={following ? "outline" : "default"}
         onClick={onFollow}
@@ -58,8 +84,8 @@ export function FollowButton({ creatorId, compact = false }: { creatorId: string
       >
         {following ? <UserCheck className="mr-1 size-4" /> : <UserPlus className="mr-1 size-4" />}
         {following ? "Following" : "Follow · Free"}
-      </Button>
-      <Button
+      </ActionButton>
+      <ActionButton
         size={compact ? "sm" : "default"}
         variant={favorite ? "default" : "outline"}
         onClick={onFav}
@@ -70,7 +96,7 @@ export function FollowButton({ creatorId, compact = false }: { creatorId: string
         {favorite
           ? <Heart className="size-4 fill-current" />
           : <HeartOff className="size-4" />}
-      </Button>
+      </ActionButton>
     </div>
   );
 }
