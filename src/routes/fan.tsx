@@ -106,20 +106,23 @@ function FanDashboard() {
   return (
     <AppShell>
       <div className="mb-6">
-        <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Fan dashboard</div>
+        <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Supporter dashboard</div>
         <h1 className="mt-1 font-display text-3xl font-bold">Your Twinly</h1>
         <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Active subscriptions" value={subs.filter((s) => s.status === "active").length} />
+        <Stat label="Active rooms" value={subs.filter((s) => s.status === "active").length} />
         <Stat label="Recent chats" value={convos.length} />
         <Stat label="Age verified" value={profile?.age_verified_at ? "Yes" : "No"} tone={profile?.age_verified_at ? "ok" : "warn"} />
-        <Stat label="Followed creators" value={follows.length} />
+        <Stat label="Following" value={follows.length} />
       </div>
 
       <section className="mb-8">
-        <SectionHead icon={<Rss className="size-4 text-brand-glow" />} title="Posts from creators you follow" />
+        <SectionHead icon={<Rss className="size-4 text-brand-glow" />} title="Feed · creators you follow" />
+        <p className="-mt-1 mb-3 text-xs text-muted-foreground">
+          Following is free — you see every creator's public posts here. Paid content lives in <span className="font-semibold text-foreground">Rooms</span> below.
+        </p>
         <PostFeed
           posts={posts}
           emptyText={follows.length === 0
@@ -165,7 +168,10 @@ function FanDashboard() {
 
       {follows.length > 0 && (
         <section className="mb-6">
-          <SectionHead icon={<Heart className="size-4 text-brand-glow" />} title="Following" />
+          <SectionHead icon={<Users className="size-4 text-brand-glow" />} title="Following · Free" />
+          <p className="-mt-1 mb-3 text-xs text-muted-foreground">
+            Manage the creators whose free feed you receive. Favorites appear first everywhere.
+          </p>
           <div className="grid gap-3 md:grid-cols-2">
             {follows.map((f) => (
               <div key={f.creatorId} className="rounded-2xl border border-border bg-surface p-4">
@@ -177,11 +183,31 @@ function FanDashboard() {
                     </div>
                     <div className="truncate text-xs text-muted-foreground">@{f.handle}</div>
                   </div>
-                  {f.handle && (
-                    <Link to="/creators/$handle" params={{ handle: f.handle }}>
-                      <Button size="sm" variant="outline">Open</Button>
-                    </Link>
-                  )}
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant={f.favorite ? "default" : "outline"}
+                      onClick={() => onToggleFavorite(f.creatorId, !f.favorite)}
+                      aria-label={f.favorite ? "Remove favorite" : "Favorite"}
+                      title={f.favorite ? "Remove favorite" : "Favorite"}
+                    >
+                      <Heart className={"size-4 " + (f.favorite ? "fill-current" : "")} />
+                    </Button>
+                    {f.handle && (
+                      <Link to="/creators/$handle" params={{ handle: f.handle }}>
+                        <Button size="sm" variant="outline">Open</Button>
+                      </Link>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => onUnfollow(f.creatorId, f.stageName ?? "creator")}
+                      title="Unfollow"
+                    >
+                      <UserMinus className="size-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -190,9 +216,12 @@ function FanDashboard() {
       )}
 
       <section className="mb-6">
-        <SectionHead icon={<Sparkles className="size-4 text-brand-glow" />} title="Your subscriptions" />
+        <SectionHead icon={<DoorOpen className="size-4 text-brand-glow" />} title="Rooms · Subscribed" />
+        <p className="-mt-1 mb-3 text-xs text-muted-foreground">
+          Paid subscriptions unlock a creator's private Rooms — exclusive personas, packs and chats.
+        </p>
         {subs.length === 0 ? (
-          <EmptyRow text="No subscriptions yet." cta={{ to: "/discover", label: "Discover creators" }} />
+          <EmptyRow text="No rooms yet. Subscribe to unlock exclusive content." cta={{ to: "/discover", label: "Discover creators" }} />
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {subs.map((s) => (
