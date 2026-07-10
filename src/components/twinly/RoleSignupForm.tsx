@@ -100,12 +100,15 @@ export function RoleSignupForm() {
           <div>
             <Label>I am a...</Label>
             <RadioGroup value={role} onValueChange={(v) => setRole(v as SignupRole)} className="mt-2 grid grid-cols-3 gap-2">
-              {(["fan","creator","agency"] as const).map(r => (
-                <label key={r} className={"cursor-pointer rounded-lg border p-3 text-center text-xs font-semibold uppercase tracking-widest " + (role === r ? "border-brand bg-brand/10 text-brand-glow" : "border-border text-muted-foreground")}>
-                  <RadioGroupItem value={r} className="sr-only" />
-                  {r}
-                </label>
-              ))}
+              {(["fan","creator","agency"] as const).map(r => {
+                const label = r === "fan" ? "Supporter" : r;
+                return (
+                  <label key={r} className={"cursor-pointer rounded-lg border p-3 text-center text-xs font-semibold uppercase tracking-widest " + (role === r ? "border-brand bg-brand/10 text-brand-glow" : "border-border text-muted-foreground")}>
+                    <RadioGroupItem value={r} className="sr-only" />
+                    {label}
+                  </label>
+                );
+              })}
             </RadioGroup>
           </div>
         )}
@@ -113,7 +116,7 @@ export function RoleSignupForm() {
           <div className="rounded-xl border border-brand/30 bg-brand/10 p-3 text-xs text-muted-foreground">
             <p className="font-semibold text-foreground">AI persona setup is integrated after secure login.</p>
             <p className="mt-1">
-              Continue as a {role} and you will be routed to the protected persona setup hub for default personas, custom persona creation, training inputs, and content-pack setup.
+              Continue as a {role === "fan" ? "supporter" : role} and you will be routed to the protected persona setup hub for default personas, custom persona creation, training inputs, and content-pack setup.
             </p>
             <Link to="/secure/personas" className="mt-2 inline-block text-brand-glow underline underline-offset-4">
               Preview secure persona setup
