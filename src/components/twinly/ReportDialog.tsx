@@ -82,7 +82,26 @@ export function ReportDialog({
 
   const hasPrior = reports.length > 0;
 
+  if (loading) {
+    return (
+      <Button type="button" size={size} variant={variant} className="gap-1.5" disabled>
+        <Flag className="size-3.5" /> {label}
+      </Button>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AuthPromptDialog title="Join Twinly to report" description="Sign up or log in to report content and help keep the community safe.">
+        <Button type="button" size={size} variant={variant} className="gap-1.5">
+          <Flag className="size-3.5" /> {label}
+        </Button>
+      </AuthPromptDialog>
+    );
+  }
+
   return (
+
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button type="button" size={size} variant={variant} className="gap-1.5">
