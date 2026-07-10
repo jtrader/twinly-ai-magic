@@ -210,7 +210,7 @@ function PersonaGrid() {
       name: "Wicked AI",
       kind: "ai" as const,
       tagline: "Adults-only, VIP-gated.",
-      blurb: "The 18+ tier for verified VIP fans. Age-gated, paywalled and creator-controlled, with per-persona rules and full moderation trail.",
+      blurb: "The 18+ tier for verified VIP supporters. Age-gated, paywalled and creator-controlled, with per-persona rules and full moderation trail.",
       image: personaWickedAi.url,
       alt: "Wicked AI persona portrait — crimson and violet noir lighting",
     },
@@ -230,7 +230,7 @@ function PersonaGrid() {
         <div>
           <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Persona system</div>
           <h2 className="mt-2 font-display text-3xl font-bold tracking-tight md:text-4xl">One creator. Many disclosed personas.</h2>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Tap a persona to see how it shows up to fans.</p>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Tap a persona to see how it shows up to supporters.</p>
         </div>
       </div>
       <div className="mx-auto grid max-w-4xl grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">

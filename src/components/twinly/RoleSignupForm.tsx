@@ -100,12 +100,15 @@ export function RoleSignupForm() {
           <div>
             <Label>I am a...</Label>
             <RadioGroup value={role} onValueChange={(v) => setRole(v as SignupRole)} className="mt-2 grid grid-cols-3 gap-2">
-              {(["fan","creator","agency"] as const).map(r => (
-                <label key={r} className={"cursor-pointer rounded-lg border p-3 text-center text-xs font-semibold uppercase tracking-widest " + (role === r ? "border-brand bg-brand/10 text-brand-glow" : "border-border text-muted-foreground")}>
-                  <RadioGroupItem value={r} className="sr-only" />
-                  {r}
-                </label>
-              ))}
+              {(["fan","creator","agency"] as const).map(r => {
+                const label = r === "fan" ? "Supporter" : r;
+                return (
+                  <label key={r} className={"cursor-pointer rounded-lg border p-3 text-center text-xs font-semibold uppercase tracking-widest " + (role === r ? "border-brand bg-brand/10 text-brand-glow" : "border-border text-muted-foreground")}>
+                    <RadioGroupItem value={r} className="sr-only" />
+                    {label}
+                  </label>
+                );
+              })}
             </RadioGroup>
           </div>
         )}
