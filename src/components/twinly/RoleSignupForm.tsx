@@ -140,27 +140,6 @@ export function RoleSignupForm() {
         </svg>
         Continue with Apple
       </Button>
-      {microsoftEnabled ? (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={microsoft}
-          className="w-full"
-        >
-          <svg viewBox="0 0 23 23" className="mr-2 h-4 w-4" aria-hidden="true">
-            <rect x="1" y="1" width="10" height="10" fill="#F25022" />
-            <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
-            <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
-            <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
-          </svg>
-          Continue with Microsoft
-        </Button>
-      ) : (
-        <div className="rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">Microsoft sign-in</span> is available on self-hosted deployments.
-          Set <code className="rounded bg-surface px-1 py-0.5 text-[10px]">VITE_ENABLE_MICROSOFT_OAUTH=1</code> and configure the Azure provider in your Supabase project to enable it.
-        </div>
-      )}
     </div>
   );
 }
