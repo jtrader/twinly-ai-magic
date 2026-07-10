@@ -51,12 +51,22 @@ export const Route = createFileRoute("/creators/$handle")({
 function CreatorProfile() {
   const data = Route.useLoaderData();
   if (!data) return <AppShell><div className="py-20 text-center text-muted-foreground">Creator not found.</div></AppShell>;
-  const { creator, profile, personas } = data;
+  const { creator, profile, personas, postCount } = data;
   const avatarUrl = profile?.avatar_url ?? null;
   const { user } = useSession();
   const isOwner = !!user && user.id === creator.user_id;
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"latest" | "experiences">("latest");
+  const visiblePersonas = (personas as any[]).filter((p) => {
+    const now = Date.now();
+    if (p.starts_at && new Date(p.starts_at).getTime() > now) return false;
+    if (p.ends_at && new Date(p.ends_at).getTime() < now) return false;
+    return true;
+  });
+  const [tab, setTab] = useState<"latest" | "experiences">(() => {
+    if (postCount === 0 && visiblePersonas.length > 0) return "experiences";
+    if (visiblePersonas.length === 0 && postCount > 0) return "latest";
+    return "latest";
+  });
   const [posts, setPosts] = useState<any[]>([]);
   const loadPosts = useServerFn(getCreatorPosts);
   const refreshPosts = async () => {
