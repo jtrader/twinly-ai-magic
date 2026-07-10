@@ -5,7 +5,9 @@ import { Heart, HeartOff, UserPlus, UserCheck } from "lucide-react";
 import { toggleFollow, setFavorite, getFollowState } from "@/lib/follows.functions";
 import { useSession } from "@/lib/session";
 import { toast } from "sonner";
+import { useNavigate } from "@tanstack/react-router";
 import { AuthPromptDialog } from "@/components/twinly/AuthPromptDialog";
+
 
 
 export function FollowButton({ creatorId, compact = false }: { creatorId: string; compact?: boolean }) {
