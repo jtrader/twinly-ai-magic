@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, LogOut, Settings, LogIn, Wallet } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { createBillingPortal } from "@/lib/checkout.functions";
