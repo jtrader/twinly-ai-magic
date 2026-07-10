@@ -7,9 +7,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
 import { Sparkles, MessageCircle, ShieldCheck, Compass, Heart, Rss } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { getMyFeed, listMyFollows } from "@/lib/follows.functions";
+import { getMyFeed, listMyFollows, toggleFollow, setFavorite } from "@/lib/follows.functions";
 import { PostFeed } from "@/components/twinly/PostFeed";
 import { getHomeFeed } from "@/lib/posts.functions";
+import { toast } from "sonner";
+import { DoorOpen, UserMinus, Users } from "lucide-react";
 
 export const Route = createFileRoute("/fan")({
   component: FanDashboard,
@@ -34,6 +36,8 @@ function FanDashboard() {
   const loadFeed = useServerFn(getMyFeed);
   const loadFollows = useServerFn(listMyFollows);
   const loadPosts = useServerFn(getHomeFeed);
+  const unfollow = useServerFn(toggleFollow);
+  const favorite = useServerFn(setFavorite);
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
@@ -71,6 +75,28 @@ function FanDashboard() {
       const ps = await loadPosts({ data: {} });
       setPosts(ps.items ?? []);
     } catch {}
+  };
+
+  const refreshFollows = async () => {
+    try {
+      const fol = await loadFollows({});
+      setFollows(fol ?? []);
+    } catch {}
+  };
+
+  const onUnfollow = async (creatorId: string, name: string) => {
+    try {
+      await unfollow({ data: { creatorId, follow: false } });
+      toast.success(`Unfollowed ${name}`);
+      await Promise.all([refreshFollows(), refreshPosts()]);
+    } catch (e: any) { toast.error(e?.message ?? "Try again"); }
+  };
+
+  const onToggleFavorite = async (creatorId: string, next: boolean) => {
+    try {
+      await favorite({ data: { creatorId, favorite: next } });
+      await refreshFollows();
+    } catch (e: any) { toast.error(e?.message ?? "Try again"); }
   };
 
   if (loading || !ready) {
