@@ -58,7 +58,8 @@ export function AuthPromptDialog({
         <div className="grid gap-3 py-4">
           <Button onClick={() => goToAuth("signup")}>
             <UserPlus className="mr-2 size-4" />
-            Sign up
+            Join <span className="mx-0.5 font-semibold">Twinly</span>
+            <span className="text-brand-foreground/80">.life</span>
           </Button>
           <Button variant="outline" onClick={() => goToAuth("login")}>
             <LogIn className="mr-2 size-4" />
