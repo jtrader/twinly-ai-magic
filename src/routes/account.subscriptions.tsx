@@ -4,9 +4,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, ExternalLink, Wallet, Loader2, AlertCircle, RotateCcw } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CreditCard, ExternalLink, Wallet, Loader2, AlertCircle, RotateCcw, XCircle } from "lucide-react";
 import { listMySubscriptions } from "@/lib/subscriptions.functions";
-import { createBillingPortal, reactivateSubscription } from "@/lib/checkout.functions";
+import { createBillingPortal, reactivateSubscription, scheduleCancelSubscription } from "@/lib/checkout.functions";
 import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 
 export const Route = createFileRoute("/account/subscriptions")({ component: SubscriptionsPage });
@@ -18,9 +22,12 @@ function SubscriptionsPage() {
   const [loading, setLoading] = useState(true);
   const [portalBusy, setPortalBusy] = useState<string | "all" | null>(null);
   const [reactivateBusy, setReactivateBusy] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Sub | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
   const load = useServerFn(listMySubscriptions);
   const openPortal = useServerFn(createBillingPortal);
   const reactivate = useServerFn(reactivateSubscription);
+  const cancel = useServerFn(scheduleCancelSubscription);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -56,6 +63,23 @@ function SubscriptionsPage() {
       setSubs(prev);
       toast.error(e?.message ?? "Could not reactivate");
     } finally { setReactivateBusy(null); }
+  }
+
+  async function handleConfirmCancel() {
+    if (!cancelTarget) return;
+    setCancelBusy(true);
+    const target = cancelTarget;
+    const prev = subs;
+    setSubs((s) => s.map((r) => r.id === target.id ? { ...r, cancelAtPeriodEnd: true } : r));
+    try {
+      const res = await cancel({ data: { subscriptionId: target.id, environment: target.environment } });
+      if ("error" in res) throw new Error(res.error);
+      toast.success(`Cancellation scheduled — access ends ${target.currentPeriodEnd ? new Date(target.currentPeriodEnd).toLocaleDateString() : "at period end"}`);
+      setCancelTarget(null);
+    } catch (e: any) {
+      setSubs(prev);
+      toast.error(e?.message ?? "Could not cancel");
+    } finally { setCancelBusy(false); }
   }
 
   const active = subs.filter((s) => s.status === "active");
@@ -102,7 +126,8 @@ function SubscriptionsPage() {
               onManage={() => handlePortal(s.id)}
               busy={portalBusy === s.id || portalBusy === "all"}
               onReactivate={() => handleReactivate(s)}
-              reactivating={reactivateBusy === s.id} />
+              reactivating={reactivateBusy === s.id}
+              onCancel={() => setCancelTarget(s)} />
           ))}
         </Section>
       )}
@@ -116,6 +141,52 @@ function SubscriptionsPage() {
           ))}
         </Section>
       )}
+
+      <AlertDialog open={!!cancelTarget} onOpenChange={(o) => { if (!o) setCancelTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this subscription?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                {cancelTarget && (
+                  <div className="rounded-lg border border-border bg-surface p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground">
+                        {cancelTarget.stageName ?? cancelTarget.handle}
+                      </span>
+                      <Badge variant="outline" className="capitalize text-[10px]">{cancelTarget.tier}</Badge>
+                    </div>
+                    {cancelTarget.currentPeriodEnd && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Access remains until{" "}
+                        <span className="font-medium text-foreground">
+                          {new Date(cancelTarget.currentPeriodEnd).toLocaleDateString(undefined, {
+                            year: "numeric", month: "long", day: "numeric",
+                          })}
+                        </span>.
+                      </div>
+                    )}
+                  </div>
+                )}
+                <p>
+                  You won't be charged again. You can reactivate any time before the end date to keep your access.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelBusy}>Keep subscription</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleConfirmCancel(); }}
+              disabled={cancelBusy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : <XCircle className="mr-2 size-4" />}
+              {cancelBusy ? "Cancelling…" : "Yes, cancel"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -130,10 +201,11 @@ function Section({ title, muted, children }: { title: string; muted?: boolean; c
 }
 
 function SubRow({
-  sub, onManage, busy, onReactivate, reactivating,
+  sub, onManage, busy, onReactivate, reactivating, onCancel,
 }: {
   sub: Sub; onManage: () => void; busy: boolean;
   onReactivate?: () => void; reactivating?: boolean;
+  onCancel?: () => void;
 }) {
   const canceled = sub.status !== "active";
   const endingSoon = !canceled && sub.cancelAtPeriodEnd;
@@ -176,6 +248,11 @@ function SubRow({
           <Button size="sm" variant="outline" disabled={busy} onClick={onManage}>
             {busy && <Loader2 className="mr-1 size-3.5 animate-spin" />}
             {busy ? "Opening…" : "Manage"}
+          </Button>
+        )}
+        {!canceled && !endingSoon && onCancel && (
+          <Button size="sm" variant="ghost" onClick={onCancel} className="text-destructive hover:text-destructive">
+            <XCircle className="mr-1 size-3.5" /> Cancel
           </Button>
         )}
       </div>

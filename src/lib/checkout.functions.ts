@@ -483,3 +483,22 @@ export const reactivateSubscription = createServerFn({ method: "POST" })
       return { error: getStripeErrorMessage(error) };
     }
   });
+
+/** Schedule a subscription to cancel at period end (keeps access until then). */
+export const scheduleCancelSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { subscriptionId: string; environment: StripeEnv }) => d)
+  .handler(async ({ data, context }): Promise<OkResult> => {
+    try {
+      const { supabase, userId } = context;
+      const { data: sub } = await supabase
+        .from("subscriptions").select("stripe_subscription_id")
+        .eq("id", data.subscriptionId).eq("fan_id", userId).maybeSingle();
+      if (!sub || !(sub as any).stripe_subscription_id) return { error: "Subscription not found" };
+      const stripe = createStripeClient(data.environment);
+      await stripe.subscriptions.update((sub as any).stripe_subscription_id, { cancel_at_period_end: true });
+      return { ok: true };
+    } catch (error) {
+      return { error: getStripeErrorMessage(error) };
+    }
+  });

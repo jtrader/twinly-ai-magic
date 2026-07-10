@@ -1,22 +1,44 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Heart, UserMinus, ExternalLink, Loader2, Check } from "lucide-react";
+import { Heart, UserMinus, ExternalLink, Loader2, Check, Search, X } from "lucide-react";
 import { listMyFollows, toggleFollow, setFavorite } from "@/lib/follows.functions";
 
-export const Route = createFileRoute("/account/following")({ component: FollowingPage });
+type TabKey = "all" | "favorites" | "following";
+const TABS: TabKey[] = ["all", "favorites", "following"];
+const STORAGE_KEY = "account.following.tab";
+
+export const Route = createFileRoute("/account/following")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    tab: typeof s.tab === "string" && TABS.includes(s.tab as TabKey) ? (s.tab as TabKey) : undefined,
+    q: typeof s.q === "string" ? s.q : undefined,
+  }),
+  component: FollowingPage,
+});
 
 type Row = Awaited<ReturnType<typeof listMyFollows>>[number];
 
 function FollowingPage() {
+  const search = useSearch({ from: "/account/following" }) as { tab?: TabKey; q?: string };
+  const navigate = useNavigate({ from: "/account/following" });
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [unfollowBusy, setUnfollowBusy] = useState<Set<string>>(new Set());
   const [favBusy, setFavBusy] = useState<Set<string>>(new Set());
+  const [tab, setTab] = useState<TabKey>(() => {
+    if (search.tab) return search.tab;
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (stored && TABS.includes(stored as TabKey)) return stored as TabKey;
+    }
+    return "all";
+  });
+  const [query, setQuery] = useState<string>(search.q ?? "");
   const load = useServerFn(listMyFollows);
   const toggle = useServerFn(toggleFollow);
   const favorite = useServerFn(setFavorite);
@@ -30,6 +52,19 @@ function FollowingPage() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Sync tab + search to URL and localStorage.
+  useEffect(() => {
+    try { window.localStorage.setItem(STORAGE_KEY, tab); } catch { /* ignore */ }
+    navigate({
+      search: (prev: any) => ({
+        ...prev,
+        tab: tab === "all" ? undefined : tab,
+        q: query.trim() ? query.trim() : undefined,
+      }),
+      replace: true,
+    });
+  }, [tab, query, navigate]);
+
   const withBusy = (
     set: React.Dispatch<React.SetStateAction<Set<string>>>,
     id: string,
@@ -41,14 +76,31 @@ function FollowingPage() {
   });
 
   async function doUnfollow(creatorId: string) {
-    if (!confirm("Unfollow this creator?")) return;
     // Optimistic: drop the row immediately, restore on error.
     const snapshot = rows;
+    const removed = rows.find((r) => r.creatorId === creatorId);
     setRows((s) => s.filter((r) => r.creatorId !== creatorId));
     withBusy(setUnfollowBusy, creatorId, true);
+    let reverted = false;
     try {
       await toggle({ data: { creatorId, follow: false } });
-      toast.success("Unfollowed");
+      toast.success(`Unfollowed ${removed?.stageName ?? removed?.handle ?? "creator"}`, {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            if (reverted) return;
+            reverted = true;
+            setRows(snapshot);
+            try {
+              await toggle({ data: { creatorId, follow: true, favorite: !!removed?.favorite } });
+              toast.success("Restored");
+            } catch {
+              toast.error("Couldn't undo — please refresh");
+            }
+          },
+        },
+        duration: 6000,
+      });
     } catch (e: any) {
       setRows(snapshot);
       toast.error(e?.message ?? "Couldn't unfollow — try again");
@@ -61,8 +113,25 @@ function FollowingPage() {
     // Optimistic flip so the tabs/counts update instantly.
     setRows((s) => s.map((r) => r.creatorId === creatorId ? { ...r, favorite: next } : r));
     withBusy(setFavBusy, creatorId, true);
+    let reverted = false;
     try {
       await favorite({ data: { creatorId, favorite: next } });
+      toast.success(next ? "Added to favorites" : "Removed from favorites", {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            if (reverted) return;
+            reverted = true;
+            setRows((s) => s.map((r) => r.creatorId === creatorId ? { ...r, favorite: !next } : r));
+            try {
+              await favorite({ data: { creatorId, favorite: !next } });
+            } catch {
+              toast.error("Couldn't undo — please refresh");
+            }
+          },
+        },
+        duration: 5000,
+      });
     } catch (e: any) {
       setRows((s) => s.map((r) => r.creatorId === creatorId ? { ...r, favorite: !next } : r));
       toast.error(e?.message ?? "Couldn't update favorite — try again");
@@ -73,6 +142,19 @@ function FollowingPage() {
 
   const favorites = useMemo(() => rows.filter((r) => r.favorite), [rows]);
   const following = useMemo(() => rows.filter((r) => !r.favorite), [rows]);
+
+  const q = query.trim().toLowerCase();
+  const filterRows = (list: Row[]) =>
+    q.length === 0
+      ? list
+      : list.filter((r) =>
+          (r.stageName ?? "").toLowerCase().includes(q) ||
+          (r.handle ?? "").toLowerCase().includes(q) ||
+          (r.bio ?? "").toLowerCase().includes(q),
+        );
+  const shownAll = filterRows(rows);
+  const shownFavorites = filterRows(favorites);
+  const shownFollowing = filterRows(following);
 
   return (
     <div>
@@ -100,25 +182,49 @@ function FollowingPage() {
       {!loading && rows.length > 0 && (
         <div className="space-y-6">
           <AvatarGrid rows={rows} favBusy={favBusy} onToggleFav={doToggleFav} />
-          <Tabs defaultValue="all" className="w-full">
+
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search your creators by name, handle, or bio…"
+              className="pl-9 pr-9"
+              aria-label="Search creators"
+            />
+            {query.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-surface-elevated"
+                aria-label="Clear search"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+
+          <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="w-full">
             <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:inline-grid">
-              <TabsTrigger value="all">All <span className="ml-1.5 text-xs text-muted-foreground">{rows.length}</span></TabsTrigger>
-              <TabsTrigger value="favorites">Favorites <span className="ml-1.5 text-xs text-muted-foreground">{favorites.length}</span></TabsTrigger>
-              <TabsTrigger value="following">Following <span className="ml-1.5 text-xs text-muted-foreground">{following.length}</span></TabsTrigger>
+              <TabsTrigger value="all">All <span className="ml-1.5 text-xs text-muted-foreground">{q ? `${shownAll.length}/${rows.length}` : rows.length}</span></TabsTrigger>
+              <TabsTrigger value="favorites">Favorites <span className="ml-1.5 text-xs text-muted-foreground">{q ? `${shownFavorites.length}/${favorites.length}` : favorites.length}</span></TabsTrigger>
+              <TabsTrigger value="following">Following <span className="ml-1.5 text-xs text-muted-foreground">{q ? `${shownFollowing.length}/${following.length}` : following.length}</span></TabsTrigger>
             </TabsList>
 
             <TabsContent value="all" className="mt-4">
-              <RowList rows={rows} unfollowBusy={unfollowBusy} favBusy={favBusy} onUnfollow={doUnfollow} onToggleFav={doToggleFav} />
+              {shownAll.length === 0
+                ? <EmptyHint text={q ? `No matches for "${query}".` : "Nothing here yet."} />
+                : <RowList rows={shownAll} unfollowBusy={unfollowBusy} favBusy={favBusy} onUnfollow={doUnfollow} onToggleFav={doToggleFav} />}
             </TabsContent>
             <TabsContent value="favorites" className="mt-4">
-              {favorites.length === 0
+              {shownFavorites.length === 0
                 ? <EmptyHint text="No favorites yet — tap the heart on anyone you follow." />
-                : <RowList rows={favorites} unfollowBusy={unfollowBusy} favBusy={favBusy} onUnfollow={doUnfollow} onToggleFav={doToggleFav} />}
+                : <RowList rows={shownFavorites} unfollowBusy={unfollowBusy} favBusy={favBusy} onUnfollow={doUnfollow} onToggleFav={doToggleFav} />}
             </TabsContent>
             <TabsContent value="following" className="mt-4">
-              {following.length === 0
+              {shownFollowing.length === 0
                 ? <EmptyHint text="Everyone you follow is favorited." />
-                : <RowList rows={following} unfollowBusy={unfollowBusy} favBusy={favBusy} onUnfollow={doUnfollow} onToggleFav={doToggleFav} />}
+                : <RowList rows={shownFollowing} unfollowBusy={unfollowBusy} favBusy={favBusy} onUnfollow={doUnfollow} onToggleFav={doToggleFav} />}
             </TabsContent>
           </Tabs>
         </div>

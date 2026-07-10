@@ -32,6 +32,7 @@ function AccountSetupPage() {
   const [hydrated, setHydrated] = useState(false);
 
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
+  const [initialAvatarPath, setInitialAvatarPath] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
@@ -51,7 +52,10 @@ function AccountSetupPage() {
       params.delete("card");
       const qs = params.toString();
       window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+      return;
     }
+    const s = Number(params.get("step"));
+    if (Number.isFinite(s) && s >= 1 && s <= TOTAL_STEPS) setStep(s);
   }, []);
 
   useEffect(() => {
@@ -60,6 +64,7 @@ function AccountSetupPage() {
       const p = r.profile;
       if (p) {
         setAvatarPath(p.avatar_url ?? null);
+        setInitialAvatarPath(p.avatar_url ?? null);
         setDisplayName(p.display_name ?? "");
         setFullName(p.full_name ?? "");
         setBio(p.bio ?? "");
@@ -68,6 +73,13 @@ function AccountSetupPage() {
       setHydrated(true);
     }).catch(() => setHydrated(true));
   }, [user, load]);
+
+  const avatarState: "unchanged-empty" | "unchanged" | "uploaded" | "replaced" | "removed" = (() => {
+    if (initialAvatarPath === avatarPath) return avatarPath ? "unchanged" : "unchanged-empty";
+    if (!initialAvatarPath && avatarPath) return "uploaded";
+    if (initialAvatarPath && !avatarPath) return "removed";
+    return "replaced";
+  })();
 
   async function handleAvatarPick(file: File) {
     if (!user) return;
@@ -211,6 +223,7 @@ function AccountSetupPage() {
                   </Button>
                 )}
               </div>
+              <AvatarStatePill state={avatarState} />
               <p className="text-xs text-muted-foreground">PNG, JPG, WebP or GIF · max 5 MB</p>
               {!avatarPath && (
                 <p className="text-xs text-muted-foreground">A profile picture is required to continue.</p>
@@ -269,6 +282,23 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
       <div className="mt-2">{children}</div>
     </div>
+  );
+}
+
+function AvatarStatePill({ state }: { state: "unchanged-empty" | "unchanged" | "uploaded" | "replaced" | "removed" }) {
+  const meta: Record<typeof state, { label: string; className: string } | null> = {
+    "unchanged-empty": null,
+    "unchanged": { label: "Current avatar", className: "bg-surface-elevated text-muted-foreground border-border" },
+    "uploaded": { label: "New avatar uploaded — remember to Continue to keep it", className: "bg-emerald-500/15 text-emerald-300 border-emerald-400/30" },
+    "replaced": { label: "Avatar replaced — remember to Continue to keep it", className: "bg-brand/15 text-brand-glow border-brand-glow/30" },
+    "removed": { label: "Avatar removed — add one to continue", className: "bg-amber-500/15 text-amber-300 border-amber-400/30" },
+  };
+  const m = meta[state];
+  if (!m) return null;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium ${m.className}`}>
+      {m.label}
+    </span>
   );
 }
 

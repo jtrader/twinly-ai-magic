@@ -60,6 +60,17 @@ function ProfileSection() {
   if (loadingProfile) return null;
   const complete = !!profile?.profile_completed_at;
 
+  // Compute what's still missing so the resume CTA shows an accurate step.
+  const steps = [
+    { key: "avatar", label: "Profile picture", done: !!profile?.avatar_url },
+    { key: "name", label: "Display name", done: !!(profile?.display_name && profile.display_name.trim().length >= 2) },
+    { key: "bio", label: "Bio & country (optional)", done: !!(profile?.bio || profile?.country) },
+    { key: "payment", label: "Payment method (optional)", done: complete },
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+  const nextStep = steps.findIndex((s) => !s.done) + 1;
+  const percent = complete ? 100 : Math.round((doneCount / steps.length) * 100);
+
   return (
     <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
       <div className="flex items-start gap-4">
@@ -95,10 +106,41 @@ function ProfileSection() {
         </Button>
       </div>
       {!complete && (
-        <p className="mt-4 rounded-lg bg-brand/10 px-3 py-2 text-xs text-brand-glow">
-          Finish setting up your profile — add a picture, name, bio, and payment method — so
-          creators and subscriptions work smoothly.
-        </p>
+        <div className="mt-4 rounded-lg border border-brand/20 bg-brand/10 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs font-semibold text-brand-glow">
+              Profile setup · {doneCount} of {steps.length} done
+            </div>
+            <Button asChild size="sm" variant="default">
+              <Link
+                to="/account/setup"
+                search={{ step: nextStep > 0 ? nextStep : 1 } as any}
+              >
+                Resume setup →
+              </Link>
+            </Button>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/30">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-brand via-brand-glow to-ai transition-all"
+              style={{ width: `${percent}%` }}
+              aria-hidden
+            />
+          </div>
+          <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {steps.map((s) => (
+              <li key={s.key} className="flex items-center gap-2 text-[11px]">
+                <span className={
+                  "inline-flex size-4 items-center justify-center rounded-full border text-[9px] font-bold " +
+                  (s.done ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-300" : "border-border bg-surface text-muted-foreground")
+                }>
+                  {s.done ? "✓" : ""}
+                </span>
+                <span className={s.done ? "text-muted-foreground line-through" : "text-foreground"}>{s.label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
