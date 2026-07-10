@@ -25,6 +25,7 @@ import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
 import { Route as StudioPacksRouteImport } from './routes/studio.packs'
 import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
 import { Route as StudioGenerateRouteImport } from './routes/studio.generate'
+import { Route as StudioFlagsRouteImport } from './routes/studio.flags'
 import { Route as StudioEscalationsRouteImport } from './routes/studio.escalations'
 import { Route as StudioCreateRouteImport } from './routes/studio.create'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
@@ -125,6 +126,11 @@ const StudioInboxRoute = StudioInboxRouteImport.update({
 const StudioGenerateRoute = StudioGenerateRouteImport.update({
   id: '/studio/generate',
   path: '/studio/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioFlagsRoute = StudioFlagsRouteImport.update({
+  id: '/studio/flags',
+  path: '/studio/flags',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioEscalationsRoute = StudioEscalationsRouteImport.update({
@@ -259,6 +265,7 @@ export interface FileRoutesByFullPath {
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/escalations': typeof StudioEscalationsRoute
+  '/studio/flags': typeof StudioFlagsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -298,6 +305,7 @@ export interface FileRoutesByTo {
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/escalations': typeof StudioEscalationsRoute
+  '/studio/flags': typeof StudioFlagsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -338,6 +346,7 @@ export interface FileRoutesById {
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/escalations': typeof StudioEscalationsRoute
+  '/studio/flags': typeof StudioFlagsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -379,6 +388,7 @@ export interface FileRouteTypes {
     | '/studio/content'
     | '/studio/create'
     | '/studio/escalations'
+    | '/studio/flags'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -418,6 +428,7 @@ export interface FileRouteTypes {
     | '/studio/content'
     | '/studio/create'
     | '/studio/escalations'
+    | '/studio/flags'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -457,6 +468,7 @@ export interface FileRouteTypes {
     | '/studio/content'
     | '/studio/create'
     | '/studio/escalations'
+    | '/studio/flags'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -495,6 +507,7 @@ export interface RootRouteChildren {
   StudioContentRoute: typeof StudioContentRoute
   StudioCreateRoute: typeof StudioCreateRoute
   StudioEscalationsRoute: typeof StudioEscalationsRoute
+  StudioFlagsRoute: typeof StudioFlagsRoute
   StudioGenerateRoute: typeof StudioGenerateRoute
   StudioInboxRoute: typeof StudioInboxRoute
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
@@ -621,6 +634,13 @@ declare module '@tanstack/react-router' {
       path: '/studio/generate'
       fullPath: '/studio/generate'
       preLoaderRoute: typeof StudioGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/flags': {
+      id: '/studio/flags'
+      path: '/studio/flags'
+      fullPath: '/studio/flags'
+      preLoaderRoute: typeof StudioFlagsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/studio/escalations': {
@@ -839,6 +859,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioContentRoute: StudioContentRoute,
   StudioCreateRoute: StudioCreateRoute,
   StudioEscalationsRoute: StudioEscalationsRoute,
+  StudioFlagsRoute: StudioFlagsRoute,
   StudioGenerateRoute: StudioGenerateRoute,
   StudioInboxRoute: StudioInboxRoute,
   StudioPacksRoute: StudioPacksRouteWithChildren,
