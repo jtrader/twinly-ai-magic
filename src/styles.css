@@ -151,12 +151,49 @@
     var(--brand-glow) 55%,
     var(--ai) 100%
   );
+
+  /* ----- Indigo → glow → AI palette stops (single source of truth) ----- */
+  /* Reference these instead of re-declaring gradient stops in components.  */
+  --brand-stop-0: var(--brand);           /* indigo core                    */
+  --brand-stop-1: var(--brand-glow);      /* glow midpoint                  */
+  --brand-stop-2: var(--ai);              /* AI persona endpoint            */
+
+  /* Alpha-mixed accents (use for surfaces, borders, rings, overlays) */
+  --brand-tint-soft:   color-mix(in oklab, var(--brand) 12%, transparent);
+  --brand-tint-medium: color-mix(in oklab, var(--brand) 28%, transparent);
+  --brand-tint-strong: color-mix(in oklab, var(--brand) 55%, transparent);
+  --glow-tint-soft:    color-mix(in oklab, var(--brand-glow) 25%, transparent);
+  --glow-tint-medium:  color-mix(in oklab, var(--brand-glow) 45%, transparent);
+  --glow-tint-strong:  color-mix(in oklab, var(--brand-glow) 65%, transparent);
+
+  /* Alternate gradients derived from the same stops */
+  --gradient-brand-soft: linear-gradient(
+    135deg,
+    var(--brand-tint-medium) 0%,
+    var(--glow-tint-medium) 100%
+  );
+  --gradient-brand-radial: radial-gradient(
+    circle at 50% 0%,
+    var(--glow-tint-strong) 0%,
+    transparent 70%
+  );
+
+  /* ----- Glow intensity scale (drop-shadow + halo pairs) ----------------- */
+  --shadow-brand-glow-sm:
+    0 4px 12px -6px var(--brand-tint-strong),
+    0 0 12px -4px var(--glow-tint-medium);
   --shadow-brand-glow:
-    0 10px 30px -12px color-mix(in oklab, var(--brand) 55%, transparent),
-    0 0 24px -6px color-mix(in oklab, var(--brand-glow) 55%, transparent);
+    0 10px 30px -12px var(--brand-tint-strong),
+    0 0 24px -6px var(--glow-tint-strong);
   --shadow-brand-glow-strong:
     0 18px 45px -14px color-mix(in oklab, var(--brand) 70%, transparent),
-    0 0 40px -4px color-mix(in oklab, var(--brand-glow) 65%, transparent);
+    0 0 40px -4px var(--glow-tint-strong);
+  --shadow-brand-glow-xl:
+    0 28px 60px -16px color-mix(in oklab, var(--brand) 80%, transparent),
+    0 0 64px 0 color-mix(in oklab, var(--brand-glow) 75%, transparent);
+
+  /* Focus ring reused across interactive elements */
+  --ring-brand: 0 0 0 2px var(--background), 0 0 0 4px var(--brand-tint-strong);
 }
 
 @keyframes twinly-aurora-drift {
