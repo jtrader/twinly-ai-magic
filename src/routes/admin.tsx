@@ -503,6 +503,78 @@ function AdminPage() {
         </div>
       )}
 
+      {tab === "creators" && (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100">
+            <span className="font-semibold">Impersonation:</span> Sign in as any creator to access their studio, personas, content, and payouts. Your admin session is replaced in this tab — use the return banner to bounce back.
+          </div>
+          {allCreators && (
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-surface-elevated text-left text-xs uppercase tracking-widest text-muted-foreground">
+                  <tr><th className="px-4 py-2">Creator</th><th className="px-4 py-2">Email</th><th className="px-4 py-2">Status</th><th className="px-4 py-2 text-right">Actions</th></tr>
+                </thead>
+                <tbody>
+                  {allCreators.creators.map((c: any) => (
+                    <tr key={c.id} className="border-b border-border/50">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {c.avatar_url && <img src={c.avatar_url} alt="" className="size-9 rounded-full object-cover" />}
+                          <div className="min-w-0">
+                            <Link to="/creators/$handle" params={{ handle: c.handle }} className="font-semibold hover:text-brand-glow">{c.stage_name}</Link>
+                            <div className="text-xs text-muted-foreground">@{c.handle}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">{allCreators.emails[c.id] ?? "—"}</td>
+                      <td className="px-4 py-3"><Pill value={c.verification_status} /></td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="outline" disabled={busy === c.id || !c.user_id} onClick={() => signInAs(c.id, c.handle)}>
+                          {busy === c.id ? "Minting…" : "Sign in as"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {allCreators.creators.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No creators yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "agencies" && (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100">
+            <span className="font-semibold">Impersonation:</span> Sign in as any agency owner to access their dashboard and managed creators.
+          </div>
+          {allAgencies && (
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-surface-elevated text-left text-xs uppercase tracking-widest text-muted-foreground">
+                  <tr><th className="px-4 py-2">Agency</th><th className="px-4 py-2">Owner email</th><th className="px-4 py-2">Creators</th><th className="px-4 py-2 text-right">Actions</th></tr>
+                </thead>
+                <tbody>
+                  {allAgencies.agencies.map((a: any) => (
+                    <tr key={a.id} className="border-b border-border/50">
+                      <td className="px-4 py-3 font-semibold">{a.name}</td>
+                      <td className="px-4 py-3 font-mono text-xs">{a.owner_email ?? "—"}</td>
+                      <td className="px-4 py-3">{a.creator_count}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="outline" disabled={busy === a.owner_user_id || !a.owner_user_id} onClick={() => signInAsAgencyOwner(a.owner_user_id, a.name)}>
+                          {busy === a.owner_user_id ? "Minting…" : "Sign in as owner"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {allAgencies.agencies.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No agencies yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {tab === "settings" && (
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-surface p-4">
