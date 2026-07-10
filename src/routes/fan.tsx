@@ -92,6 +92,17 @@ function FanDashboard() {
         <Stat label="Followed creators" value={follows.length} />
       </div>
 
+      <section className="mb-8">
+        <SectionHead icon={<Rss className="size-4 text-brand-glow" />} title="Posts from creators you follow" />
+        <PostFeed
+          posts={posts}
+          emptyText={follows.length === 0
+            ? "Follow creators to see their posts here."
+            : "Nothing new yet. Check back soon."}
+          onChanged={refreshPosts}
+        />
+      </section>
+
       <section className="mb-6">
         <SectionHead icon={<Heart className="size-4 text-brand-glow" />} title="Your feed" />
         {feed.length === 0 ? (
