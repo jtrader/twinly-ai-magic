@@ -4,6 +4,7 @@ import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, Lo
 import { cn } from "@/lib/utils";
 import { ImpersonationBanner } from "@/components/twinly/ImpersonationBanner";
 import { NotificationBell } from "@/components/twinly/NotificationBell";
+import { PaymentTestModeBanner } from "@/components/twinly/PaymentTestModeBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
 import {
@@ -19,6 +20,7 @@ import { useNavigate } from "@tanstack/react-router";
 export function AppShell({ children, mobileNav = true }: { children: ReactNode; mobileNav?: boolean }) {
   return (
     <div className="min-h-screen bg-background">
+      <PaymentTestModeBanner />
       <TopBar />
       <ImpersonationBanner />
       <main className={cn("mx-auto max-w-6xl px-4 pb-24 pt-4 md:pt-8", mobileNav && "pb-24")}>{children}</main>
