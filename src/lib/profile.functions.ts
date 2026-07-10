@@ -5,14 +5,20 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const getMyProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, display_name, full_name, bio, avatar_url, country, handle, profile_completed_at, created_at")
-      .eq("id", userId)
-      .maybeSingle();
+    const { supabase } = context;
+    // Sensitive columns aren't exposed via table-level SELECT anymore;
+    // use the security-definer helper which returns the caller's own row only.
+    const { data, error } = await (supabase as any).rpc("get_my_profile");
     if (error) throw new Error(error.message);
-    return { profile: data };
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return { profile: null };
+    const {
+      id, display_name, full_name, bio, avatar_url, country, handle,
+      profile_completed_at, created_at,
+    } = row;
+    return {
+      profile: { id, display_name, full_name, bio, avatar_url, country, handle, profile_completed_at, created_at },
+    };
   });
 
 const UpdateSchema = z.object({

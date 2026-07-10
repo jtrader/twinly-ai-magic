@@ -22,11 +22,8 @@ function AuthPage() {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return;
       const uid = data.session.user.id;
-      const { data: p } = await supabase
-        .from("profiles")
-        .select("profile_completed_at")
-        .eq("id", uid)
-        .maybeSingle();
+      const { data: rows } = await (supabase as any).rpc("get_my_profile_status");
+      const p = Array.isArray(rows) ? rows[0] : rows;
       const dest = !p || !p.profile_completed_at ? "/account/setup" : redirectTarget;
       navigate({ to: dest as any });
     });
