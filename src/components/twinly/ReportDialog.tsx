@@ -44,6 +44,8 @@ export function ReportDialog({
   const [loadingReports, setLoadingReports] = useState(false);
   const submit = useServerFn(reportSubject);
   const list = useServerFn(listMyReports);
+  const { user, loading } = useSession();
+
 
   async function refresh() {
     if (!targetId) { setReports([]); return; }
