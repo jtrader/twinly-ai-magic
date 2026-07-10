@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
-import { Sparkles, MessageCircle, ShieldCheck, Compass, Heart } from "lucide-react";
+import { Sparkles, MessageCircle, ShieldCheck, Compass, Heart, Rss } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyFeed, listMyFollows } from "@/lib/follows.functions";
+import { PostFeed } from "@/components/twinly/PostFeed";
+import { getHomeFeed } from "@/lib/posts.functions";
 
 export const Route = createFileRoute("/fan")({
   component: FanDashboard,
@@ -28,8 +30,10 @@ function FanDashboard() {
   const [ready, setReady] = useState(false);
   const [feed, setFeed] = useState<any[]>([]);
   const [follows, setFollows] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const loadFeed = useServerFn(getMyFeed);
   const loadFollows = useServerFn(listMyFollows);
+  const loadPosts = useServerFn(getHomeFeed);
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
@@ -49,13 +53,25 @@ function FanDashboard() {
       setConvos(c ?? []);
       setProfile(p ?? null);
       try {
-        const [f, fol] = await Promise.all([loadFeed({}), loadFollows({})]);
+        const [f, fol, ps] = await Promise.all([
+          loadFeed({}),
+          loadFollows({}),
+          loadPosts({ data: {} }).catch(() => ({ items: [] })),
+        ]);
         setFeed(f.items ?? []);
         setFollows(fol ?? []);
+        setPosts(ps.items ?? []);
       } catch {}
       setReady(true);
     })();
   }, [user]);
+
+  const refreshPosts = async () => {
+    try {
+      const ps = await loadPosts({ data: {} });
+      setPosts(ps.items ?? []);
+    } catch {}
+  };
 
   if (loading || !ready) {
     return <AppShell><div className="py-20 text-center text-muted-foreground">Loading…</div></AppShell>;
