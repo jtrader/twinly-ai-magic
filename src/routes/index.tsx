@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AgeGateDialog } from "@/components/twinly/AgeGateDialog";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
@@ -181,40 +182,109 @@ function TrustStrip() {
 
 function PersonaGrid() {
   const items = [
-    { name: "Real Me", kind: "real_me" as const, blurb: "Direct with the verified creator. No AI in the loop.", image: personaRealMe.url, alt: "Real Me persona portrait — natural daylight, no filter" },
-    { name: "Nice AI", kind: "ai" as const, blurb: "Warm, playful, safe-for-work AI persona.", image: personaNiceAi.url, alt: "Nice AI persona portrait — pastel aura, warm smile" },
-    { name: "Naughty AI", kind: "ai" as const, blurb: "Flirty AI persona with clear boundaries.", image: personaNaughtyAi.url, alt: "Naughty AI persona portrait — magenta neon, flirty smirk" },
-    { name: "Wicked AI", kind: "ai" as const, blurb: "Adults-only AI persona for VIPs.", image: personaWickedAi.url, alt: "Wicked AI persona portrait — crimson and violet noir lighting" },
-    { name: "Custom", kind: "ai" as const, blurb: "Creators can spin up unlimited themed personas — VIP Fantasy, After Dark, XNurse and more.", image: personaCustom.url, alt: "Custom persona portrait — kaleidoscopic prism lighting" },
+    {
+      name: "Real Me",
+      kind: "real_me" as const,
+      tagline: "The verified creator, unfiltered.",
+      blurb: "Every message is typed by the real, verified person. No AI ghostwriting, no auto-replies — just direct conversation with the creator themselves.",
+      image: personaRealMe.url,
+      alt: "Real Me persona portrait — natural daylight, no filter",
+    },
+    {
+      name: "Nice AI",
+      kind: "ai" as const,
+      tagline: "Warm, playful, safe-for-work.",
+      blurb: "A friendly AI companion for daily chats, hype and encouragement. Clearly disclosed as AI, tuned for comfort and always inside safe-for-work limits.",
+      image: personaNiceAi.url,
+      alt: "Nice AI persona portrait — pastel aura, warm smile",
+    },
+    {
+      name: "Naughty AI",
+      kind: "ai" as const,
+      tagline: "Flirty, with clear boundaries.",
+      blurb: "A playful, flirty AI persona for suggestive chat. Consent-first and rule-bound — the creator sets exactly what it will and won't say.",
+      image: personaNaughtyAi.url,
+      alt: "Naughty AI persona portrait — magenta neon, flirty smirk",
+    },
+    {
+      name: "Wicked AI",
+      kind: "ai" as const,
+      tagline: "Adults-only, VIP-gated.",
+      blurb: "The 18+ tier for verified VIP fans. Age-gated, paywalled and creator-controlled, with per-persona rules and full moderation trail.",
+      image: personaWickedAi.url,
+      alt: "Wicked AI persona portrait — crimson and violet noir lighting",
+    },
+    {
+      name: "Custom",
+      kind: "ai" as const,
+      tagline: "Unlimited themed personas.",
+      blurb: "Spin up any character — VIP Fantasy, After Dark, XNurse, cosplay drops. Each persona gets its own tone, pricing, vault and visibility.",
+      image: personaCustom.url,
+      alt: "Custom persona portrait — kaleidoscopic prism lighting",
+    },
   ];
+  const [selected, setSelected] = useState<string>(items[0].name);
   return (
     <section className="mx-auto max-w-5xl px-4 py-16">
       <div className="mb-8 flex items-end justify-between gap-4">
         <div>
           <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Persona system</div>
           <h2 className="mt-2 font-display text-3xl font-bold tracking-tight md:text-4xl">One creator. Many disclosed personas.</h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Tap a persona to see how it shows up to fans.</p>
         </div>
       </div>
-      <div className="mx-auto grid max-w-4xl grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
-        {items.map((p) => (
-          <div key={p.name} className="overflow-hidden rounded-2xl border border-border bg-surface">
-            <div className="aspect-[4/5] w-full overflow-hidden bg-black/40">
-              <img
-                src={p.image}
-                alt={p.alt}
-                loading="lazy"
-                className="h-full w-full object-cover"
-              />
-            </div>
-            <div className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="font-display text-lg font-semibold">{p.name}</div>
-                <PersonaBadge kind={p.kind} />
+      <div className="mx-auto grid max-w-4xl grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
+        {items.map((p) => {
+          const isSelected = selected === p.name;
+          return (
+            <button
+              key={p.name}
+              type="button"
+              onClick={() => setSelected(p.name)}
+              aria-pressed={isSelected}
+              className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-surface text-left transition-all duration-300 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-glow ${
+                isSelected
+                  ? "-translate-y-0.5 border-brand-glow shadow-[0_0_0_1px_rgb(var(--brand-glow-rgb,168_85_247)/0.6),0_20px_40px_-20px_rgb(168_85_247/0.4)]"
+                  : "border-border hover:-translate-y-0.5 hover:border-brand-glow/60 hover:shadow-lg"
+              }`}
+            >
+              <div className="relative aspect-[4/5] w-full overflow-hidden bg-black/40">
+                <img
+                  src={p.image}
+                  alt={p.alt}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+                />
+                <div
+                  className={`pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent transition-opacity duration-300 ${
+                    isSelected ? "opacity-100" : "opacity-70 group-hover:opacity-90"
+                  }`}
+                />
+                <div className="absolute left-2 top-2">
+                  <PersonaBadge kind={p.kind} />
+                </div>
+                {isSelected && (
+                  <div className="absolute right-2 top-2 rounded-full bg-brand-glow px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-black">
+                    Selected
+                  </div>
+                )}
+                <div className="absolute inset-x-0 bottom-0 p-3">
+                  <div className="font-display text-sm font-semibold text-white drop-shadow">{p.name}</div>
+                  <div className="mt-0.5 text-[11px] text-white/80">{p.tagline}</div>
+                </div>
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">{p.blurb}</p>
-            </div>
-          </div>
-        ))}
+              <div
+                className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+                  isSelected ? "grid-rows-[1fr]" : "grid-rows-[0fr] group-hover:grid-rows-[1fr]"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <p className="px-3 pb-3 pt-3 text-xs leading-relaxed text-muted-foreground">{p.blurb}</p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
       </div>
       <p className="mt-6 text-xs text-muted-foreground">Default names are examples only. Creators define the persona catalog — names, tone, rules, pricing, visibility, and lifecycle.</p>
     </section>
