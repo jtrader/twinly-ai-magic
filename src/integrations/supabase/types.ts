@@ -449,6 +449,103 @@ export type Database = {
           },
         ]
       }
+      conversation_flags: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          creator_id: string
+          flagged_by: string
+          handoff_conversation_id: string | null
+          id: string
+          message_id: string | null
+          note: string | null
+          persona_id: string
+          reason: Database["public"]["Enums"]["conversation_flag_reason"]
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: Database["public"]["Enums"]["conversation_flag_status"]
+          updated_at: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          creator_id: string
+          flagged_by: string
+          handoff_conversation_id?: string | null
+          id?: string
+          message_id?: string | null
+          note?: string | null
+          persona_id: string
+          reason: Database["public"]["Enums"]["conversation_flag_reason"]
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["conversation_flag_status"]
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          creator_id?: string
+          flagged_by?: string
+          handoff_conversation_id?: string | null
+          id?: string
+          message_id?: string | null
+          note?: string | null
+          persona_id?: string
+          reason?: Database["public"]["Enums"]["conversation_flag_reason"]
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["conversation_flag_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_flags_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_flags_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_flags_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_flags_handoff_conversation_id_fkey"
+            columns: ["handoff_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_flags_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_flags_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           creator_id: string
@@ -1492,6 +1589,17 @@ export type Database = {
       asset_type: "image" | "video" | "audio" | "text"
       asset_visibility: "private" | "subscribers" | "vip" | "ppv" | "public"
       consent_status: "n_a" | "on_file" | "missing"
+      conversation_flag_reason:
+        | "off_tone"
+        | "inaccurate"
+        | "uncomfortable"
+        | "wants_human"
+        | "other"
+      conversation_flag_status:
+        | "open"
+        | "acknowledged"
+        | "handed_off"
+        | "dismissed"
       generation_output_type:
         | "image"
         | "audio"
@@ -1661,6 +1769,19 @@ export const Constants = {
       asset_type: ["image", "video", "audio", "text"],
       asset_visibility: ["private", "subscribers", "vip", "ppv", "public"],
       consent_status: ["n_a", "on_file", "missing"],
+      conversation_flag_reason: [
+        "off_tone",
+        "inaccurate",
+        "uncomfortable",
+        "wants_human",
+        "other",
+      ],
+      conversation_flag_status: [
+        "open",
+        "acknowledged",
+        "handed_off",
+        "dismissed",
+      ],
       generation_output_type: [
         "image",
         "audio",

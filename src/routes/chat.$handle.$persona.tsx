@@ -7,6 +7,7 @@ import { PersonaBadge } from "@/components/twinly/PersonaBadge";
 import { ReportDialog } from "@/components/twinly/ReportDialog";
 import { BlockButton } from "@/components/twinly/BlockButton";
 import { RequestRealMeButton } from "@/components/twinly/RequestRealMeButton";
+import { FlagConversationButton } from "@/components/twinly/FlagConversationButton";
 import { PersonaMemoryPanel } from "@/components/twinly/PersonaMemoryPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,6 +170,9 @@ function ChatPage() {
             {persona.kind === "ai" && (
               <RequestRealMeButton creatorHandle={creator.handle} personaSlug={persona.slug} />
             )}
+            {persona.kind === "ai" && authed && (
+              <FlagConversationButton conversationId={conversationId} />
+            )}
             <ReportDialog targetType="persona" targetId={persona.id} label="Report" />
             <BlockButton targetType="creator" targetId={creator.id} />
           </div>
@@ -242,6 +246,11 @@ function ChatPage() {
                   />
                 ) : (
                   <div className="whitespace-pre-wrap">{m.body}</div>
+                )}
+                {m.sender_type === "ai" && persona.kind === "ai" && authed && conversationId && (
+                  <div className="mt-1.5 flex justify-end">
+                    <FlagConversationButton conversationId={conversationId} messageId={m.id} compact />
+                  </div>
                 )}
               </div>
             </div>

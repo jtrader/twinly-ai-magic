@@ -25,6 +25,7 @@ import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
 import { Route as StudioPacksRouteImport } from './routes/studio.packs'
 import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
 import { Route as StudioGenerateRouteImport } from './routes/studio.generate'
+import { Route as StudioFlagsRouteImport } from './routes/studio.flags'
 import { Route as StudioEscalationsRouteImport } from './routes/studio.escalations'
 import { Route as StudioCreateRouteImport } from './routes/studio.create'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
@@ -36,6 +37,7 @@ import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
 import { Route as FanUnlocksRouteImport } from './routes/fan.unlocks'
+import { Route as FanFlagsRouteImport } from './routes/fan.flags'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
@@ -127,6 +129,11 @@ const StudioGenerateRoute = StudioGenerateRouteImport.update({
   path: '/studio/generate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioFlagsRoute = StudioFlagsRouteImport.update({
+  id: '/studio/flags',
+  path: '/studio/flags',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioEscalationsRoute = StudioEscalationsRouteImport.update({
   id: '/studio/escalations',
   path: '/studio/escalations',
@@ -180,6 +187,11 @@ const LegalAiDisclosureRoute = LegalAiDisclosureRouteImport.update({
 const FanUnlocksRoute = FanUnlocksRouteImport.update({
   id: '/unlocks',
   path: '/unlocks',
+  getParentRoute: () => FanRoute,
+} as any)
+const FanFlagsRoute = FanFlagsRouteImport.update({
+  id: '/flags',
+  path: '/flags',
   getParentRoute: () => FanRoute,
 } as any)
 const CreatorsHandleRoute = CreatorsHandleRouteImport.update({
@@ -248,6 +260,7 @@ export interface FileRoutesByFullPath {
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
+  '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -259,6 +272,7 @@ export interface FileRoutesByFullPath {
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/escalations': typeof StudioEscalationsRoute
+  '/studio/flags': typeof StudioFlagsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -287,6 +301,7 @@ export interface FileRoutesByTo {
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
+  '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -298,6 +313,7 @@ export interface FileRoutesByTo {
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/escalations': typeof StudioEscalationsRoute
+  '/studio/flags': typeof StudioFlagsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -327,6 +343,7 @@ export interface FileRoutesById {
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
+  '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -338,6 +355,7 @@ export interface FileRoutesById {
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/escalations': typeof StudioEscalationsRoute
+  '/studio/flags': typeof StudioFlagsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
@@ -368,6 +386,7 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
+    | '/fan/flags'
     | '/fan/unlocks'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -379,6 +398,7 @@ export interface FileRouteTypes {
     | '/studio/content'
     | '/studio/create'
     | '/studio/escalations'
+    | '/studio/flags'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -407,6 +427,7 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
+    | '/fan/flags'
     | '/fan/unlocks'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -418,6 +439,7 @@ export interface FileRouteTypes {
     | '/studio/content'
     | '/studio/create'
     | '/studio/escalations'
+    | '/studio/flags'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -446,6 +468,7 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
+    | '/fan/flags'
     | '/fan/unlocks'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -457,6 +480,7 @@ export interface FileRouteTypes {
     | '/studio/content'
     | '/studio/create'
     | '/studio/escalations'
+    | '/studio/flags'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
@@ -495,6 +519,7 @@ export interface RootRouteChildren {
   StudioContentRoute: typeof StudioContentRoute
   StudioCreateRoute: typeof StudioCreateRoute
   StudioEscalationsRoute: typeof StudioEscalationsRoute
+  StudioFlagsRoute: typeof StudioFlagsRoute
   StudioGenerateRoute: typeof StudioGenerateRoute
   StudioInboxRoute: typeof StudioInboxRoute
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
@@ -623,6 +648,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioGenerateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/flags': {
+      id: '/studio/flags'
+      path: '/studio/flags'
+      fullPath: '/studio/flags'
+      preLoaderRoute: typeof StudioFlagsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/escalations': {
       id: '/studio/escalations'
       path: '/studio/escalations'
@@ -698,6 +730,13 @@ declare module '@tanstack/react-router' {
       path: '/unlocks'
       fullPath: '/fan/unlocks'
       preLoaderRoute: typeof FanUnlocksRouteImport
+      parentRoute: typeof FanRoute
+    }
+    '/fan/flags': {
+      id: '/fan/flags'
+      path: '/flags'
+      fullPath: '/fan/flags'
+      preLoaderRoute: typeof FanFlagsRouteImport
       parentRoute: typeof FanRoute
     }
     '/creators/$handle': {
@@ -784,10 +823,12 @@ const AuthRouteChildren: AuthRouteChildren = {
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface FanRouteChildren {
+  FanFlagsRoute: typeof FanFlagsRoute
   FanUnlocksRoute: typeof FanUnlocksRoute
 }
 
 const FanRouteChildren: FanRouteChildren = {
+  FanFlagsRoute: FanFlagsRoute,
   FanUnlocksRoute: FanUnlocksRoute,
 }
 
@@ -839,6 +880,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioContentRoute: StudioContentRoute,
   StudioCreateRoute: StudioCreateRoute,
   StudioEscalationsRoute: StudioEscalationsRoute,
+  StudioFlagsRoute: StudioFlagsRoute,
   StudioGenerateRoute: StudioGenerateRoute,
   StudioInboxRoute: StudioInboxRoute,
   StudioPacksRoute: StudioPacksRouteWithChildren,
