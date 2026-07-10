@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { createServerFn, useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/twinly/AppShell";
@@ -7,7 +7,7 @@ import { AiDisclosureBanner } from "@/components/twinly/AiDisclosureBanner";
 import { ReportDialog } from "@/components/twinly/ReportDialog";
 import { BlockButton } from "@/components/twinly/BlockButton";
 import { FollowButton } from "@/components/twinly/FollowButton";
-import { ShieldCheck, Rss } from "lucide-react";
+import { ShieldCheck, Rss, Sparkles } from "lucide-react";
 import { PostComposer, PostFeed } from "@/components/twinly/PostFeed";
 import { getCreatorPosts } from "@/lib/posts.functions";
 import { useSession } from "@/lib/session";
@@ -48,6 +48,7 @@ function CreatorProfile() {
   const avatarUrl = profile?.avatar_url ?? null;
   const { user } = useSession();
   const isOwner = !!user && user.id === creator.user_id;
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<any[]>([]);
   const loadPosts = useServerFn(getCreatorPosts);
   const refreshPosts = async () => {
@@ -96,28 +97,7 @@ function CreatorProfile() {
         )}
       </div>
       <AiDisclosureBanner kind="ai" label="This creator uses official AI personas. All AI chats are clearly labeled." className="mb-6" />
-      <h2 className="mb-3 font-display text-xl font-semibold">Choose your experience</h2>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {visible.map((p) => (
-          <PersonaCard
-            key={p.id}
-            id={p.id}
-            slug={p.slug}
-            displayName={p.display_name}
-            description={p.description}
-            kind={p.kind}
-            disclosureLabel={p.disclosure_label}
-            priceCents={p.price_cents ?? 0}
-            avatarUrl={p.cover_url}
-            href={`/creators/${creator.handle}/${p.slug}`}
-          />
-        ))}
-      </div>
-      <p className="mt-6 text-xs text-muted-foreground">
-        <Link to="/legal/ai-disclosure" className="underline">Learn how AI personas work →</Link>
-      </p>
-
-      <section className="mt-10">
+      <section className="mb-10">
         <div className="mb-3 flex items-center gap-2">
           <Rss className="size-4 text-brand-glow" />
           <h2 className="font-display text-xl font-semibold">Latest from {creator.stage_name}</h2>
@@ -135,6 +115,36 @@ function CreatorProfile() {
           onChanged={refreshPosts}
         />
       </section>
+
+      <div className="mb-3 flex items-center gap-2">
+        <Sparkles className="size-4 text-brand-glow" />
+        <h2 className="font-display text-xl font-semibold">Choose your experience</h2>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {visible.map((p) => {
+          const target = `/creators/${creator.handle}/${p.slug}`;
+          const cardProps = user
+            ? { href: target }
+            : { onClick: () => navigate({ to: "/auth", search: { redirect: target } as any }) };
+          return (
+            <PersonaCard
+              key={p.id}
+              id={p.id}
+              slug={p.slug}
+              displayName={p.display_name}
+              description={p.description}
+              kind={p.kind}
+              disclosureLabel={p.disclosure_label}
+              priceCents={p.price_cents ?? 0}
+              avatarUrl={p.cover_url}
+              {...cardProps}
+            />
+          );
+        })}
+      </div>
+      <p className="mt-6 text-xs text-muted-foreground">
+        <Link to="/legal/ai-disclosure" className="underline">Learn how AI personas work →</Link>
+      </p>
     </AppShell>
   );
 }
