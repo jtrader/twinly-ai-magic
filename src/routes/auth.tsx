@@ -24,8 +24,7 @@ function AuthPage() {
     });
   }, [navigate]);
 
-  // Fire-and-forget: ensure the support admin account exists before any
-  // OAuth (esp. Microsoft) attempt. Idempotent + safe to call repeatedly.
+  // Fire-and-forget: ensure the support admin account exists before any OAuth attempt.
   useEffect(() => {
     const KEY = "twinly:supportAdminBootstrapped";
     if (typeof window === "undefined") return;
