@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Camera, User as UserIcon, Loader2, CreditCard, Wallet, Check, Trash2, ExternalLink } from "lucide-react";
+import { Camera, User as UserIcon, Loader2, CreditCard, Wallet, Check, Trash2, ExternalLink, AlertCircle, RefreshCw, Star } from "lucide-react";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
 import { useAvatarUrl } from "@/lib/useAvatarUrl";
 import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
-import { createBillingPortal, createSetupIntentCheckout, getSavedPaymentMethod } from "@/lib/checkout.functions";
+import { createBillingPortal, createSetupIntentCheckout, listSavedPaymentMethods, setDefaultPaymentMethod, type SavedCard } from "@/lib/checkout.functions";
 import { getStripe, getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 
 export const Route = createFileRoute("/account/setup")({ component: AccountSetupPage });
