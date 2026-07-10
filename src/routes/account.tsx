@@ -7,11 +7,11 @@ import { useSession } from "@/lib/session";
 
 export const Route = createFileRoute("/account")({ component: AccountLayout });
 
-const NAV = [
+const NAV: ReadonlyArray<{ to: string; label: string; icon: typeof User; exact?: boolean }> = [
   { to: "/account", label: "Profile", icon: User, exact: true },
   { to: "/account/subscriptions", label: "Subscriptions", icon: CreditCard },
   { to: "/account/following", label: "Following & Favorites", icon: Heart },
-] as const;
+];
 
 function AccountLayout() {
   const { user, loading } = useSession();
@@ -30,7 +30,7 @@ function AccountLayout() {
                 return (
                   <Link
                     key={to}
-                    to={to}
+                    to={to as any}
                     className={cn(
                       "flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                       active

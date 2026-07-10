@@ -16,6 +16,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AgencyRouteImport } from './routes/agency'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
@@ -84,6 +85,11 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -95,9 +101,9 @@ const StudioIndexRoute = StudioIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountIndexRoute = AccountIndexRouteImport.update({
-  id: '/account/',
-  path: '/account/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => AccountRoute,
 } as any)
 const StudioTwinRoute = StudioTwinRouteImport.update({
   id: '/studio/twin',
@@ -249,6 +255,7 @@ const ApiPublicCronHeygenPollRoute = ApiPublicCronHeygenPollRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRouteWithChildren
   '/admin': typeof AdminRoute
   '/agency': typeof AgencyRoute
   '/app': typeof AppRoute
@@ -332,6 +339,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account': typeof AccountRouteWithChildren
   '/admin': typeof AdminRoute
   '/agency': typeof AgencyRoute
   '/app': typeof AppRoute
@@ -375,6 +383,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account'
     | '/admin'
     | '/agency'
     | '/app'
@@ -457,6 +466,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/account'
     | '/admin'
     | '/agency'
     | '/app'
@@ -499,6 +509,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountRoute: typeof AccountRouteWithChildren
   AdminRoute: typeof AdminRoute
   AgencyRoute: typeof AgencyRoute
   AppRoute: typeof AppRoute
@@ -525,7 +536,6 @@ export interface RootRouteChildren {
   StudioPayoutsRoute: typeof StudioPayoutsRoute
   StudioPersonasRoute: typeof StudioPersonasRoute
   StudioTwinRoute: typeof StudioTwinRoute
-  AccountIndexRoute: typeof AccountIndexRoute
   StudioIndexRoute: typeof StudioIndexRoute
   ApiPublicBootstrapDemoCreatorsRoute: typeof ApiPublicBootstrapDemoCreatorsRoute
   ApiPublicBootstrapSupportAdminRoute: typeof ApiPublicBootstrapSupportAdminRoute
@@ -585,6 +595,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -601,10 +618,10 @@ declare module '@tanstack/react-router' {
     }
     '/account/': {
       id: '/account/'
-      path: '/account'
+      path: '/'
       fullPath: '/account/'
       preLoaderRoute: typeof AccountIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AccountRoute
     }
     '/studio/twin': {
       id: '/studio/twin'
@@ -812,6 +829,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AccountRouteChildren {
+  AccountIndexRoute: typeof AccountIndexRoute
+}
+
+const AccountRouteChildren: AccountRouteChildren = {
+  AccountIndexRoute: AccountIndexRoute,
+}
+
+const AccountRouteWithChildren =
+  AccountRoute._addFileChildren(AccountRouteChildren)
+
 interface AuthRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
 }
@@ -860,6 +888,7 @@ const StudioPacksRouteWithChildren = StudioPacksRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountRoute: AccountRouteWithChildren,
   AdminRoute: AdminRoute,
   AgencyRoute: AgencyRoute,
   AppRoute: AppRoute,
@@ -886,7 +915,6 @@ const rootRouteChildren: RootRouteChildren = {
   StudioPayoutsRoute: StudioPayoutsRoute,
   StudioPersonasRoute: StudioPersonasRoute,
   StudioTwinRoute: StudioTwinRoute,
-  AccountIndexRoute: AccountIndexRoute,
   StudioIndexRoute: StudioIndexRoute,
   ApiPublicBootstrapDemoCreatorsRoute: ApiPublicBootstrapDemoCreatorsRoute,
   ApiPublicBootstrapSupportAdminRoute: ApiPublicBootstrapSupportAdminRoute,
