@@ -1669,42 +1669,51 @@ export type Database = {
         Row: {
           age_verified_at: string | null
           avatar_url: string | null
+          bio: string | null
           country: string | null
           created_at: string
           date_of_birth: string | null
           display_name: string | null
           dob_attested_at: string | null
           explicit_content_opt_in: boolean
+          full_name: string | null
           handle: string | null
           id: string
+          profile_completed_at: string | null
           strike_count: number
           updated_at: string
         }
         Insert: {
           age_verified_at?: string | null
           avatar_url?: string | null
+          bio?: string | null
           country?: string | null
           created_at?: string
           date_of_birth?: string | null
           display_name?: string | null
           dob_attested_at?: string | null
           explicit_content_opt_in?: boolean
+          full_name?: string | null
           handle?: string | null
           id: string
+          profile_completed_at?: string | null
           strike_count?: number
           updated_at?: string
         }
         Update: {
           age_verified_at?: string | null
           avatar_url?: string | null
+          bio?: string | null
           country?: string | null
           created_at?: string
           date_of_birth?: string | null
           display_name?: string | null
           dob_attested_at?: string | null
           explicit_content_opt_in?: boolean
+          full_name?: string | null
           handle?: string | null
           id?: string
+          profile_completed_at?: string | null
           strike_count?: number
           updated_at?: string
         }
