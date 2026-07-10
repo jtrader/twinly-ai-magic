@@ -143,6 +143,32 @@ export const createBillingPortal = createServerFn({ method: "POST" })
     }
   });
 
+/** Create (or reuse) a Stripe customer and open embedded checkout in `setup` mode
+ *  so the user can save a payment method for later — no charge is made. */
+export const createSetupIntentCheckout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { returnUrl: string; environment: StripeEnv }) => d)
+  .handler(async ({ data, context }): Promise<CheckoutResult> => {
+    try {
+      const { supabase, userId } = context;
+      const { data: { user } } = await supabase.auth.getUser();
+      const email = user?.email ?? undefined;
+      const stripe = createStripeClient(data.environment);
+      const customerId = await resolveOrCreateCustomer(stripe, { email, userId });
+      const session = await stripe.checkout.sessions.create({
+        mode: "setup",
+        ui_mode: "embedded_page" as any,
+        return_url: data.returnUrl,
+        customer: customerId,
+        currency: "usd",
+        metadata: { userId, kind: "setup_card" },
+      });
+      return { clientSecret: session.client_secret ?? "" };
+    } catch (error) {
+      return { error: getStripeErrorMessage(error) };
+    }
+  });
+
 /** Twinly+ platform membership. */
 export const createTwinlyPlusCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
