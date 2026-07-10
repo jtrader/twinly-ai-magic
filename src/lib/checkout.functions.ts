@@ -173,6 +173,82 @@ type SavedCardResult =
   | { card: { brand: string; last4: string; expMonth: number; expYear: number } | null }
   | { error: string };
 
+export type SavedCard = {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  isDefault: boolean;
+};
+type SavedCardsResult = { cards: SavedCard[] } | { error: string };
+
+/** List all saved cards on the fan's Stripe customer, marking the invoice-default one. */
+export const listSavedPaymentMethods = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { environment: StripeEnv }) => d)
+  .handler(async ({ data, context }): Promise<SavedCardsResult> => {
+    try {
+      const { userId } = context;
+      if (!/^[a-zA-Z0-9_-]+$/.test(userId)) return { cards: [] };
+      const stripe = createStripeClient(data.environment);
+      const found = await stripe.customers.search({
+        query: `metadata['userId']:'${userId}'`,
+        limit: 1,
+      });
+      const customer = found.data[0];
+      if (!customer) return { cards: [] };
+      const defaultPmId =
+        (customer as any).invoice_settings?.default_payment_method ??
+        (typeof customer.default_source === "string" ? customer.default_source : null);
+      const list = await stripe.paymentMethods.list({ customer: customer.id, type: "card", limit: 20 });
+      const cards: SavedCard[] = list.data
+        .filter((p) => !!p.card)
+        .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))
+        .map((p) => ({
+          id: p.id,
+          brand: p.card!.brand,
+          last4: p.card!.last4,
+          expMonth: p.card!.exp_month,
+          expYear: p.card!.exp_year,
+          isDefault: p.id === defaultPmId,
+        }));
+      return { cards };
+    } catch (error) {
+      return { error: getStripeErrorMessage(error) };
+    }
+  });
+
+/** Set a saved card as the invoice-default for the fan's Stripe customer. */
+export const setDefaultPaymentMethod = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { paymentMethodId: string; environment: StripeEnv }) => {
+    if (!/^pm_[a-zA-Z0-9_]+$/.test(d.paymentMethodId)) throw new Error("Invalid paymentMethodId");
+    return d;
+  })
+  .handler(async ({ data, context }): Promise<OkResult> => {
+    try {
+      const { userId } = context;
+      if (!/^[a-zA-Z0-9_-]+$/.test(userId)) return { error: "Invalid user" };
+      const stripe = createStripeClient(data.environment);
+      const found = await stripe.customers.search({
+        query: `metadata['userId']:'${userId}'`,
+        limit: 1,
+      });
+      const customer = found.data[0];
+      if (!customer) return { error: "No billing account found" };
+      const pm = await stripe.paymentMethods.retrieve(data.paymentMethodId);
+      const pmCustomer = typeof pm.customer === "string" ? pm.customer : pm.customer?.id;
+      if (pmCustomer !== customer.id) return { error: "Card doesn't belong to this account" };
+      await stripe.customers.update(customer.id, {
+        invoice_settings: { default_payment_method: data.paymentMethodId },
+      });
+      return { ok: true };
+    } catch (error) {
+      return { error: getStripeErrorMessage(error) };
+    }
+  });
+
 /** Look up the fan's most recently saved card on their Stripe customer. */
 export const getSavedPaymentMethod = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
