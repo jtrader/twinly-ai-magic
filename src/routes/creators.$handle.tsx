@@ -40,7 +40,8 @@ export const Route = createFileRoute("/creators/$handle")({
 function CreatorProfile() {
   const data = Route.useLoaderData();
   if (!data) return <AppShell><div className="py-20 text-center text-muted-foreground">Creator not found.</div></AppShell>;
-  const { creator, personas } = data;
+  const { creator, profile, personas } = data;
+  const avatarUrl = profile?.avatar_url ?? null;
   const now = Date.now();
   const visible = (personas as any[]).filter((p) => {
     if (p.starts_at && new Date(p.starts_at).getTime() > now) return false;
@@ -49,9 +50,9 @@ function CreatorProfile() {
   });
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-display text-3xl font-bold">{creator.stage_name}</h1>
             {creator.verification_status === "verified" && (
               <span className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-brand-glow">
@@ -59,14 +60,25 @@ function CreatorProfile() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="mt-1 text-sm text-muted-foreground">@{creator.handle}</div>
+          {creator.bio && <p className="mt-2 text-sm text-muted-foreground">{creator.bio}</p>}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <FollowButton creatorId={creator.id} compact />
             <ReportDialog targetType="creator" targetId={creator.id} label="Report creator" variant="outline" />
             <BlockButton targetType="creator" targetId={creator.id} variant="outline" />
           </div>
         </div>
-        <div className="text-sm text-muted-foreground">@{creator.handle}</div>
-        {creator.bio && <p className="text-sm text-muted-foreground">{creator.bio}</p>}
+        {avatarUrl && (
+          <div className="relative shrink-0 self-center">
+            <div className="absolute inset-0 rounded-full bg-brand-glow/40 blur-lg" aria-hidden />
+            <img
+              src={avatarUrl}
+              alt={creator.stage_name}
+              loading="lazy"
+              className="relative size-24 rounded-full border-2 border-brand-glow/70 object-cover shadow-[0_0_24px_-2px_hsl(var(--brand-glow)/0.6)] sm:size-28"
+            />
+          </div>
+        )}
       </div>
       <AiDisclosureBanner kind="ai" label="This creator uses official AI personas. All AI chats are clearly labeled." className="mb-6" />
       <h2 className="mb-3 font-display text-xl font-semibold">Choose your experience</h2>
