@@ -2251,6 +2251,18 @@ export type Database = {
         | "escalation_requested"
         | "escalation_accepted"
         | "escalation_declined"
+        | "subscription_started"
+        | "subscription_changed"
+        | "subscription_ending"
+        | "subscription_reactivated"
+        | "new_subscriber"
+        | "subscriber_changed"
+        | "tip_sent"
+        | "tip_received"
+        | "unlock_purchased"
+        | "content_unlocked"
+        | "twinly_plus_active"
+        | "twinly_plus_ended"
       payout_status: "none" | "pending" | "active"
       permission_type: "included" | "ppv" | "restricted"
       persona_kind: "real_me" | "ai"
@@ -2448,6 +2460,18 @@ export const Constants = {
         "escalation_requested",
         "escalation_accepted",
         "escalation_declined",
+        "subscription_started",
+        "subscription_changed",
+        "subscription_ending",
+        "subscription_reactivated",
+        "new_subscriber",
+        "subscriber_changed",
+        "tip_sent",
+        "tip_received",
+        "unlock_purchased",
+        "content_unlocked",
+        "twinly_plus_active",
+        "twinly_plus_ended",
       ],
       payout_status: ["none", "pending", "active"],
       permission_type: ["included", "ppv", "restricted"],
