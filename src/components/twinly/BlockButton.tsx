@@ -46,6 +46,10 @@ export function BlockButton({
   if (!targetId) return null;
 
   async function confirmBlock() {
+    if (!user) {
+      toast.error("Sign in to block users.");
+      return;
+    }
     setBusy(true);
     try {
       const payload = targetType === "creator" ? { creatorId: targetId } : { userId: targetId };
@@ -61,6 +65,10 @@ export function BlockButton({
   }
 
   async function unblock() {
+    if (!user) {
+      toast.error("Sign in to unblock users.");
+      return;
+    }
     setBusy(true);
     try {
       const payload = targetType === "creator" ? { creatorId: targetId } : { userId: targetId };
