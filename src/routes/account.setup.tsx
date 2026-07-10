@@ -305,27 +305,45 @@ function AvatarStatePill({ state }: { state: "unchanged-empty" | "unchanged" | "
 function PaymentStep() {
   const openPortal = useServerFn(createBillingPortal);
   const startSetup = useServerFn(createSetupIntentCheckout);
-  const loadCard = useServerFn(getSavedPaymentMethod);
+  const loadCards = useServerFn(listSavedPaymentMethods);
+  const setDefault = useServerFn(setDefaultPaymentMethod);
   const [busy, setBusy] = useState(false);
   const [portalBusy, setPortalBusy] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [card, setCard] = useState<{ brand: string; last4: string; expMonth: number; expYear: number } | null>(null);
-  const [cardLoading, setCardLoading] = useState(true);
+  const [cards, setCards] = useState<SavedCard[]>([]);
+  const [cardsLoading, setCardsLoading] = useState(true);
+  const [cardsError, setCardsError] = useState<string | null>(null);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
   const configured = isPaymentsConfigured();
 
-  async function refreshCard() {
-    if (!configured) { setCardLoading(false); return; }
-    setCardLoading(true);
+  async function refreshCards() {
+    if (!configured) { setCardsLoading(false); return; }
+    setCardsLoading(true);
+    setCardsError(null);
     try {
-      const res = await loadCard({ data: { environment: getStripeEnvironment() } });
-      if ("error" in res) { setCard(null); }
-      else { setCard(res.card); }
-    } catch { setCard(null); }
-    finally { setCardLoading(false); }
+      const res = await loadCards({ data: { environment: getStripeEnvironment() } });
+      if ("error" in res) { setCards([]); setCardsError(res.error); }
+      else { setCards(res.cards); }
+    } catch (e: any) {
+      setCards([]);
+      setCardsError(e?.message ?? "Could not load saved cards");
+    } finally { setCardsLoading(false); }
   }
 
-  useEffect(() => { refreshCard(); /* eslint-disable-line */ }, []);
+  useEffect(() => { refreshCards(); /* eslint-disable-line */ }, []);
+
+  async function handleMakeDefault(pmId: string) {
+    setSettingDefaultId(pmId);
+    try {
+      const res = await setDefault({ data: { paymentMethodId: pmId, environment: getStripeEnvironment() } });
+      if ("error" in res) throw new Error(res.error);
+      setCards((prev) => prev.map((c) => ({ ...c, isDefault: c.id === pmId })));
+      toast.success("Default card updated");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not set default");
+    } finally { setSettingDefaultId(null); }
+  }
 
   async function handleAddCard() {
     if (!configured) { toast.error("Payments not configured yet"); return; }
@@ -356,33 +374,96 @@ function PaymentStep() {
 
   return (
     <div className="space-y-4">
-      {cardLoading ? (
+      {cardsLoading ? (
         <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-elevated p-4 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" /> Checking for a saved card…
+          <Loader2 className="size-4 animate-spin" /> Checking for saved cards…
         </div>
-      ) : card ? (
-        <div className="flex items-start gap-3 rounded-xl border border-emerald-400/40 bg-emerald-500/10 p-4">
-          <Check className="mt-0.5 size-5 text-emerald-400" />
-          <div className="flex-1 text-sm">
-            <div className="font-medium text-emerald-100">Card saved</div>
-            <div className="mt-1 flex items-center gap-2 text-emerald-100/90">
-              <span className="rounded bg-black/30 px-2 py-0.5 font-mono text-xs uppercase tracking-wider">
-                {card.brand}
-              </span>
-              <span>•••• {card.last4}</span>
-              <span className="text-emerald-100/70">
-                exp {String(card.expMonth).padStart(2, "0")}/{String(card.expYear).slice(-2)}
-              </span>
+      ) : cardsError ? (
+        <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 size-5 text-amber-400" />
+            <div className="flex-1">
+              <div className="font-medium text-amber-100">Couldn't load your saved cards</div>
+              <div className="mt-1 text-amber-100/80">{cardsError}</div>
             </div>
+            <Button size="sm" variant="outline" onClick={refreshCards}>
+              <RefreshCw className="mr-1.5 size-3.5" /> Retry
+            </Button>
           </div>
         </div>
-      ) : null}
+      ) : cards.length === 0 ? (
+        <div className="rounded-xl border border-border bg-surface-elevated p-4 text-sm">
+          <div className="flex items-start gap-3">
+            <CreditCard className="mt-0.5 size-5 text-muted-foreground" />
+            <div className="flex-1">
+              <div className="font-medium">No saved card yet</div>
+              <p className="mt-1 text-muted-foreground">
+                Add one below so future checkouts, tips, and subscriptions are one tap.
+              </p>
+            </div>
+            <Button size="sm" variant="ghost" onClick={refreshCards} aria-label="Refresh saved cards">
+              <RefreshCw className="size-3.5" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Saved cards ({cards.length})
+            </div>
+            <Button size="sm" variant="ghost" onClick={refreshCards} aria-label="Refresh saved cards">
+              <RefreshCw className="size-3.5" />
+            </Button>
+          </div>
+          <ul className="space-y-2">
+            {cards.map((c) => (
+              <li
+                key={c.id}
+                className={
+                  "flex items-center gap-3 rounded-xl border p-3 text-sm " +
+                  (c.isDefault
+                    ? "border-emerald-400/40 bg-emerald-500/10"
+                    : "border-border bg-surface-elevated")
+                }
+              >
+                <CreditCard className={"size-5 " + (c.isDefault ? "text-emerald-400" : "text-muted-foreground")} />
+                <div className="flex flex-1 items-center gap-2">
+                  <span className="rounded bg-black/30 px-2 py-0.5 font-mono text-xs uppercase tracking-wider">
+                    {c.brand}
+                  </span>
+                  <span>•••• {c.last4}</span>
+                  <span className="text-xs text-muted-foreground">
+                    exp {String(c.expMonth).padStart(2, "0")}/{String(c.expYear).slice(-2)}
+                  </span>
+                </div>
+                {c.isDefault ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/20 px-2 py-0.5 text-[11px] font-medium text-emerald-100">
+                    <Star className="size-3 fill-current" /> Default
+                  </span>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={settingDefaultId !== null}
+                    onClick={() => handleMakeDefault(c.id)}
+                  >
+                    {settingDefaultId === c.id ? (
+                      <><Loader2 className="mr-1.5 size-3.5 animate-spin" /> Setting…</>
+                    ) : "Make default"}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="flex items-start gap-3 rounded-xl border border-border bg-surface-elevated p-4">
         <CreditCard className="mt-0.5 size-5 text-brand-glow" />
         <div className="flex-1 text-sm">
           <div className="font-medium">
-            {card ? "Add another payment method" : "Save a card for one-tap purchases"}
+            {cards.length > 0 ? "Add another payment method" : "Save a card for one-tap purchases"}
           </div>
           <p className="mt-1 text-muted-foreground">
             We'll create your billing account with Stripe and save your card securely.
@@ -393,7 +474,7 @@ function PaymentStep() {
       </div>
       <Button onClick={handleAddCard} disabled={busy || !configured} className="w-full">
         <Wallet className="mr-2 size-4" />
-        {busy ? "Preparing…" : card ? "Add another card" : "Add payment method"}
+        {busy ? "Preparing…" : cards.length > 0 ? "Add another card" : "Add payment method"}
       </Button>
       <Button variant="ghost" onClick={handlePortal} disabled={portalBusy || !configured} className="w-full">
         <ExternalLink className="mr-2 size-4" />
@@ -405,7 +486,7 @@ function PaymentStep() {
         </p>
       )}
 
-      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setClientSecret(null); refreshCard(); } }}>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setClientSecret(null); refreshCards(); } }}>
         <DialogContent className="max-w-lg overflow-hidden p-0">
           <DialogHeader className="px-6 pt-6">
             <DialogTitle>Add payment method</DialogTitle>
