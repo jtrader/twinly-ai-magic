@@ -2168,6 +2168,39 @@ export type Database = {
         Args: { _bucket: string; _limit: number; _window_seconds: number }
         Returns: boolean
       }
+      get_my_profile: {
+        Args: never
+        Returns: {
+          age_verified_at: string | null
+          avatar_url: string | null
+          bio: string | null
+          country: string | null
+          created_at: string
+          date_of_birth: string | null
+          display_name: string | null
+          dob_attested_at: string | null
+          explicit_content_opt_in: boolean
+          full_name: string | null
+          handle: string | null
+          id: string
+          profile_completed_at: string | null
+          strike_count: number
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_my_profile_status: {
+        Args: never
+        Returns: {
+          age_verified_at: string
+          profile_completed_at: string
+        }[]
+      }
       has_creator_access: {
         Args: { _creator_id: string; _min_tier?: string; _user_id: string }
         Returns: boolean
