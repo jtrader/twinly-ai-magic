@@ -29,10 +29,19 @@ export const updateMyProfile = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => UpdateSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const patch: Record<string, unknown> = {};
-    for (const k of ["display_name", "full_name", "bio", "avatar_url", "country"] as const) {
-      if (data[k] !== undefined) patch[k] = data[k];
-    }
+    const patch: {
+      display_name?: string | null;
+      full_name?: string | null;
+      bio?: string | null;
+      avatar_url?: string | null;
+      country?: string | null;
+      profile_completed_at?: string;
+    } = {};
+    if (data.display_name !== undefined) patch.display_name = data.display_name;
+    if (data.full_name !== undefined) patch.full_name = data.full_name;
+    if (data.bio !== undefined) patch.bio = data.bio;
+    if (data.avatar_url !== undefined) patch.avatar_url = data.avatar_url;
+    if (data.country !== undefined) patch.country = data.country;
     if (data.markComplete) patch.profile_completed_at = new Date().toISOString();
     if (Object.keys(patch).length === 0) return { ok: true };
     const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
