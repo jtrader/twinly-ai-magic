@@ -49,6 +49,7 @@ function CreatorProfile() {
   const { user } = useSession();
   const isOwner = !!user && user.id === creator.user_id;
   const navigate = useNavigate();
+  const [tab, setTab] = useState<"latest" | "experiences">("latest");
   const [posts, setPosts] = useState<any[]>([]);
   const loadPosts = useServerFn(getCreatorPosts);
   const refreshPosts = async () => {
@@ -97,54 +98,79 @@ function CreatorProfile() {
         )}
       </div>
       <AiDisclosureBanner kind="ai" label="This creator uses official AI personas. All AI chats are clearly labeled." className="mb-6" />
-      <section className="mb-10">
-        <div className="mb-3 flex items-center gap-2">
-          <Rss className="size-4 text-brand-glow" />
-          <h2 className="font-display text-xl font-semibold">Latest from {creator.stage_name}</h2>
+      <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-border bg-background/85 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div role="tablist" aria-label="Profile sections" className="flex items-center gap-1">
+          {([
+            { id: "latest", label: "Latest", Icon: Rss },
+            { id: "experiences", label: "Experiences", Icon: Sparkles },
+          ] as const).map(({ id, label, Icon }) => {
+            const active = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(id)}
+                className={
+                  "inline-flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition " +
+                  (active
+                    ? "bg-brand/15 text-brand-glow shadow-[0_0_16px_-6px_hsl(var(--brand-glow)/0.6)]"
+                    : "text-muted-foreground hover:text-foreground")
+                }
+              >
+                <Icon className={"size-4 " + (active ? "text-brand-glow" : "")} />
+                {label}
+              </button>
+            );
+          })}
         </div>
-        {isOwner && (
-          <div className="mb-4">
-            <PostComposer creatorId={creator.id} onPosted={refreshPosts} />
-          </div>
-        )}
-        <PostFeed
-          posts={posts}
-          emptyText={isOwner
-            ? "You haven't posted yet. Share an update with your supporters."
-            : "No posts yet."}
-          onChanged={refreshPosts}
-        />
-      </section>
+      </div>
 
-      <div className="mb-3 flex items-center gap-2">
-        <Sparkles className="size-4 text-brand-glow" />
-        <h2 className="font-display text-xl font-semibold">Choose your experience</h2>
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {visible.map((p) => {
-          const target = `/creators/${creator.handle}/${p.slug}`;
-          const cardProps = user
-            ? { href: target }
-            : { onClick: () => navigate({ to: "/auth", search: { redirect: target } as any }) };
-          return (
-            <PersonaCard
-              key={p.id}
-              id={p.id}
-              slug={p.slug}
-              displayName={p.display_name}
-              description={p.description}
-              kind={p.kind}
-              disclosureLabel={p.disclosure_label}
-              priceCents={p.price_cents ?? 0}
-              avatarUrl={p.cover_url}
-              {...cardProps}
-            />
-          );
-        })}
-      </div>
-      <p className="mt-6 text-xs text-muted-foreground">
-        <Link to="/legal/ai-disclosure" className="underline">Learn how AI personas work →</Link>
-      </p>
+      {tab === "latest" ? (
+        <section>
+          {isOwner && (
+            <div className="mb-4">
+              <PostComposer creatorId={creator.id} onPosted={refreshPosts} />
+            </div>
+          )}
+          <PostFeed
+            posts={posts}
+            emptyText={isOwner
+              ? "You haven't posted yet. Share an update with your supporters."
+              : "No posts yet."}
+            onChanged={refreshPosts}
+          />
+        </section>
+      ) : (
+        <section>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {visible.map((p) => {
+              const target = `/creators/${creator.handle}/${p.slug}`;
+              const cardProps = user
+                ? { href: target }
+                : { onClick: () => navigate({ to: "/auth", search: { redirect: target } as any }) };
+              return (
+                <PersonaCard
+                  key={p.id}
+                  id={p.id}
+                  slug={p.slug}
+                  displayName={p.display_name}
+                  description={p.description}
+                  kind={p.kind}
+                  disclosureLabel={p.disclosure_label}
+                  priceCents={p.price_cents ?? 0}
+                  avatarUrl={p.cover_url}
+                  {...cardProps}
+                />
+              );
+            })}
+          </div>
+          <p className="mt-6 text-xs text-muted-foreground">
+            <Link to="/legal/ai-disclosure" className="underline">Learn how AI personas work →</Link>
+          </p>
+        </section>
+      )}
     </AppShell>
   );
 }
