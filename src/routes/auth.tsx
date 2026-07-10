@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RoleSignupForm } from "@/components/twinly/RoleSignupForm";
+import { TwinlyWordmark } from "@/components/twinly/TwinlyWordmark";
 
 function sanitizeRedirect(value: string | null) {
   if (!value) return "/app";
@@ -38,10 +39,10 @@ function AuthPage() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
         <Link to="/" className="mb-8 text-center font-display text-2xl font-bold">
-          Twinly<span className="text-brand-glow">.life</span>
+          <TwinlyWordmark />
         </Link>
         <div className="rounded-2xl border border-border bg-surface p-6">
-          <h1 className="font-display text-2xl font-bold">Enter Twinly<span className="text-brand-glow">.life</span></h1>
+          <h1 className="font-display text-2xl font-bold"><TwinlyWordmark /></h1>
           <p className="mt-1 text-sm text-muted-foreground">18+ only. Every AI persona is clearly disclosed.</p>
           <div className="mt-4 rounded-xl border border-brand/25 bg-brand/10 p-3 text-xs text-muted-foreground">
             <p className="font-semibold text-foreground">Creators: secure persona setup is connected.</p>
