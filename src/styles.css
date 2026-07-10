@@ -137,3 +137,134 @@
 @utility glow-ring {
   box-shadow: var(--shadow-glow);
 }
+
+/* ------------------------------------------------------------------ */
+/* Gradient + glow for primary actions and animated aurora backdrops. */
+/* Palette stays inside brand tokens (indigo → glow → ai) to keep the */
+/* Twinly.life visual identity intact.                                */
+/* ------------------------------------------------------------------ */
+
+@theme inline {
+  --gradient-brand: linear-gradient(
+    135deg,
+    var(--brand) 0%,
+    var(--brand-glow) 55%,
+    var(--ai) 100%
+  );
+  --shadow-brand-glow:
+    0 10px 30px -12px color-mix(in oklab, var(--brand) 55%, transparent),
+    0 0 24px -6px color-mix(in oklab, var(--brand-glow) 55%, transparent);
+  --shadow-brand-glow-strong:
+    0 18px 45px -14px color-mix(in oklab, var(--brand) 70%, transparent),
+    0 0 40px -4px color-mix(in oklab, var(--brand-glow) 65%, transparent);
+}
+
+@keyframes twinly-aurora-drift {
+  0%   { transform: translate3d(-6%, -4%, 0) scale(1);   }
+  33%  { transform: translate3d(8%, 6%, 0)  scale(1.08); }
+  66%  { transform: translate3d(-4%, 10%, 0) scale(0.96);}
+  100% { transform: translate3d(-6%, -4%, 0) scale(1);   }
+}
+@keyframes twinly-aurora-drift-rev {
+  0%   { transform: translate3d(6%, 8%, 0)  scale(1);   }
+  50%  { transform: translate3d(-10%, -6%, 0) scale(1.12); }
+  100% { transform: translate3d(6%, 8%, 0)  scale(1);   }
+}
+@keyframes twinly-aurora-hue {
+  0%,100% { filter: blur(60px) hue-rotate(0deg);   }
+  50%     { filter: blur(60px) hue-rotate(28deg);  }
+}
+@keyframes twinly-glow-pulse {
+  0%,100% { box-shadow: var(--shadow-brand-glow); }
+  50%     { box-shadow: var(--shadow-brand-glow-strong); }
+}
+@keyframes twinly-sheen {
+  0%   { transform: translateX(-120%) skewX(-18deg); }
+  100% { transform: translateX(220%)  skewX(-18deg); }
+}
+
+/* Gradient + glow CTA. Applied via the default Button variant so every
+   primary action inherits it site-wide without hand-editing call sites. */
+@utility btn-brand-glow {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--brand-foreground);
+  background-image: var(--gradient-brand);
+  background-size: 200% 200%;
+  background-position: 0% 50%;
+  box-shadow: var(--shadow-brand-glow);
+  transition:
+    background-position 500ms ease,
+    box-shadow 300ms ease,
+    transform 200ms ease;
+  animation: twinly-glow-pulse 3.6s ease-in-out infinite;
+
+  &:hover {
+    background-position: 100% 50%;
+    box-shadow: var(--shadow-brand-glow-strong);
+    transform: translateY(-1px);
+  }
+  &:active { transform: translateY(0); }
+
+  /* Diagonal sheen sweep on hover */
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklab, var(--brand-foreground) 28%, transparent) 50%,
+      transparent 100%
+    );
+    transform: translateX(-120%) skewX(-18deg);
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+  &:hover::after {
+    opacity: 1;
+    animation: twinly-sheen 900ms ease forwards;
+  }
+
+  &:disabled {
+    animation: none;
+    box-shadow: none;
+    opacity: 0.5;
+  }
+}
+
+/* Aurora blob used inside hero backdrops. Combine with size + position
+   utilities on the element itself. */
+@utility aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.55;
+  will-change: transform, filter;
+  animation:
+    twinly-aurora-drift 18s ease-in-out infinite,
+    twinly-aurora-hue 12s ease-in-out infinite;
+  pointer-events: none;
+}
+@utility aurora-blob-alt {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.45;
+  will-change: transform, filter;
+  animation:
+    twinly-aurora-drift-rev 22s ease-in-out infinite,
+    twinly-aurora-hue 14s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-brand-glow,
+  .aurora-blob,
+  .aurora-blob-alt {
+    animation: none !important;
+  }
+  .btn-brand-glow::after { display: none; }
+}
