@@ -1,50 +1,75 @@
 ## Goal
+Let each creator set their own prices for Base / Plus / VIP tiers, and let fans subscribe to a specific creator at that creator's price via embedded Stripe checkout.
 
-Give each card in the "Persona system" section on the home page (`src/routes/index.tsx` → `PersonaGrid`) a hero image that reuses the **same subject/model** as `src/assets/hero-ai.png` (dark-haired woman in glasses with neon aura), but re-lit and re-styled to match each persona's flavor.
+## Data model
 
-## Source model
+New table `public.creator_tier_prices`:
+- `creator_id`, `tier` (base|plus|vip), `amount_cents`, `currency` (default `usd`), `active`
+- Unique per (creator, tier)
+- RLS: creators manage own rows (via `can_manage_creator`), `anon` + `authenticated` read active rows
 
-Base image: `src/assets/hero-ai.png` (existing hero). Every variant is produced with `imagegen--edit_image` using this file as `image_paths[0]` so the face, hair, and general likeness stay consistent. Only wardrobe, lighting, mood, and background change.
+Existing `subscriptions` table already has `fan_id`, `creator_id`, `tier`, `status`, `current_period_end`, `provider_ref` — reuse it. Add columns: `stripe_subscription_id`, `stripe_customer_id`, `environment` (sandbox|live), `cancel_at_period_end`, `amount_cents`, `currency`.
 
-## Per-persona prompts
+## Server-side
 
-All variants share this preamble: *"Keep the exact same woman as the reference — same face, same long dark hair, same subtle smile. Portrait crop, cinematic 3D render, soft rim lighting, no text, no logos."*
+`src/lib/stripe.server.ts` — shared gateway-routed Stripe client + `verifyWebhook` + `getStripeErrorMessage` (per knowledge, verbatim).
 
-1. **Real Me** → `src/assets/persona-real-me.png`
-   - Flavor: authentic, human, no AI.
-   - Prompt add: warm natural daylight, no neon, no glasses, cozy off-white knit sweater, softly blurred sunlit bedroom window behind her, candid unretouched feel, gentle golden-hour tones.
+`src/lib/creator-pricing.functions.ts`:
+- `getCreatorPricing({creatorId})` — public read of active prices
+- `upsertCreatorPrice({tier, amountCents})` — creator only (RLS)
+- `deactivateCreatorPrice({tier})` — creator only
 
-2. **Nice AI** → `src/assets/persona-nice-ai.png`
-   - Flavor: warm, playful, SFW.
-   - Prompt add: bright pastel aura (mint, peach, soft lavender), friendly open smile, casual pastel hoodie, floating soft light particles, cheerful and approachable.
+`src/lib/checkout.functions.ts`:
+- `createCreatorSubscriptionCheckout({creatorId, tier, returnUrl, environment})` — auth-required
+  - Loads active price for (creator, tier)
+  - Resolves/creates Stripe Customer with `metadata.userId`
+  - Creates embedded Checkout session with dynamic `price_data` (recurring monthly), `subscription_data.metadata` = `{userId, creatorId, tier}`, `automatic_tax: { enabled: true }` (adult content → tax calc only, not full compliance)
+  - Returns `clientSecret`
+- `createBillingPortal({returnUrl, environment})` — auth-required, returns portal URL for the user's Stripe customer
 
-3. **Naughty AI** → `src/assets/persona-naughty-ai.png`
-   - Flavor: flirty with boundaries.
-   - Prompt add: hot pink and magenta rim light, playful smirk over the shoulder, glossy black cropped jacket, subtle sparkle bokeh, confident and flirty (still tasteful, shoulders-up crop).
+`src/routes/api/public/payments/webhook.ts` — verifies signature, handles `customer.subscription.{created,updated,deleted}`; upserts into `subscriptions` keyed off `stripe_subscription_id`, reads `creatorId`/`tier`/`userId` from subscription metadata.
 
-4. **Wicked AI** → `src/assets/persona-wicked-ai.png`
-   - Flavor: adults-only VIP.
-   - Prompt add: deep crimson and violet lighting, dark smoky background, sleek black latex-look high-neck top, sultry half-lit expression, moody film-noir contrast (shoulders-up crop, no explicit content).
+## Client-side / UI
 
-5. **Custom** → `src/assets/persona-custom.png`
-   - Flavor: unlimited themed personas.
-   - Prompt add: kaleidoscopic split-lighting across the face (cyan / magenta / gold / green), holographic prism refractions in the background, subtle "multiple exposures" ghosting suggesting many personas layered into one.
+`src/lib/stripe.ts` — `getStripe()` + `getStripeEnvironment()` derived from `VITE_PAYMENTS_CLIENT_TOKEN` prefix.
 
-Each call uses `transparent_background: false`, keeps the source dimensions (omit width/height), saves as `.png` (portraits with soft glows keep better in PNG than JPG here).
+`src/components/twinly/PaymentTestModeBanner.tsx` — mount at `__root.tsx`.
 
-## Wiring the images into the cards
+`src/components/twinly/CreatorSubscribeButtons.tsx` — reads creator's active prices, shows tier cards (Base / Plus / VIP with amount + name), opens embedded checkout in a dialog. Signed-out users see the existing `AuthPromptDialog`. If a fan already has an active subscription to that creator+tier, show "Subscribed · Manage" that opens the billing portal.
 
-Edit `src/routes/index.tsx`:
+Wire it into `src/routes/creators.$handle.tsx` — new "Subscribe" section above / near the profile pills.
 
-- Import the 5 new asset JSONs.
-- Extend each item in `PersonaGrid`'s `items` array with an `image` field pointing at the imported asset's `url`.
-- Update the card markup: add an `<img>` above the name/badge row — `aspect-[4/5]` (matches the portrait source), `object-cover`, `rounded-xl`, subtle inner border, `loading="lazy"`, and a persona-specific `alt` (e.g. *"Nice AI persona portrait"*).
-- Keep existing badge, name, and blurb below the image; keep the current 1/2/3-column responsive grid and the disclaimer paragraph unchanged.
+`src/routes/checkout.return.tsx` — post-checkout landing that shows success + link back to creator or `/account/subscriptions`.
 
-No other sections, routes, or components change.
+## Creator pricing management
 
-## Out of scope
+`src/routes/studio.pricing.tsx` — creator studio page with a form for each tier: enable/disable + price input (USD, cents), warns 18+ tiers about extra visibility rules. Add nav link in the studio.
 
-- No changes to the hero, auth page, or `TwinlyWordmark`.
-- No new components — the card markup stays inline in `PersonaGrid`.
-- No copy changes to persona names or blurbs.
+## Account hub integration
+
+Update `src/routes/account.subscriptions.tsx` list rendering:
+- Show tier + creator + monthly amount + renewal date
+- Replace inline "Cancel" with "Manage in billing portal" that calls `createBillingPortal`
+
+Add "Billing portal" link in the hamburger menu when the user has any subscription.
+
+## Tax handling
+
+Adult creator platform → Stripe full compliance handling not available. Use `automatic_tax: { enabled: true }` (Stripe calculates & collects, you handle registration/filing). Assign tax code `txcd_10000000` (general digital goods) to any shared product-level records if we create them.
+
+## Out of scope for this pass
+
+- One-time content unlocks (pay-per-post)
+- Tips
+- Refund UI
+- Multiple currencies (USD only)
+- Coupons / promo codes
+
+We can add any of these after the base flow is solid.
+
+## Technical notes
+
+- Uses dynamic `price_data` with `recurring: { interval: "month" }` per checkout — no per-creator Stripe Price object needed, so no admin work when a creator changes their price.
+- Uses `product_data.name` = `"{Creator stage_name} — {Tier}"` for readable dashboards / customer receipts.
+- Follows the "resolveOrCreateCustomer" pattern so lookups by userId work later.
+- Adds `stripe@22.0.2`, `@stripe/stripe-js@9.2.0`, `@stripe/react-stripe-js@6.2.0`.

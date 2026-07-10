@@ -1,9 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import type { ReactNode } from "react";
-import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, LogOut, Settings, LogIn } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, LogOut, Settings, LogIn, Wallet } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { createBillingPortal } from "@/lib/checkout.functions";
+import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ImpersonationBanner } from "@/components/twinly/ImpersonationBanner";
 import { NotificationBell } from "@/components/twinly/NotificationBell";
+import { PaymentTestModeBanner } from "@/components/twinly/PaymentTestModeBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
 import {
@@ -19,6 +24,7 @@ import { useNavigate } from "@tanstack/react-router";
 export function AppShell({ children, mobileNav = true }: { children: ReactNode; mobileNav?: boolean }) {
   return (
     <div className="min-h-screen bg-background">
+      <PaymentTestModeBanner />
       <TopBar />
       <ImpersonationBanner />
       <main className={cn("mx-auto max-w-6xl px-4 pb-24 pt-4 md:pt-8", mobileNav && "pb-24")}>{children}</main>
@@ -73,6 +79,7 @@ function AccountMenu() {
             <DropdownMenuItem asChild>
               <Link to="/account/following"><Heart className="mr-2 size-4" />Following & Favorites</Link>
             </DropdownMenuItem>
+            <BillingPortalMenuItem />
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link to="/account"><Settings className="mr-2 size-4" />Settings</Link>
@@ -96,6 +103,33 @@ function AccountMenu() {
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function BillingPortalMenuItem() {
+  const openPortal = useServerFn(createBillingPortal);
+  const [busy, setBusy] = useState(false);
+  async function handleClick(e: React.MouseEvent) {
+    e.preventDefault();
+    if (!isPaymentsConfigured()) { toast.error("Payments not configured"); return; }
+    setBusy(true);
+    try {
+      const res = await openPortal({
+        data: { returnUrl: window.location.href, environment: getStripeEnvironment() },
+      });
+      if ("error" in res) throw new Error(res.error);
+      window.open(res.url, "_blank", "noopener,noreferrer");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not open billing portal");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <DropdownMenuItem onClick={handleClick} disabled={busy}>
+      <Wallet className="mr-2 size-4" />
+      {busy ? "Opening…" : "Billing portal"}
+    </DropdownMenuItem>
   );
 }
 

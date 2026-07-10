@@ -4,8 +4,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, ExternalLink } from "lucide-react";
-import { listMySubscriptions, cancelMySubscription } from "@/lib/subscriptions.functions";
+import { CreditCard, ExternalLink, Wallet } from "lucide-react";
+import { listMySubscriptions } from "@/lib/subscriptions.functions";
+import { createBillingPortal } from "@/lib/checkout.functions";
+import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 
 export const Route = createFileRoute("/account/subscriptions")({ component: SubscriptionsPage });
 
@@ -14,9 +16,9 @@ type Sub = Awaited<ReturnType<typeof listMySubscriptions>>[number];
 function SubscriptionsPage() {
   const [subs, setSubs] = useState<Sub[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [portalBusy, setPortalBusy] = useState(false);
   const load = useServerFn(listMySubscriptions);
-  const cancel = useServerFn(cancelMySubscription);
+  const openPortal = useServerFn(createBillingPortal);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -27,15 +29,17 @@ function SubscriptionsPage() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  async function doCancel(id: string) {
-    if (!confirm("Cancel this subscription? You'll keep access until the end of the current period.")) return;
-    setBusyId(id);
+  async function handlePortal() {
+    if (!isPaymentsConfigured()) { toast.error("Payments not configured yet."); return; }
+    setPortalBusy(true);
     try {
-      await cancel({ data: { subscriptionId: id } });
-      setSubs((s) => s.map((x) => x.id === id ? { ...x, status: "canceled" } : x));
-      toast.success("Subscription canceled");
-    } catch (e: any) { toast.error(e?.message ?? "Could not cancel"); }
-    finally { setBusyId(null); }
+      const res = await openPortal({
+        data: { returnUrl: window.location.href, environment: getStripeEnvironment() },
+      });
+      if ("error" in res) throw new Error(res.error);
+      window.open(res.url, "_blank", "noopener,noreferrer");
+    } catch (e: any) { toast.error(e?.message ?? "Could not open billing portal"); }
+    finally { setPortalBusy(false); }
   }
 
   const active = subs.filter((s) => s.status === "active");
@@ -43,9 +47,17 @@ function SubscriptionsPage() {
 
   return (
     <div>
-      <header className="mb-6">
-        <h1 className="font-display text-3xl font-bold">Subscriptions</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Manage your paid creator subscriptions.</p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl font-bold">Subscriptions</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Manage your paid creator subscriptions.</p>
+        </div>
+        {subs.length > 0 && (
+          <Button variant="outline" size="sm" onClick={handlePortal} disabled={portalBusy}>
+            <Wallet className="mr-2 size-4" />
+            {portalBusy ? "Opening…" : "Billing portal"}
+          </Button>
+        )}
       </header>
 
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
@@ -63,13 +75,13 @@ function SubscriptionsPage() {
 
       {!loading && active.length > 0 && (
         <Section title="Active">
-          {active.map((s) => <SubRow key={s.id} sub={s} busy={busyId === s.id} onCancel={() => doCancel(s.id)} />)}
+          {active.map((s) => <SubRow key={s.id} sub={s} onManage={handlePortal} portalBusy={portalBusy} />)}
         </Section>
       )}
 
       {!loading && inactive.length > 0 && (
         <Section title="Past" muted>
-          {inactive.map((s) => <SubRow key={s.id} sub={s} busy={false} onCancel={() => {}} />)}
+          {inactive.map((s) => <SubRow key={s.id} sub={s} onManage={handlePortal} portalBusy={portalBusy} />)}
         </Section>
       )}
     </div>
@@ -85,7 +97,7 @@ function Section({ title, muted, children }: { title: string; muted?: boolean; c
   );
 }
 
-function SubRow({ sub, busy, onCancel }: { sub: Sub; busy: boolean; onCancel: () => void }) {
+function SubRow({ sub, onManage, portalBusy }: { sub: Sub; onManage: () => void; portalBusy: boolean }) {
   const canceled = sub.status !== "active";
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3">
@@ -112,8 +124,8 @@ function SubRow({ sub, busy, onCancel }: { sub: Sub; busy: boolean; onCancel: ()
           </Button>
         )}
         {!canceled && (
-          <Button size="sm" variant="outline" disabled={busy} onClick={onCancel}>
-            {busy ? "…" : "Cancel"}
+          <Button size="sm" variant="outline" disabled={portalBusy} onClick={onManage}>
+            {portalBusy ? "…" : "Manage"}
           </Button>
         )}
       </div>

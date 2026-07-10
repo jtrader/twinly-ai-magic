@@ -744,6 +744,54 @@ export type Database = {
           },
         ]
       }
+      creator_tier_prices: {
+        Row: {
+          active: boolean
+          amount_cents: number
+          created_at: string
+          creator_id: string
+          currency: string
+          id: string
+          tier: Database["public"]["Enums"]["sub_tier"]
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amount_cents: number
+          created_at?: string
+          creator_id: string
+          currency?: string
+          id?: string
+          tier: Database["public"]["Enums"]["sub_tier"]
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amount_cents?: number
+          created_at?: string
+          creator_id?: string
+          currency?: string
+          id?: string
+          tier?: Database["public"]["Enums"]["sub_tier"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_tier_prices_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_tier_prices_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_voice_profiles: {
         Row: {
           approved_phrases: string[]
@@ -1685,34 +1733,58 @@ export type Database = {
       }
       subscriptions: {
         Row: {
+          amount_cents: number | null
+          cancel_at_period_end: boolean
           created_at: string
           creator_id: string
+          currency: string | null
           current_period_end: string | null
+          current_period_start: string | null
+          environment: string
           fan_id: string
           id: string
           provider_ref: string | null
           status: Database["public"]["Enums"]["sub_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           tier: Database["public"]["Enums"]["sub_tier"]
+          updated_at: string
         }
         Insert: {
+          amount_cents?: number | null
+          cancel_at_period_end?: boolean
           created_at?: string
           creator_id: string
+          currency?: string | null
           current_period_end?: string | null
+          current_period_start?: string | null
+          environment?: string
           fan_id: string
           id?: string
           provider_ref?: string | null
           status?: Database["public"]["Enums"]["sub_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           tier?: Database["public"]["Enums"]["sub_tier"]
+          updated_at?: string
         }
         Update: {
+          amount_cents?: number | null
+          cancel_at_period_end?: boolean
           created_at?: string
           creator_id?: string
+          currency?: string | null
           current_period_end?: string | null
+          current_period_start?: string | null
+          environment?: string
           fan_id?: string
           id?: string
           provider_ref?: string | null
           status?: Database["public"]["Enums"]["sub_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           tier?: Database["public"]["Enums"]["sub_tier"]
+          updated_at?: string
         }
         Relationships: [
           {
