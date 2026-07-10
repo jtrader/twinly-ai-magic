@@ -297,38 +297,23 @@
    whole button family shares the same identity. */
 @utility btn-brand-glow-outline {
   position: relative;
-  isolation: isolate;
   color: var(--foreground);
-  background-color: color-mix(in oklab, var(--background) 70%, transparent);
-  border: 1px solid transparent;
-  background-clip: padding-box;
+  background-color: color-mix(in oklab, var(--background) 55%, transparent);
+  border: 1px solid color-mix(in oklab, var(--brand) 55%, transparent);
   transition:
     background-color 300ms ease,
     color 300ms ease,
+    border-color 300ms ease,
     box-shadow 300ms ease,
     transform 200ms ease;
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--brand) 45%, transparent) inset;
-
-  &::before {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    z-index: -1;
-    border-radius: inherit;
-    padding: 1px;
-    background: var(--gradient-brand);
-    /* Draw the gradient only in the border area */
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-            mask-composite: exclude;
-    opacity: 0.9;
-  }
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--brand-glow) 25%, transparent),
+    0 4px 16px -8px color-mix(in oklab, var(--brand) 45%, transparent);
 
   &:hover {
     color: var(--brand-foreground);
-    background-color: color-mix(in oklab, var(--brand) 22%, transparent);
+    background-color: color-mix(in oklab, var(--brand) 28%, transparent);
+    border-color: color-mix(in oklab, var(--brand-glow) 85%, transparent);
     box-shadow: var(--shadow-brand-glow);
     transform: translateY(-1px);
   }
