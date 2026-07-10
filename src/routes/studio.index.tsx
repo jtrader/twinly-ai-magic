@@ -4,7 +4,7 @@ import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
-import { Sparkles, Library, ShieldCheck, MessageCircle, Wallet, BadgeCheck, Package, User, Wand2, BarChart3, Moon, Flag, UserCheck } from "lucide-react";
+import { Sparkles, Library, ShieldCheck, MessageCircle, Wallet, BadgeCheck, Package, User, Wand2, BarChart3, Moon, Flag, UserCheck, DollarSign } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { countOpenCreatorFlags } from "@/lib/conversation-flags.functions";
 
@@ -98,6 +98,7 @@ function StudioHome() {
         <Tile to="/studio/flags" icon={<Flag className="size-5 text-brand-glow" />} title="Flagged AI chats" desc="Supporter-flagged AI conversations for your review or handoff to Real Me." badge={openFlags} />
         <Tile to="/studio/escalations" icon={<UserCheck className="size-5 text-brand-glow" />} title="Real Me requests" desc="Accept or decline supporters asking to talk to you directly." />
         <Tile to="/studio/payouts" icon={<Wallet className="size-5 text-brand-glow" />} title="Payouts" desc="Payment history, subscribers, next payout." />
+        <Tile to="/studio/pricing" icon={<DollarSign className="size-5 text-brand-glow" />} title="Subscription pricing" desc="Set your monthly Base / Plus / VIP tier prices." />
         <Tile to="/studio/analytics" icon={<BarChart3 className="size-5 text-brand-glow" />} title="Analytics" desc="Generation volume, approval rate, chat engagement." />
         <Tile to="/studio/twin" icon={<User className="size-5 text-brand-glow" />} title="Digital twin profile" desc="Identity, voice, style, consent & use rules." />
         <Tile to="/studio/away" icon={<Moon className="size-5 text-brand-glow" />} title="Away mode" desc="Auto-reply for Real Me and route fans to your AI personas when you're offline." />

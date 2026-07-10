@@ -21,6 +21,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as StudioTwinRouteImport } from './routes/studio.twin'
+import { Route as StudioPricingRouteImport } from './routes/studio.pricing'
 import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
 import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
 import { Route as StudioPacksRouteImport } from './routes/studio.packs'
@@ -112,6 +113,11 @@ const AccountIndexRoute = AccountIndexRouteImport.update({
 const StudioTwinRoute = StudioTwinRouteImport.update({
   id: '/studio/twin',
   path: '/studio/twin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioPricingRoute = StudioPricingRouteImport.update({
+  id: '/studio/pricing',
+  path: '/studio/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioPersonasRoute = StudioPersonasRouteImport.update({
@@ -312,6 +318,7 @@ export interface FileRoutesByFullPath {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio/pricing': typeof StudioPricingRoute
   '/studio/twin': typeof StudioTwinRoute
   '/account/': typeof AccountIndexRoute
   '/studio/': typeof StudioIndexRoute
@@ -357,6 +364,7 @@ export interface FileRoutesByTo {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio/pricing': typeof StudioPricingRoute
   '/studio/twin': typeof StudioTwinRoute
   '/account': typeof AccountIndexRoute
   '/studio': typeof StudioIndexRoute
@@ -404,6 +412,7 @@ export interface FileRoutesById {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio/pricing': typeof StudioPricingRoute
   '/studio/twin': typeof StudioTwinRoute
   '/account/': typeof AccountIndexRoute
   '/studio/': typeof StudioIndexRoute
@@ -452,6 +461,7 @@ export interface FileRouteTypes {
     | '/studio/packs'
     | '/studio/payouts'
     | '/studio/personas'
+    | '/studio/pricing'
     | '/studio/twin'
     | '/account/'
     | '/studio/'
@@ -497,6 +507,7 @@ export interface FileRouteTypes {
     | '/studio/packs'
     | '/studio/payouts'
     | '/studio/personas'
+    | '/studio/pricing'
     | '/studio/twin'
     | '/account'
     | '/studio'
@@ -543,6 +554,7 @@ export interface FileRouteTypes {
     | '/studio/packs'
     | '/studio/payouts'
     | '/studio/personas'
+    | '/studio/pricing'
     | '/studio/twin'
     | '/account/'
     | '/studio/'
@@ -585,6 +597,7 @@ export interface RootRouteChildren {
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
   StudioPayoutsRoute: typeof StudioPayoutsRoute
   StudioPersonasRoute: typeof StudioPersonasRoute
+  StudioPricingRoute: typeof StudioPricingRoute
   StudioTwinRoute: typeof StudioTwinRoute
   StudioIndexRoute: typeof StudioIndexRoute
   ApiPublicBootstrapDemoCreatorsRoute: typeof ApiPublicBootstrapDemoCreatorsRoute
@@ -679,6 +692,13 @@ declare module '@tanstack/react-router' {
       path: '/studio/twin'
       fullPath: '/studio/twin'
       preLoaderRoute: typeof StudioTwinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/pricing': {
+      id: '/studio/pricing'
+      path: '/studio/pricing'
+      fullPath: '/studio/pricing'
+      preLoaderRoute: typeof StudioPricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/studio/personas': {
@@ -998,6 +1018,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioPacksRoute: StudioPacksRouteWithChildren,
   StudioPayoutsRoute: StudioPayoutsRoute,
   StudioPersonasRoute: StudioPersonasRoute,
+  StudioPricingRoute: StudioPricingRoute,
   StudioTwinRoute: StudioTwinRoute,
   StudioIndexRoute: StudioIndexRoute,
   ApiPublicBootstrapDemoCreatorsRoute: ApiPublicBootstrapDemoCreatorsRoute,
