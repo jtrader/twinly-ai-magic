@@ -667,6 +667,83 @@ export type Database = {
           },
         ]
       }
+      creator_posts: {
+        Row: {
+          author_user_id: string
+          body: string
+          comment_count: number
+          created_at: string
+          creator_id: string
+          id: string
+          image_url: string | null
+          is_removed: boolean
+          like_count: number
+          linked_pack_id: string | null
+          linked_persona_id: string | null
+          removed_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          author_user_id: string
+          body: string
+          comment_count?: number
+          created_at?: string
+          creator_id: string
+          id?: string
+          image_url?: string | null
+          is_removed?: boolean
+          like_count?: number
+          linked_pack_id?: string | null
+          linked_persona_id?: string | null
+          removed_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          author_user_id?: string
+          body?: string
+          comment_count?: number
+          created_at?: string
+          creator_id?: string
+          id?: string
+          image_url?: string | null
+          is_removed?: boolean
+          like_count?: number
+          linked_pack_id?: string | null
+          linked_persona_id?: string | null
+          removed_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_posts_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_posts_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_posts_linked_pack_id_fkey"
+            columns: ["linked_pack_id"]
+            isOneToOne: false
+            referencedRelation: "content_packs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_posts_linked_persona_id_fkey"
+            columns: ["linked_persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_voice_profiles: {
         Row: {
           approved_phrases: string[]
@@ -1478,6 +1555,67 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      post_comments: {
+        Row: {
+          author_user_id: string
+          body: string
+          created_at: string
+          id: string
+          is_removed: boolean
+          post_id: string
+        }
+        Insert: {
+          author_user_id: string
+          body: string
+          created_at?: string
+          id?: string
+          is_removed?: boolean
+          post_id: string
+        }
+        Update: {
+          author_user_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          is_removed?: boolean
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "creator_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_likes: {
+        Row: {
+          created_at: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "creator_posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
