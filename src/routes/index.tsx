@@ -8,6 +8,11 @@ import { ShieldCheck, Sparkles, Bot, User2, Lock } from "lucide-react";
 import { ArrowRight, Heart } from "lucide-react";
 import heroAi from "@/assets/hero-ai.png.asset.json";
 import brandIcon from "@/assets/brand-icon.png.asset.json";
+import personaRealMe from "@/assets/persona-real-me.png.asset.json";
+import personaNiceAi from "@/assets/persona-nice-ai.png.asset.json";
+import personaNaughtyAi from "@/assets/persona-naughty-ai.png.asset.json";
+import personaWickedAi from "@/assets/persona-wicked-ai.png.asset.json";
+import personaCustom from "@/assets/persona-custom.png.asset.json";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -176,11 +181,11 @@ function TrustStrip() {
 
 function PersonaGrid() {
   const items = [
-    { name: "Real Me", kind: "real_me" as const, blurb: "Direct with the verified creator. No AI in the loop." },
-    { name: "Nice AI", kind: "ai" as const, blurb: "Warm, playful, safe-for-work AI persona." },
-    { name: "Naughty AI", kind: "ai" as const, blurb: "Flirty AI persona with clear boundaries." },
-    { name: "Wicked AI", kind: "ai" as const, blurb: "Adults-only AI persona for VIPs." },
-    { name: "Custom", kind: "ai" as const, blurb: "Creators can spin up unlimited themed personas — VIP Fantasy, After Dark, XNurse and more." },
+    { name: "Real Me", kind: "real_me" as const, blurb: "Direct with the verified creator. No AI in the loop.", image: personaRealMe.url, alt: "Real Me persona portrait — natural daylight, no filter" },
+    { name: "Nice AI", kind: "ai" as const, blurb: "Warm, playful, safe-for-work AI persona.", image: personaNiceAi.url, alt: "Nice AI persona portrait — pastel aura, warm smile" },
+    { name: "Naughty AI", kind: "ai" as const, blurb: "Flirty AI persona with clear boundaries.", image: personaNaughtyAi.url, alt: "Naughty AI persona portrait — magenta neon, flirty smirk" },
+    { name: "Wicked AI", kind: "ai" as const, blurb: "Adults-only AI persona for VIPs.", image: personaWickedAi.url, alt: "Wicked AI persona portrait — crimson and violet noir lighting" },
+    { name: "Custom", kind: "ai" as const, blurb: "Creators can spin up unlimited themed personas — VIP Fantasy, After Dark, XNurse and more.", image: personaCustom.url, alt: "Custom persona portrait — kaleidoscopic prism lighting" },
   ];
   return (
     <section className="mx-auto max-w-6xl px-4 py-16">
@@ -192,12 +197,22 @@ function PersonaGrid() {
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((p) => (
-          <div key={p.name} className="rounded-2xl border border-border bg-surface p-5">
-            <div className="flex items-start justify-between">
-              <div className="font-display text-lg font-semibold">{p.name}</div>
-              <PersonaBadge kind={p.kind} />
+          <div key={p.name} className="overflow-hidden rounded-2xl border border-border bg-surface">
+            <div className="aspect-[4/5] w-full overflow-hidden bg-black/40">
+              <img
+                src={p.image}
+                alt={p.alt}
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">{p.blurb}</p>
+            <div className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="font-display text-lg font-semibold">{p.name}</div>
+                <PersonaBadge kind={p.kind} />
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">{p.blurb}</p>
+            </div>
           </div>
         ))}
       </div>
