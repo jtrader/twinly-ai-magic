@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as FanRouteImport } from './routes/fan'
 import { Route as DiscoverRouteImport } from './routes/discover'
@@ -56,6 +57,11 @@ import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/publi
 import { Route as ApiPublicHooksHeygenRouteImport } from './routes/api/public/hooks/heygen'
 import { Route as ApiPublicCronHeygenPollRouteImport } from './routes/api/public/cron/heygen-poll'
 
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
@@ -300,6 +306,7 @@ export interface FileRoutesByFullPath {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
+  '/pricing': typeof PricingRoute
   '/account/following': typeof AccountFollowingRoute
   '/account/setup': typeof AccountSetupRoute
   '/account/subscriptions': typeof AccountSubscriptionsRoute
@@ -347,6 +354,7 @@ export interface FileRoutesByTo {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
+  '/pricing': typeof PricingRoute
   '/account/following': typeof AccountFollowingRoute
   '/account/setup': typeof AccountSetupRoute
   '/account/subscriptions': typeof AccountSubscriptionsRoute
@@ -396,6 +404,7 @@ export interface FileRoutesById {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
+  '/pricing': typeof PricingRoute
   '/account/following': typeof AccountFollowingRoute
   '/account/setup': typeof AccountSetupRoute
   '/account/subscriptions': typeof AccountSubscriptionsRoute
@@ -446,6 +455,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/pricing'
     | '/account/following'
     | '/account/setup'
     | '/account/subscriptions'
@@ -493,6 +503,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/pricing'
     | '/account/following'
     | '/account/setup'
     | '/account/subscriptions'
@@ -541,6 +552,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/pricing'
     | '/account/following'
     | '/account/setup'
     | '/account/subscriptions'
@@ -590,6 +602,7 @@ export interface RootRouteChildren {
   DiscoverRoute: typeof DiscoverRoute
   FanRoute: typeof FanRouteWithChildren
   OnboardingRoute: typeof OnboardingRoute
+  PricingRoute: typeof PricingRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   CreatorsHandleRoute: typeof CreatorsHandleRouteWithChildren
@@ -622,6 +635,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding': {
       id: '/onboarding'
       path: '/onboarding'
@@ -1020,6 +1040,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiscoverRoute: DiscoverRoute,
   FanRoute: FanRouteWithChildren,
   OnboardingRoute: OnboardingRoute,
+  PricingRoute: PricingRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   CreatorsHandleRoute: CreatorsHandleRouteWithChildren,
