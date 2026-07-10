@@ -30,9 +30,10 @@ export function BlockButton({
   const [blocking, setBlocking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
-  const { user } = useSession();
+  const { user, loading } = useSession();
 
   const doBlock = useServerFn(targetType === "creator" ? blockCreator : blockUserId);
+
   const doUnblock = useServerFn(targetType === "creator" ? unblockCreator : unblockUserId);
   const doCheck = useServerFn(targetType === "creator" ? isBlockingCreator : isBlockingUserId);
 
