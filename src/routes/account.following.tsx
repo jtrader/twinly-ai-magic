@@ -9,8 +9,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Heart, UserMinus, ExternalLink, Loader2, Check, Search, X } from "lucide-react";
 import { listMyFollows, toggleFollow, setFavorite } from "@/lib/follows.functions";
 
-type TabKey = "all" | "favorites" | "following";
-const TABS: TabKey[] = ["all", "favorites", "following"];
+type TabKey = "following" | "favorites";
+const TABS: TabKey[] = ["following", "favorites"];
 const STORAGE_KEY = "account.following.tab";
 
 export const Route = createFileRoute("/account/following")({
@@ -36,7 +36,7 @@ function FollowingPage() {
       const stored = window.localStorage.getItem(STORAGE_KEY);
       if (stored && TABS.includes(stored as TabKey)) return stored as TabKey;
     }
-    return "all";
+    return "following";
   });
   const [query, setQuery] = useState<string>(search.q ?? "");
   const load = useServerFn(listMyFollows);
@@ -58,7 +58,7 @@ function FollowingPage() {
     navigate({
       search: (prev: any) => ({
         ...prev,
-        tab: tab === "all" ? undefined : tab,
+        tab: tab === "following" ? undefined : tab,
         q: query.trim() ? query.trim() : undefined,
       }),
       replace: true,
@@ -141,7 +141,6 @@ function FollowingPage() {
   }
 
   const favorites = useMemo(() => rows.filter((r) => r.favorite), [rows]);
-  const following = useMemo(() => rows.filter((r) => !r.favorite), [rows]);
 
   const q = query.trim().toLowerCase();
   const filterRows = (list: Row[]) =>
@@ -152,9 +151,8 @@ function FollowingPage() {
           (r.handle ?? "").toLowerCase().includes(q) ||
           (r.bio ?? "").toLowerCase().includes(q),
         );
-  const shownAll = filterRows(rows);
+  const shownFollowing = filterRows(rows);
   const shownFavorites = filterRows(favorites);
-  const shownFollowing = filterRows(following);
 
   return (
     <div>
@@ -205,26 +203,20 @@ function FollowingPage() {
           </div>
 
           <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:inline-grid">
-              <TabsTrigger value="all">All <span className="ml-1.5 text-xs text-muted-foreground">{q ? `${shownAll.length}/${rows.length}` : rows.length}</span></TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-grid">
+              <TabsTrigger value="following">Following <span className="ml-1.5 text-xs text-muted-foreground">{q ? `${shownFollowing.length}/${rows.length}` : rows.length}</span></TabsTrigger>
               <TabsTrigger value="favorites">Favorites <span className="ml-1.5 text-xs text-muted-foreground">{q ? `${shownFavorites.length}/${favorites.length}` : favorites.length}</span></TabsTrigger>
-              <TabsTrigger value="following">Following <span className="ml-1.5 text-xs text-muted-foreground">{q ? `${shownFollowing.length}/${following.length}` : following.length}</span></TabsTrigger>
             </TabsList>
 
-            <TabsContent value="all" className="mt-4">
-              {shownAll.length === 0
+            <TabsContent value="following" className="mt-4">
+              {shownFollowing.length === 0
                 ? <EmptyHint text={q ? `No matches for "${query}".` : "Nothing here yet."} />
-                : <RowList rows={shownAll} unfollowBusy={unfollowBusy} favBusy={favBusy} onUnfollow={doUnfollow} onToggleFav={doToggleFav} />}
+                : <RowList rows={shownFollowing} unfollowBusy={unfollowBusy} favBusy={favBusy} onUnfollow={doUnfollow} onToggleFav={doToggleFav} />}
             </TabsContent>
             <TabsContent value="favorites" className="mt-4">
               {shownFavorites.length === 0
                 ? <EmptyHint text="No favorites yet — tap the heart on anyone you follow." />
                 : <RowList rows={shownFavorites} unfollowBusy={unfollowBusy} favBusy={favBusy} onUnfollow={doUnfollow} onToggleFav={doToggleFav} />}
-            </TabsContent>
-            <TabsContent value="following" className="mt-4">
-              {shownFollowing.length === 0
-                ? <EmptyHint text="Everyone you follow is favorited." />
-                : <RowList rows={shownFollowing} unfollowBusy={unfollowBusy} favBusy={favBusy} onUnfollow={doUnfollow} onToggleFav={doToggleFav} />}
             </TabsContent>
           </Tabs>
         </div>
