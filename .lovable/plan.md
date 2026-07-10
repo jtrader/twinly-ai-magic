@@ -1,77 +1,50 @@
-# Supporter-flagged AI conversations → Creator review + handoff
+## Goal
 
-## Context
+Give each card in the "Persona system" section on the home page (`src/routes/index.tsx` → `PersonaGrid`) a hero image that reuses the **same subject/model** as `src/assets/hero-ai.png` (dark-haired woman in glasses with neon aura), but re-lit and re-styled to match each persona's flavor.
 
-The app already has three adjacent pieces, none of which cover this flow:
+## Source model
 
-- `ReportDialog` / `moderation.functions` — safety reports to the platform team.
-- `RequestRealMeButton` / `escalation_requests` — supporter *pays/asks* to move to Real Me.
-- `flagAiMessage` (creator-side) — creator QA-flags an AI message from `studio/ai-review`.
+Base image: `src/assets/hero-ai.png` (existing hero). Every variant is produced with `imagegen--edit_image` using this file as `image_paths[0]` so the face, hair, and general likeness stay consistent. Only wardrobe, lighting, mood, and background change.
 
-Missing: a lightweight way for a supporter to say "this AI reply was off — please have the real creator look at this thread," which lands in the creator's queue and can be resolved by (a) acknowledging, (b) editing/retraining the reply, or (c) opening a Real Me handoff.
+## Per-persona prompts
 
-## What to build
+All variants share this preamble: *"Keep the exact same woman as the reference — same face, same long dark hair, same subtle smile. Portrait crop, cinematic 3D render, soft rim lighting, no text, no logos."*
 
-### 1. Data model (one migration)
+1. **Real Me** → `src/assets/persona-real-me.png`
+   - Flavor: authentic, human, no AI.
+   - Prompt add: warm natural daylight, no neon, no glasses, cozy off-white knit sweater, softly blurred sunlit bedroom window behind her, candid unretouched feel, gentle golden-hour tones.
 
-New table `public.conversation_flags`:
+2. **Nice AI** → `src/assets/persona-nice-ai.png`
+   - Flavor: warm, playful, SFW.
+   - Prompt add: bright pastel aura (mint, peach, soft lavender), friendly open smile, casual pastel hoodie, floating soft light particles, cheerful and approachable.
 
-- `id`, `created_at`, `resolved_at`
-- `conversation_id` → conversations, `message_id` → messages (nullable — flag whole thread or a specific AI message)
-- `creator_id`, `persona_id` (denormalized for queue filtering)
-- `flagged_by` (supporter user id)
-- `reason` enum: `off_tone`, `inaccurate`, `uncomfortable`, `wants_human`, `other`
-- `note` text (≤500 chars)
-- `status` enum: `open`, `acknowledged`, `handed_off`, `dismissed`
-- `resolution_note` text, `resolved_by` uuid, `handoff_request_id` uuid (nullable link to `escalation_requests` when creator converts to Real Me)
+3. **Naughty AI** → `src/assets/persona-naughty-ai.png`
+   - Flavor: flirty with boundaries.
+   - Prompt add: hot pink and magenta rim light, playful smirk over the shoulder, glossy black cropped jacket, subtle sparkle bokeh, confident and flirty (still tasteful, shoulders-up crop).
 
-RLS + GRANTs:
-- Supporter INSERT for own `flagged_by = auth.uid()` (rate-limited via `check_rate_limit`).
-- Supporter SELECT own flags.
-- Creator SELECT/UPDATE flags where they own the `creator_id` (reuse `can_manage_creator`).
-- Admin full access.
+4. **Wicked AI** → `src/assets/persona-wicked-ai.png`
+   - Flavor: adults-only VIP.
+   - Prompt add: deep crimson and violet lighting, dark smoky background, sleek black latex-look high-neck top, sultry half-lit expression, moody film-noir contrast (shoulders-up crop, no explicit content).
 
-### 2. Server functions (`src/lib/conversation-flags.functions.ts`)
+5. **Custom** → `src/assets/persona-custom.png`
+   - Flavor: unlimited themed personas.
+   - Prompt add: kaleidoscopic split-lighting across the face (cyan / magenta / gold / green), holographic prism refractions in the background, subtle "multiple exposures" ghosting suggesting many personas layered into one.
 
-- `flagConversation({ conversationId, messageId?, reason, note? })` — supporter side; validates ownership of conversation (fan_id = auth.uid()), rate-limits, inserts flag, notifies creator via `createNotification` (`type: "conversation_flagged"`, link `/studio/flags`).
-- `listCreatorFlags()` — creator queue (open first, then history); joins supporter profile, persona, last message body preview.
-- `loadFlagThread({ flagId })` — full conversation thread + flag context for review pane.
-- `resolveFlag({ flagId, action: "acknowledge" | "dismiss", note? })` — updates status, notifies supporter.
-- `handoffFlagToRealMe({ flagId, message? })` — creates an `escalation_requests` row auto-accepted by the creator (creates/ensures the Real Me conversation just like `respondToEscalation` accept path), links it back on the flag, notifies supporter with the Real Me chat link.
+Each call uses `transparent_background: false`, keeps the source dimensions (omit width/height), saves as `.png` (portraits with soft glows keep better in PNG than JPG here).
 
-All writes go through `logAudit`.
+## Wiring the images into the cards
 
-### 3. Supporter UI
+Edit `src/routes/index.tsx`:
 
-- New `FlagConversationButton` (icon + dialog) added to the chat header in `src/routes/chat.$handle.$persona.tsx`, visible only on AI personas. Dialog: reason radios + optional note + "Flag this reply" checkbox that captures the last AI `messageId` from thread state.
-- Small inline "Flag" affordance on each AI message bubble (hover/tap) that pre-fills the messageId.
-- Post-submit toast with link to a new `/fan` tab "My flags" listing status.
+- Import the 5 new asset JSONs.
+- Extend each item in `PersonaGrid`'s `items` array with an `image` field pointing at the imported asset's `url`.
+- Update the card markup: add an `<img>` above the name/badge row — `aspect-[4/5]` (matches the portrait source), `object-cover`, `rounded-xl`, subtle inner border, `loading="lazy"`, and a persona-specific `alt` (e.g. *"Nice AI persona portrait"*).
+- Keep existing badge, name, and blurb below the image; keep the current 1/2/3-column responsive grid and the disclaimer paragraph unchanged.
 
-### 4. Creator UI (`src/routes/studio.flags.tsx`)
-
-- Same shell/style as `studio.escalations.tsx` and `studio.ai-review.tsx`.
-- Left: list of open + history flags (badge counts, reason, supporter, persona, time).
-- Right: selected flag detail — thread preview around the flagged message, reason/note, action buttons: **Acknowledge**, **Open handoff** (uses `handoffFlagToRealMe`), **Dismiss**, and a shortcut into `studio/ai-review` for the same conversation to save a corrected reply as a few-shot example.
-- Add a nav entry in `studio.index.tsx` and a badge count on the studio dashboard for open flags.
-
-### 5. Notifications & wiring
-
-- Reuse `createNotification` for both sides (creator on new flag; supporter on resolve/handoff).
-- Header bell already renders these — no changes there.
+No other sections, routes, or components change.
 
 ## Out of scope
 
-- No new payment flow: handoff reuses the existing `escalation_requests` path and its pricing.
-- No changes to safety reports or the existing creator-side `flagAiMessage` QA flow.
-- No background jobs; stale-open flags remain visible until the creator resolves them (matches existing pattern).
-
-## Files
-
-- add: `supabase/migrations/<ts>_conversation_flags.sql`
-- add: `src/lib/conversation-flags.functions.ts`
-- add: `src/components/twinly/FlagConversationButton.tsx`
-- add: `src/routes/studio.flags.tsx`
-- add: `src/routes/fan.flags.tsx` (supporter's own flags list)
-- edit: `src/routes/chat.$handle.$persona.tsx` (button + per-message flag)
-- edit: `src/routes/studio.index.tsx` (nav card + open-count)
-- edit: `src/lib/notifications.functions.ts` only if a new notification `type` needs whitelisting
+- No changes to the hero, auth page, or `TwinlyWordmark`.
+- No new components — the card markup stays inline in `PersonaGrid`.
+- No copy changes to persona names or blurbs.
