@@ -45,7 +45,26 @@ export function BlockButton({
 
   if (!targetId) return null;
 
+  if (loading) {
+    return (
+      <Button type="button" size={size} variant={variant} className="gap-1.5" disabled>
+        <Ban className="size-3.5" /> Block
+      </Button>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AuthPromptDialog title="Join Twinly to block" description="Sign up or log in to manage who you interact with.">
+        <Button type="button" size={size} variant={variant} className="gap-1.5">
+          <Ban className="size-3.5" /> Block
+        </Button>
+      </AuthPromptDialog>
+    );
+  }
+
   async function confirmBlock() {
+
     if (!user) {
       toast.error("Sign in to block users.");
       return;
