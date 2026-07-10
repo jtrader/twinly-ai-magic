@@ -11,7 +11,7 @@ import { adminListModeration, adminResolveModeration } from "@/lib/moderation.fu
 import { adminListPendingAssets, adminSetAssetApproval } from "@/lib/admin.functions";
 import { adminListPendingPacks, adminSetPackApproval } from "@/lib/admin.functions";
 import { adminListPendingTwinRefs, adminSetTwinRefReview, adminGetTwinRefSignedUrl } from "@/lib/twin.functions";
-import { adminListDemoCreators, adminSeedDemoCreators, adminImpersonateCreator } from "@/lib/demo.functions";
+import { adminListDemoCreators, adminSeedDemoCreators, adminImpersonateCreator, adminListAllCreators, adminListAllAgencies, adminImpersonateUser } from "@/lib/demo.functions";
 import { setImpersonationContext } from "@/components/twinly/ImpersonationBanner";
 
 export const Route = createFileRoute("/admin")({
@@ -30,7 +30,7 @@ function AdminPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
-  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo" | "settings">("overview");
+  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo" | "creators" | "agencies" | "settings">("overview");
   const [stats, setStats] = useState<any>(null);
   const [creators, setCreators] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
@@ -41,6 +41,8 @@ function AdminPage() {
   const [twinPreviews, setTwinPreviews] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [demo, setDemo] = useState<{ seeded: any[]; available: any[]; emails: Record<string, string | null> } | null>(null);
+  const [allCreators, setAllCreators] = useState<{ creators: any[]; emails: Record<string, string | null> } | null>(null);
+  const [allAgencies, setAllAgencies] = useState<{ agencies: any[] } | null>(null);
   const [platformSettings, setPlatformSettings] = useState<{ max_explicitness_ceiling: string } | null>(null);
 
   const overview = useServerFn(adminOverview);
@@ -60,6 +62,9 @@ function AdminPage() {
   const listDemo = useServerFn(adminListDemoCreators);
   const seedDemo = useServerFn(adminSeedDemoCreators);
   const impersonate = useServerFn(adminImpersonateCreator);
+  const listAllCreatorsFn = useServerFn(adminListAllCreators);
+  const listAllAgenciesFn = useServerFn(adminListAllAgencies);
+  const impersonateUserFn = useServerFn(adminImpersonateUser);
   const getSettings = useServerFn(adminGetPlatformSettings);
   const setSettings = useServerFn(adminSetPlatformSettings);
   const verifyLedger = useServerFn(adminVerifyConsentLedger);
@@ -86,6 +91,8 @@ function AdminPage() {
           setTwinPreviews(Object.fromEntries(entries));
         }
         if (tab === "demo") setDemo(await listDemo({}));
+        if (tab === "creators") setAllCreators(await listAllCreatorsFn({}));
+        if (tab === "agencies") setAllAgencies(await listAllAgenciesFn({}));
         if (tab === "settings") setPlatformSettings((await getSettings({})).settings);
       } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
     })();
@@ -229,6 +236,17 @@ function AdminPage() {
     } catch (e: any) { toast.error(e?.message ?? "Failed"); setBusy(null); }
   }
 
+  async function signInAsAgencyOwner(userId: string, name: string) {
+    if (!window.confirm(`Sign in as owner of "${name}"?\n\nYour admin session will be replaced in this tab. Use the "Return to admin" banner to bounce back.`)) return;
+    setBusy(userId);
+    try {
+      const { url, returnUrl, adminEmail } = await impersonateUserFn({ data: { userId, redirectPath: "/agency", label: `agency:${name}` } });
+      setImpersonationContext({ returnUrl, adminEmail, handle: name });
+      toast.success(`Signing in as ${name}…`);
+      window.location.href = url;
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); setBusy(null); }
+  }
+
   return (
     <AppShell>
       <div className="mb-4">
@@ -237,7 +255,7 @@ function AdminPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-2">
-        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo","settings"] as const).map((t) => (
+        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo","creators","agencies","settings"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
