@@ -98,8 +98,16 @@ function CreatorProfile() {
         )}
       </div>
       <AiDisclosureBanner kind="ai" label="This creator uses official AI personas. All AI chats are clearly labeled." className="mb-6" />
-      <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-border bg-background/85 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div role="tablist" aria-label="Profile sections" className="flex items-center gap-1">
+      <div className="sticky top-0 z-10 -mx-4 mb-6 border-b border-border bg-background/85 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div role="tablist" aria-label="Profile sections" className="relative flex items-center gap-1 rounded-full bg-surface p-1 shadow-inner">
+          <div
+            className="absolute inset-y-1 rounded-full bg-gradient-to-r from-brand via-brand-glow to-ai shadow-[var(--shadow-brand-glow)] transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+            style={{
+              width: "calc(50% - 0.375rem)",
+              left: tab === "latest" ? "0.25rem" : "calc(50% + 0.125rem)",
+            }}
+            aria-hidden
+          />
           {([
             { id: "latest", label: "Latest", Icon: Rss },
             { id: "experiences", label: "Experiences", Icon: Sparkles },
@@ -113,13 +121,13 @@ function CreatorProfile() {
                 aria-selected={active}
                 onClick={() => setTab(id)}
                 className={
-                  "inline-flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition " +
+                  "relative z-10 flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2.5 text-sm font-semibold transition-colors duration-300 " +
                   (active
-                    ? "bg-brand/15 text-brand-glow shadow-[0_0_16px_-6px_hsl(var(--brand-glow)/0.6)]"
+                    ? "text-brand-foreground"
                     : "text-muted-foreground hover:text-foreground")
                 }
               >
-                <Icon className={"size-4 " + (active ? "text-brand-glow" : "")} />
+                <Icon className={`size-4 transition-transform duration-300 ${active ? "scale-110" : ""}`} />
                 {label}
               </button>
             );
@@ -128,7 +136,7 @@ function CreatorProfile() {
       </div>
 
       {tab === "latest" ? (
-        <section>
+        <section key="latest" className="animate-fade-in">
           {isOwner && (
             <div className="mb-4">
               <PostComposer creatorId={creator.id} onPosted={refreshPosts} />
@@ -143,7 +151,7 @@ function CreatorProfile() {
           />
         </section>
       ) : (
-        <section>
+        <section key="experiences" className="animate-fade-in">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((p) => {
               const target = `/creators/${creator.handle}/${p.slug}`;

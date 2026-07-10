@@ -10,6 +10,7 @@ import {
 import {
   blockCreator, unblockCreator, isBlockingCreator, blockUserId, unblockUserId, isBlockingUserId,
 } from "@/lib/blocks.functions";
+import { useSession } from "@/lib/session";
 
 type Target = "creator" | "fan";
 
@@ -27,23 +28,28 @@ export function BlockButton({
   const [blocking, setBlocking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
+  const { user } = useSession();
 
   const doBlock = useServerFn(targetType === "creator" ? blockCreator : blockUserId);
   const doUnblock = useServerFn(targetType === "creator" ? unblockCreator : unblockUserId);
   const doCheck = useServerFn(targetType === "creator" ? isBlockingCreator : isBlockingUserId);
 
   useEffect(() => {
-    if (!targetId) return;
+    if (!targetId || !user) return;
     const payload = targetType === "creator" ? { creatorId: targetId } : { userId: targetId };
     doCheck({ data: payload as any })
       .then((r) => setBlocking(r.blocking))
       .catch(() => {});
     // eslint-disable-next-line
-  }, [targetId, targetType]);
+  }, [targetId, targetType, user]);
 
   if (!targetId) return null;
 
   async function confirmBlock() {
+    if (!user) {
+      toast.error("Sign in to block users.");
+      return;
+    }
     setBusy(true);
     try {
       const payload = targetType === "creator" ? { creatorId: targetId } : { userId: targetId };
@@ -59,6 +65,10 @@ export function BlockButton({
   }
 
   async function unblock() {
+    if (!user) {
+      toast.error("Sign in to unblock users.");
+      return;
+    }
     setBusy(true);
     try {
       const payload = targetType === "creator" ? { creatorId: targetId } : { userId: targetId };
