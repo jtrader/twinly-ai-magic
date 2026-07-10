@@ -78,7 +78,11 @@ function TopNav() {
 function Hero() {
   return (
     <section className="relative overflow-hidden">
-      <div className="absolute inset-0 -z-10 opacity-60 [background:radial-gradient(60%_60%_at_50%_0%,theme(colors.brand)/20,transparent)]" />
+      <div
+        className="absolute inset-0 -z-10 opacity-60"
+        style={{ background: "var(--gradient-brand-radial)" }}
+        aria-hidden="true"
+      />
       <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-16 pt-16 md:grid-cols-[1fr_1.05fr] md:items-center md:pt-24">
         <div className="text-center md:text-left">
           <div className="inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-xs font-semibold tracking-widest uppercase text-brand-glow">
@@ -118,7 +122,8 @@ function HeroCompare() {
         {items.map((it) => (
           <figure
             key={it.badge}
-            className="group relative overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_20px_60px_-20px_rgba(120,60,255,0.35)]"
+            className="group relative overflow-hidden rounded-2xl border border-border bg-surface"
+            style={{ boxShadow: "var(--shadow-brand-glow-strong)" }}
           >
             <div className="aspect-[4/5] w-full overflow-hidden">
               <img
@@ -239,7 +244,13 @@ function Footer() {
 function JoinBanner() {
   return (
     <section className="mx-auto max-w-6xl px-4 pb-12 pt-2 md:pb-16">
-      <div className="relative overflow-hidden rounded-3xl border border-brand/40 bg-gradient-to-br from-brand/15 via-surface to-background p-6 md:p-10">
+      <div
+        className="relative overflow-hidden rounded-3xl border border-brand/40 p-6 md:p-10"
+        style={{
+          backgroundImage:
+            "linear-gradient(135deg, var(--brand-tint-medium) 0%, var(--surface) 55%, var(--background) 100%)",
+        }}
+      >
         {/* Animated aurora backdrop — brav-0.com inspired, palette locked
             to Twinly brand tokens (brand / brand-glow / ai). */}
         <div className="pointer-events-none absolute inset-0 opacity-90" aria-hidden="true">
@@ -250,7 +261,7 @@ function JoinBanner() {
             className="absolute inset-0 mix-blend-overlay opacity-40"
             style={{
               backgroundImage:
-                "radial-gradient(circle at 20% 30%, color-mix(in oklab, var(--brand-glow) 40%, transparent), transparent 45%), radial-gradient(circle at 80% 70%, color-mix(in oklab, var(--brand) 50%, transparent), transparent 50%)",
+                "radial-gradient(circle at 20% 30%, var(--glow-tint-medium), transparent 45%), radial-gradient(circle at 80% 70%, var(--brand-tint-strong), transparent 50%)",
             }}
           />
         </div>
