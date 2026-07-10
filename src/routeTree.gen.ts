@@ -40,6 +40,7 @@ import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclos
 import { Route as FanUnlocksRouteImport } from './routes/fan.unlocks'
 import { Route as FanFlagsRouteImport } from './routes/fan.flags'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
+import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
 import { Route as AccountSubscriptionsRouteImport } from './routes/account.subscriptions'
@@ -208,6 +209,11 @@ const CreatorsHandleRoute = CreatorsHandleRouteImport.update({
   path: '/creators/$handle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
+  id: '/checkout/return',
+  path: '/checkout/return',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
@@ -286,6 +292,7 @@ export interface FileRoutesByFullPath {
   '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
@@ -330,6 +337,7 @@ export interface FileRoutesByTo {
   '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
@@ -376,6 +384,7 @@ export interface FileRoutesById {
   '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
@@ -423,6 +432,7 @@ export interface FileRouteTypes {
     | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
+    | '/checkout/return'
     | '/creators/$handle'
     | '/fan/flags'
     | '/fan/unlocks'
@@ -467,6 +477,7 @@ export interface FileRouteTypes {
     | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
+    | '/checkout/return'
     | '/creators/$handle'
     | '/fan/flags'
     | '/fan/unlocks'
@@ -512,6 +523,7 @@ export interface FileRouteTypes {
     | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
+    | '/checkout/return'
     | '/creators/$handle'
     | '/fan/flags'
     | '/fan/unlocks'
@@ -555,6 +567,7 @@ export interface RootRouteChildren {
   FanRoute: typeof FanRouteWithChildren
   OnboardingRoute: typeof OnboardingRoute
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
+  CheckoutReturnRoute: typeof CheckoutReturnRoute
   CreatorsHandleRoute: typeof CreatorsHandleRouteWithChildren
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
@@ -801,6 +814,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreatorsHandleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/checkout/return': {
+      id: '/checkout/return'
+      path: '/checkout/return'
+      fullPath: '/checkout/return'
+      preLoaderRoute: typeof CheckoutReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/callback': {
       id: '/auth/callback'
       path: '/callback'
@@ -960,6 +980,7 @@ const rootRouteChildren: RootRouteChildren = {
   FanRoute: FanRouteWithChildren,
   OnboardingRoute: OnboardingRoute,
   ApiGenerateImageRoute: ApiGenerateImageRoute,
+  CheckoutReturnRoute: CheckoutReturnRoute,
   CreatorsHandleRoute: CreatorsHandleRouteWithChildren,
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
