@@ -41,7 +41,7 @@ function AuthPage() {
           Twinly<span className="text-brand-glow">.life</span>
         </Link>
         <div className="rounded-2xl border border-border bg-surface p-6">
-          <h1 className="font-display text-2xl font-bold">Enter Twinly.life</h1>
+          <h1 className="font-display text-2xl font-bold">Enter Twinly<span className="text-brand-glow">.life</span></h1>
           <p className="mt-1 text-sm text-muted-foreground">18+ only. Every AI persona is clearly disclosed.</p>
           <div className="mt-4 rounded-xl border border-brand/25 bg-brand/10 p-3 text-xs text-muted-foreground">
             <p className="font-semibold text-foreground">Creators: secure persona setup is connected.</p>
