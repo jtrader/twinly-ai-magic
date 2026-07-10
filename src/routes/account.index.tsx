@@ -3,8 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { User as UserIcon, Pencil, Heart, Users } from "lucide-react";
-import { AppShell } from "@/components/twinly/AppShell";
+import { User as UserIcon, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +21,7 @@ function AccountPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
   return (
-    <AppShell>
+    <>
       <h1 className="font-display text-3xl font-bold">Account</h1>
       <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
       {user && <ProfileSection />}
@@ -41,7 +40,7 @@ function AccountPage() {
       <div className="mt-6">
         <Button variant="outline" onClick={async () => { await supabase.auth.signOut(); navigate({ to: "/" }); }}>Sign out</Button>
       </div>
-    </AppShell>
+    </>
   );
 }
 
@@ -73,8 +72,8 @@ function ProfileSection() {
 
   return (
     <div className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
           <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-elevated sm:size-16">
             {avatarUrl
               ? <img src={avatarUrl} alt="Your avatar" className="size-full object-cover" />
@@ -103,17 +102,9 @@ function ProfileSection() {
             )}
           </div>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start">
-          <Button asChild size="sm" variant={complete ? "outline" : "default"} className="w-full sm:w-auto">
-            <Link to="/account/setup"><Pencil className="mr-2 size-3.5" />{complete ? "Edit" : "Complete profile"}</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
-            <Link to="/account/following"><Users className="mr-2 size-3.5" />Following</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
-            <Link to="/account/following" search={{ tab: "favorites" } as any}><Heart className="mr-2 size-3.5" />Favorites</Link>
-          </Button>
-        </div>
+        <Button asChild size="sm" variant={complete ? "outline" : "default"} className="w-full shrink-0 sm:w-auto">
+          <Link to="/account/setup"><Pencil className="mr-2 size-3.5" />{complete ? "Edit profile" : "Complete profile"}</Link>
+        </Button>
       </div>
       {!complete && (
         <div className="mt-4 rounded-lg border border-brand/20 bg-brand/10 p-3">
