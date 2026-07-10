@@ -244,7 +244,7 @@ function BlockedUsersSection() {
   }
 
   return (
-    <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
+    <div className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:p-5">
       <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Blocked users</div>
       {loadingList && <p className="mt-2 text-sm text-muted-foreground">Loading…</p>}
       {!loadingList && blocks.length === 0 && (
@@ -253,9 +253,9 @@ function BlockedUsersSection() {
       {!loadingList && blocks.length > 0 && (
         <ul className="mt-2 space-y-2">
           {blocks.map((b) => (
-            <li key={b.userId} className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm">
-              <span>{b.profile?.display_name ?? "Unknown user"}</span>
-              <Button size="sm" variant="ghost" disabled={busyId === b.userId} onClick={() => doUnblock(b.userId)}>
+            <li key={b.userId} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm">
+              <span className="truncate">{b.profile?.display_name ?? "Unknown user"}</span>
+              <Button size="sm" variant="ghost" disabled={busyId === b.userId} onClick={() => doUnblock(b.userId)} className="shrink-0">
                 {busyId === b.userId ? "…" : "Unblock"}
               </Button>
             </li>
