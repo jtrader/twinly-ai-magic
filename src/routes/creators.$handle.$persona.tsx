@@ -252,7 +252,13 @@ function FeedTile({ item, onNeedAuth, onNeedAge, onUnlocked }: {
           // Deliberate tease, not a broken-image state — no real pixel data
           // is ever sent to an unpaid viewer, so this is a styled placeholder
           // (icon + price), not a blurred copy of the actual asset.
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-ai/20 via-surface-elevated to-brand/10 text-foreground">
+          <div
+            className="flex h-full w-full flex-col items-center justify-center gap-2 text-foreground"
+            style={{
+              backgroundImage:
+                "linear-gradient(135deg, color-mix(in oklab, var(--ai) 20%, transparent) 0%, var(--surface-elevated) 55%, var(--brand-tint-soft) 100%)",
+            }}
+          >
             <Icon className="h-7 w-7 opacity-60" />
             <span className="rounded-full bg-background/70 px-3 py-1 text-xs font-semibold backdrop-blur">
               {lockLabel}
