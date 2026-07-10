@@ -76,12 +76,6 @@ function CreatorProfile() {
     } catch {}
   };
   useEffect(() => { refreshPosts(); /* eslint-disable-line */ }, [creator.handle]);
-  const now = Date.now();
-  const visible = (personas as any[]).filter((p) => {
-    if (p.starts_at && new Date(p.starts_at).getTime() > now) return false;
-    if (p.ends_at && new Date(p.ends_at).getTime() < now) return false;
-    return true;
-  });
   return (
     <AppShell>
       <div className="mb-6 flex items-center justify-between gap-4">
