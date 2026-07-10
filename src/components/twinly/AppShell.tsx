@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, LogOut, Settings, LogIn, Wallet } from "lucide-react";
+import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, LogOut, Settings, LogIn, Wallet, Sparkles } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { createBillingPortal } from "@/lib/checkout.functions";
 import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
@@ -75,6 +75,9 @@ function AccountMenu() {
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to="/account/subscriptions"><CreditCard className="mr-2 size-4" />Subscriptions</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/pricing"><Sparkles className="mr-2 size-4" />Twinly+</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to="/account/following"><Heart className="mr-2 size-4" />Following & Favorites</Link>
