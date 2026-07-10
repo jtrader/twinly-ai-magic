@@ -10,7 +10,7 @@ export const Route = createFileRoute("/account")({ component: AccountLayout });
 const NAV: ReadonlyArray<{ to: string; label: string; icon: typeof User; exact?: boolean }> = [
   { to: "/account", label: "Profile", icon: User, exact: true },
   { to: "/account/subscriptions", label: "Subscriptions", icon: CreditCard },
-  { to: "/account/following", label: "Following & Favorites", icon: Heart },
+  { to: "/account/following", label: "Following", icon: Heart },
 ];
 
 function AccountLayout() {
