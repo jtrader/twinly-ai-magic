@@ -280,7 +280,7 @@ function JoinBanner() {
           <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto md:flex-col md:items-end">
             <Link to="/auth">
               <Button size="lg" className="w-full sm:w-auto md:w-full">
-                Join Twinly.life <ArrowRight className="ml-2 h-4 w-4" />
+                Join Twinly<span className="text-brand-glow">.life</span> <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
             <Link to="/discover">
