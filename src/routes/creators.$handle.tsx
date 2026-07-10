@@ -27,13 +27,20 @@ const loadCreator = createServerFn({ method: "GET" })
       .select("id, display_name, avatar_url")
       .eq("id", creator.user_id)
       .maybeSingle();
-    const { data: personas } = await supabaseAdmin
-      .from("personas")
-      .select("id, slug, display_name, description, kind, disclosure_label, price_cents, visibility, starts_at, ends_at, sort_order, is_explicit, cover_url")
-      .eq("creator_id", creator.id)
-      .in("visibility", ["public", "subscribers", "vip"])
-      .order("sort_order", { ascending: true });
-    return { creator, profile: profile ?? null, personas: personas ?? [] };
+    const [{ data: personas }, { count: postCount }] = await Promise.all([
+      supabaseAdmin
+        .from("personas")
+        .select("id, slug, display_name, description, kind, disclosure_label, price_cents, visibility, starts_at, ends_at, sort_order, is_explicit, cover_url")
+        .eq("creator_id", creator.id)
+        .in("visibility", ["public", "subscribers", "vip"])
+        .order("sort_order", { ascending: true }),
+      supabaseAdmin
+        .from("creator_posts")
+        .select("id", { count: "exact", head: true })
+        .eq("creator_id", creator.id)
+        .eq("is_removed", false),
+    ]);
+    return { creator, profile: profile ?? null, personas: personas ?? [], postCount: postCount ?? 0 };
   });
 
 export const Route = createFileRoute("/creators/$handle")({
