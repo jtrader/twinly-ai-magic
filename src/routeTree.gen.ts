@@ -37,6 +37,7 @@ import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
 import { Route as FanUnlocksRouteImport } from './routes/fan.unlocks'
+import { Route as FanFlagsRouteImport } from './routes/fan.flags'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
@@ -188,6 +189,11 @@ const FanUnlocksRoute = FanUnlocksRouteImport.update({
   path: '/unlocks',
   getParentRoute: () => FanRoute,
 } as any)
+const FanFlagsRoute = FanFlagsRouteImport.update({
+  id: '/flags',
+  path: '/flags',
+  getParentRoute: () => FanRoute,
+} as any)
 const CreatorsHandleRoute = CreatorsHandleRouteImport.update({
   id: '/creators/$handle',
   path: '/creators/$handle',
@@ -254,6 +260,7 @@ export interface FileRoutesByFullPath {
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
+  '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -294,6 +301,7 @@ export interface FileRoutesByTo {
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
+  '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -335,6 +343,7 @@ export interface FileRoutesById {
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
+  '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
@@ -377,6 +386,7 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
+    | '/fan/flags'
     | '/fan/unlocks'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -417,6 +427,7 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
+    | '/fan/flags'
     | '/fan/unlocks'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -457,6 +468,7 @@ export interface FileRouteTypes {
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
+    | '/fan/flags'
     | '/fan/unlocks'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
@@ -720,6 +732,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FanUnlocksRouteImport
       parentRoute: typeof FanRoute
     }
+    '/fan/flags': {
+      id: '/fan/flags'
+      path: '/flags'
+      fullPath: '/fan/flags'
+      preLoaderRoute: typeof FanFlagsRouteImport
+      parentRoute: typeof FanRoute
+    }
     '/creators/$handle': {
       id: '/creators/$handle'
       path: '/creators/$handle'
@@ -804,10 +823,12 @@ const AuthRouteChildren: AuthRouteChildren = {
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface FanRouteChildren {
+  FanFlagsRoute: typeof FanFlagsRoute
   FanUnlocksRoute: typeof FanUnlocksRoute
 }
 
 const FanRouteChildren: FanRouteChildren = {
+  FanFlagsRoute: FanFlagsRoute,
   FanUnlocksRoute: FanUnlocksRoute,
 }
 
