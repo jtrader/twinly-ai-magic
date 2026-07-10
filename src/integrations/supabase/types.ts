@@ -129,6 +129,24 @@ export type Database = {
         }
         Relationships: []
       }
+      blocked_users: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       consent_records: {
         Row: {
           asset_id: string | null
@@ -137,6 +155,8 @@ export type Database = {
           document_url: string | null
           id: string
           kind: string
+          prev_hash: string | null
+          record_hash: string | null
           revoked_at: string | null
           valid_from: string | null
           valid_until: string | null
@@ -148,6 +168,8 @@ export type Database = {
           document_url?: string | null
           id?: string
           kind: string
+          prev_hash?: string | null
+          record_hash?: string | null
           revoked_at?: string | null
           valid_from?: string | null
           valid_until?: string | null
@@ -159,6 +181,8 @@ export type Database = {
           document_url?: string | null
           id?: string
           kind?: string
+          prev_hash?: string | null
+          record_hash?: string | null
           revoked_at?: string | null
           valid_from?: string | null
           valid_until?: string | null
@@ -193,6 +217,7 @@ export type Database = {
           ai_generated_label: boolean
           approval_status: Database["public"]["Enums"]["approval_status"]
           asset_type: Database["public"]["Enums"]["asset_type"]
+          byte_size: number | null
           category: string | null
           consent_status: Database["public"]["Enums"]["consent_status"]
           cost_cents: number | null
@@ -210,6 +235,7 @@ export type Database = {
           provider_status: string | null
           render_completed_at: string | null
           render_started_at: string | null
+          shared_across_personas: boolean
           source_type: Database["public"]["Enums"]["asset_source_type"]
           storage_path: string | null
           tags: string[]
@@ -223,6 +249,7 @@ export type Database = {
           ai_generated_label?: boolean
           approval_status?: Database["public"]["Enums"]["approval_status"]
           asset_type: Database["public"]["Enums"]["asset_type"]
+          byte_size?: number | null
           category?: string | null
           consent_status?: Database["public"]["Enums"]["consent_status"]
           cost_cents?: number | null
@@ -240,6 +267,7 @@ export type Database = {
           provider_status?: string | null
           render_completed_at?: string | null
           render_started_at?: string | null
+          shared_across_personas?: boolean
           source_type?: Database["public"]["Enums"]["asset_source_type"]
           storage_path?: string | null
           tags?: string[]
@@ -253,6 +281,7 @@ export type Database = {
           ai_generated_label?: boolean
           approval_status?: Database["public"]["Enums"]["approval_status"]
           asset_type?: Database["public"]["Enums"]["asset_type"]
+          byte_size?: number | null
           category?: string | null
           consent_status?: Database["public"]["Enums"]["consent_status"]
           cost_cents?: number | null
@@ -270,6 +299,7 @@ export type Database = {
           provider_status?: string | null
           render_completed_at?: string | null
           render_started_at?: string | null
+          shared_across_personas?: boolean
           source_type?: Database["public"]["Enums"]["asset_source_type"]
           storage_path?: string | null
           tags?: string[]
@@ -698,6 +728,7 @@ export type Database = {
           cover_url: string | null
           created_at: string
           digital_twin_status: Database["public"]["Enums"]["twin_status"]
+          generation_spend_cap_cents: number | null
           handle: string
           id: string
           onboarding_completed_at: string | null
@@ -706,6 +737,8 @@ export type Database = {
           style_notes: Json
           updated_at: string
           user_id: string
+          verification_provider: string | null
+          verification_provider_ref: string | null
           verification_status: Database["public"]["Enums"]["verification_status"]
         }
         Insert: {
@@ -720,6 +753,7 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           digital_twin_status?: Database["public"]["Enums"]["twin_status"]
+          generation_spend_cap_cents?: number | null
           handle: string
           id?: string
           onboarding_completed_at?: string | null
@@ -728,6 +762,8 @@ export type Database = {
           style_notes?: Json
           updated_at?: string
           user_id: string
+          verification_provider?: string | null
+          verification_provider_ref?: string | null
           verification_status?: Database["public"]["Enums"]["verification_status"]
         }
         Update: {
@@ -742,6 +778,7 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           digital_twin_status?: Database["public"]["Enums"]["twin_status"]
+          generation_spend_cap_cents?: number | null
           handle?: string
           id?: string
           onboarding_completed_at?: string | null
@@ -750,6 +787,8 @@ export type Database = {
           style_notes?: Json
           updated_at?: string
           user_id?: string
+          verification_provider?: string | null
+          verification_provider_ref?: string | null
           verification_status?: Database["public"]["Enums"]["verification_status"]
         }
         Relationships: [
@@ -771,6 +810,8 @@ export type Database = {
           likeness_ok: boolean
           revoked_at: string | null
           signed_at: string | null
+          training_consent_revoked_at: string | null
+          training_consent_signed_at: string | null
           updated_at: string
           video_ok: boolean
           voice_ok: boolean
@@ -783,6 +824,8 @@ export type Database = {
           likeness_ok?: boolean
           revoked_at?: string | null
           signed_at?: string | null
+          training_consent_revoked_at?: string | null
+          training_consent_signed_at?: string | null
           updated_at?: string
           video_ok?: boolean
           voice_ok?: boolean
@@ -795,6 +838,8 @@ export type Database = {
           likeness_ok?: boolean
           revoked_at?: string | null
           signed_at?: string | null
+          training_consent_revoked_at?: string | null
+          training_consent_signed_at?: string | null
           updated_at?: string
           video_ok?: boolean
           voice_ok?: boolean
@@ -816,6 +861,67 @@ export type Database = {
           },
         ]
       }
+      escalation_requests: {
+        Row: {
+          creator_id: string
+          expires_at: string
+          from_persona_id: string
+          id: string
+          message: string | null
+          price_cents: number
+          requested_at: string
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["escalation_status"]
+          supporter_id: string
+        }
+        Insert: {
+          creator_id: string
+          expires_at?: string
+          from_persona_id: string
+          id?: string
+          message?: string | null
+          price_cents?: number
+          requested_at?: string
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["escalation_status"]
+          supporter_id: string
+        }
+        Update: {
+          creator_id?: string
+          expires_at?: string
+          from_persona_id?: string
+          id?: string
+          message?: string | null
+          price_cents?: number
+          requested_at?: string
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["escalation_status"]
+          supporter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escalation_requests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalation_requests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalation_requests_from_persona_id_fkey"
+            columns: ["from_persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generation_requests: {
         Row: {
           created_at: string
@@ -828,6 +934,8 @@ export type Database = {
           produced_asset_ids: string[]
           prompt_notes: string
           quantity: number
+          regenerated_from_id: string | null
+          regeneration_count: number
           reviewed_at: string | null
           reviewed_by: string | null
           reviewer_note: string | null
@@ -847,6 +955,8 @@ export type Database = {
           produced_asset_ids?: string[]
           prompt_notes?: string
           quantity?: number
+          regenerated_from_id?: string | null
+          regeneration_count?: number
           reviewed_at?: string | null
           reviewed_by?: string | null
           reviewer_note?: string | null
@@ -866,6 +976,8 @@ export type Database = {
           produced_asset_ids?: string[]
           prompt_notes?: string
           quantity?: number
+          regenerated_from_id?: string | null
+          regeneration_count?: number
           reviewed_at?: string | null
           reviewed_by?: string | null
           reviewer_note?: string | null
@@ -901,6 +1013,13 @@ export type Database = {
             columns: ["persona_id"]
             isOneToOne: false
             referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generation_requests_regenerated_from_id_fkey"
+            columns: ["regenerated_from_id"]
+            isOneToOne: false
+            referencedRelation: "generation_requests"
             referencedColumns: ["id"]
           },
         ]
@@ -1007,6 +1126,86 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          email_enabled: boolean
+          escalation_updates: boolean
+          in_app_enabled: boolean
+          new_content: boolean
+          persona_reply: boolean
+          push_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          email_enabled?: boolean
+          escalation_updates?: boolean
+          in_app_enabled?: boolean
+          new_content?: boolean
+          persona_reply?: boolean
+          push_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          email_enabled?: boolean
+          escalation_updates?: boolean
+          in_app_enabled?: boolean
+          new_content?: boolean
+          persona_reply?: boolean
+          push_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          is_ai_generated: boolean
+          link_path: string | null
+          persona_id: string | null
+          read_at: string | null
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_ai_generated?: boolean
+          link_path?: string | null
+          persona_id?: string | null
+          read_at?: string | null
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_ai_generated?: boolean
+          link_path?: string | null
+          persona_id?: string | null
+          read_at?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       persona_content_permissions: {
         Row: {
           asset_id: string
@@ -1036,6 +1235,44 @@ export type Database = {
           },
           {
             foreignKeyName: "persona_content_permissions_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      persona_memory: {
+        Row: {
+          created_at: string
+          fan_id: string
+          id: string
+          message_count_at_summary: number
+          persona_id: string
+          summary: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fan_id: string
+          id?: string
+          message_count_at_summary?: number
+          persona_id: string
+          summary?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fan_id?: string
+          id?: string
+          message_count_at_summary?: number
+          persona_id?: string
+          summary?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "persona_memory_persona_id_fkey"
             columns: ["persona_id"]
             isOneToOne: false
             referencedRelation: "personas"
@@ -1120,6 +1357,7 @@ export type Database = {
           disclosure_label: string
           display_name: string
           ends_at: string | null
+          explicitness_ceiling: Database["public"]["Enums"]["explicitness_level"]
           heygen_avatar_id: string | null
           heygen_voice_id: string | null
           id: string
@@ -1127,6 +1365,7 @@ export type Database = {
           is_explicit: boolean
           kind: Database["public"]["Enums"]["persona_kind"]
           linked_twin_ref_ids: string[]
+          memory_enabled: boolean
           price_cents: number
           slug: string
           sort_order: number
@@ -1149,6 +1388,7 @@ export type Database = {
           disclosure_label: string
           display_name: string
           ends_at?: string | null
+          explicitness_ceiling?: Database["public"]["Enums"]["explicitness_level"]
           heygen_avatar_id?: string | null
           heygen_voice_id?: string | null
           id?: string
@@ -1156,6 +1396,7 @@ export type Database = {
           is_explicit?: boolean
           kind: Database["public"]["Enums"]["persona_kind"]
           linked_twin_ref_ids?: string[]
+          memory_enabled?: boolean
           price_cents?: number
           slug: string
           sort_order?: number
@@ -1178,6 +1419,7 @@ export type Database = {
           disclosure_label?: string
           display_name?: string
           ends_at?: string | null
+          explicitness_ceiling?: Database["public"]["Enums"]["explicitness_level"]
           heygen_avatar_id?: string | null
           heygen_voice_id?: string | null
           id?: string
@@ -1185,6 +1427,7 @@ export type Database = {
           is_explicit?: boolean
           kind?: Database["public"]["Enums"]["persona_kind"]
           linked_twin_ref_ids?: string[]
+          memory_enabled?: boolean
           price_cents?: number
           slug?: string
           sort_order?: number
@@ -1215,6 +1458,27 @@ export type Database = {
           },
         ]
       }
+      platform_settings: {
+        Row: {
+          id: boolean
+          max_explicitness_ceiling: Database["public"]["Enums"]["explicitness_level"]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: boolean
+          max_explicitness_ceiling?: Database["public"]["Enums"]["explicitness_level"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: boolean
+          max_explicitness_ceiling?: Database["public"]["Enums"]["explicitness_level"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           age_verified_at: string | null
@@ -1227,6 +1491,7 @@ export type Database = {
           explicit_content_opt_in: boolean
           handle: string | null
           id: string
+          strike_count: number
           updated_at: string
         }
         Insert: {
@@ -1240,6 +1505,7 @@ export type Database = {
           explicit_content_opt_in?: boolean
           handle?: string | null
           id: string
+          strike_count?: number
           updated_at?: string
         }
         Update: {
@@ -1253,6 +1519,7 @@ export type Database = {
           explicit_content_opt_in?: boolean
           handle?: string | null
           id?: string
+          strike_count?: number
           updated_at?: string
         }
         Relationships: []
@@ -1563,7 +1830,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_strike_count: { Args: { _user_id: string }; Returns: number }
       is_adult: { Args: { _user_id?: string }; Returns: boolean }
+      is_blocked: { Args: { _a: string; _b: string }; Returns: boolean }
       is_creator_owner: { Args: { _creator_id: string }; Returns: boolean }
       log_audit: {
         Args: {
@@ -1575,6 +1844,13 @@ export type Database = {
         Returns: undefined
       }
       screen_message: { Args: { _text: string }; Returns: string }
+      verify_consent_ledger_integrity: {
+        Args: { _creator_id: string }
+        Returns: {
+          ok: boolean
+          record_id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "fan" | "creator" | "agency" | "admin"
@@ -1600,6 +1876,8 @@ export type Database = {
         | "acknowledged"
         | "handed_off"
         | "dismissed"
+      escalation_status: "requested" | "accepted" | "declined" | "expired"
+      explicitness_level: "sfw" | "suggestive" | "explicit"
       generation_output_type:
         | "image"
         | "audio"
@@ -1617,6 +1895,12 @@ export type Database = {
         | "published"
         | "failed"
       moderation_status: "clean" | "flagged" | "removed"
+      notification_type:
+        | "new_content"
+        | "persona_reply"
+        | "escalation_requested"
+        | "escalation_accepted"
+        | "escalation_declined"
       payout_status: "none" | "pending" | "active"
       permission_type: "included" | "ppv" | "restricted"
       persona_kind: "real_me" | "ai"
@@ -1627,7 +1911,12 @@ export type Database = {
       twin_status: "none" | "pending" | "approved" | "revoked"
       tx_kind: "sub" | "ppv" | "tip" | "credits"
       tx_status: "stub" | "succeeded" | "failed"
-      verification_status: "unverified" | "pending" | "verified" | "rejected"
+      verification_status:
+        | "unverified"
+        | "pending"
+        | "verified"
+        | "rejected"
+        | "revoked"
       visibility: "draft" | "public" | "subscribers" | "vip" | "hidden"
     }
     CompositeTypes: {
@@ -1782,6 +2071,8 @@ export const Constants = {
         "handed_off",
         "dismissed",
       ],
+      escalation_status: ["requested", "accepted", "declined", "expired"],
+      explicitness_level: ["sfw", "suggestive", "explicit"],
       generation_output_type: [
         "image",
         "audio",
@@ -1801,6 +2092,13 @@ export const Constants = {
         "failed",
       ],
       moderation_status: ["clean", "flagged", "removed"],
+      notification_type: [
+        "new_content",
+        "persona_reply",
+        "escalation_requested",
+        "escalation_accepted",
+        "escalation_declined",
+      ],
       payout_status: ["none", "pending", "active"],
       permission_type: ["included", "ppv", "restricted"],
       persona_kind: ["real_me", "ai"],
@@ -1811,7 +2109,13 @@ export const Constants = {
       twin_status: ["none", "pending", "approved", "revoked"],
       tx_kind: ["sub", "ppv", "tip", "credits"],
       tx_status: ["stub", "succeeded", "failed"],
-      verification_status: ["unverified", "pending", "verified", "rejected"],
+      verification_status: [
+        "unverified",
+        "pending",
+        "verified",
+        "rejected",
+        "revoked",
+      ],
       visibility: ["draft", "public", "subscribers", "vip", "hidden"],
     },
   },
