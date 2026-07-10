@@ -359,7 +359,13 @@ function SummaryCard({ data }: { data: any }) {
   const revoked = !!c.revoked_at;
 
   return (
-    <section className="rounded-2xl border border-brand/20 bg-gradient-to-br from-brand/5 to-transparent p-5">
+    <section
+      className="rounded-2xl border border-brand/20 p-5"
+      style={{
+        backgroundImage:
+          "linear-gradient(135deg, var(--brand-tint-soft) 0%, transparent 100%)",
+      }}
+    >
       <div className="flex flex-wrap items-start gap-4">
         <div className="size-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-surface-elevated/60">
           {avatarUrl

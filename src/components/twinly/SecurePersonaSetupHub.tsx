@@ -39,7 +39,14 @@ const setupSteps = [
 export function SecurePersonaSetupHub() {
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-background via-background to-primary/10 p-5 shadow-2xl sm:p-8">
+      <div
+        className="rounded-3xl border border-white/10 p-5 sm:p-8"
+        style={{
+          backgroundImage:
+            "linear-gradient(135deg, var(--background) 0%, var(--background) 60%, var(--brand-tint-medium) 100%)",
+          boxShadow: "var(--shadow-brand-glow-xl)",
+        }}
+      >
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="max-w-3xl space-y-3">
             <Badge variant="secondary" className="w-fit gap-2 border-white/10 bg-white/10 text-white">
