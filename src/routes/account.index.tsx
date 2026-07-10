@@ -72,46 +72,56 @@ function ProfileSection() {
   const percent = complete ? 100 : Math.round((doneCount / steps.length) * 100);
 
   return (
-    <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
-      <div className="flex items-start gap-4">
-        <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-elevated">
-          {avatarUrl
-            ? <img src={avatarUrl} alt="Your avatar" className="size-full object-cover" />
-            : <UserIcon className="size-7 text-muted-foreground" />}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Profile</div>
-            {!complete && (
-              <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-brand-glow">
-                Setup needed
-              </span>
+    <div className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+          <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-elevated sm:size-16">
+            {avatarUrl
+              ? <img src={avatarUrl} alt="Your avatar" className="size-full object-cover" />
+              : <UserIcon className="size-6 text-muted-foreground sm:size-7" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Profile</div>
+              {!complete && (
+                <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-brand-glow">
+                  Setup needed
+                </span>
+              )}
+            </div>
+            <div className="mt-1 truncate font-display text-base font-semibold sm:text-lg">
+              {profile?.display_name || "No display name yet"}
+            </div>
+            {profile?.full_name && (
+              <div className="text-xs text-muted-foreground">Real name: {profile.full_name}</div>
+            )}
+            {profile?.bio && (
+              <p className="mt-2 text-sm text-muted-foreground line-clamp-3">{profile.bio}</p>
+            )}
+            {profile?.country && (
+              <div className="mt-1 text-xs text-muted-foreground">{profile.country}</div>
             )}
           </div>
-          <div className="mt-1 truncate font-display text-lg font-semibold">
-            {profile?.display_name || "No display name yet"}
-          </div>
-          {profile?.full_name && (
-            <div className="text-xs text-muted-foreground">Real name: {profile.full_name}</div>
-          )}
-          {profile?.bio && (
-            <p className="mt-2 text-sm text-muted-foreground line-clamp-3">{profile.bio}</p>
-          )}
-          {profile?.country && (
-            <div className="mt-1 text-xs text-muted-foreground">{profile.country}</div>
-          )}
         </div>
-        <Button asChild size="sm" variant={complete ? "outline" : "default"}>
-          <Link to="/account/setup"><Pencil className="mr-2 size-3.5" />{complete ? "Edit" : "Complete profile"}</Link>
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start">
+          <Button asChild size="sm" variant={complete ? "outline" : "default"} className="w-full sm:w-auto">
+            <Link to="/account/setup"><Pencil className="mr-2 size-3.5" />{complete ? "Edit" : "Complete profile"}</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+            <Link to="/account/following"><Users className="mr-2 size-3.5" />Following</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+            <Link to="/account/following" search={{ tab: "favorites" } as any}><Heart className="mr-2 size-3.5" />Favorites</Link>
+          </Button>
+        </div>
       </div>
       {!complete && (
         <div className="mt-4 rounded-lg border border-brand/20 bg-brand/10 p-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_auto]">
             <div className="text-xs font-semibold text-brand-glow">
               Profile setup · {doneCount} of {steps.length} done
             </div>
-            <Button asChild size="sm" variant="default">
+            <Button asChild size="sm" variant="default" className="w-full sm:w-auto">
               <Link
                 to="/account/setup"
                 search={{ step: nextStep > 0 ? nextStep : 1 } as any}
