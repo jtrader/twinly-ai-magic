@@ -32,6 +32,7 @@ function AccountSetupPage() {
   const [hydrated, setHydrated] = useState(false);
 
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
+  const [initialAvatarPath, setInitialAvatarPath] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
@@ -60,6 +61,7 @@ function AccountSetupPage() {
       const p = r.profile;
       if (p) {
         setAvatarPath(p.avatar_url ?? null);
+        setInitialAvatarPath(p.avatar_url ?? null);
         setDisplayName(p.display_name ?? "");
         setFullName(p.full_name ?? "");
         setBio(p.bio ?? "");
@@ -68,6 +70,13 @@ function AccountSetupPage() {
       setHydrated(true);
     }).catch(() => setHydrated(true));
   }, [user, load]);
+
+  const avatarState: "unchanged-empty" | "unchanged" | "uploaded" | "replaced" | "removed" = (() => {
+    if (initialAvatarPath === avatarPath) return avatarPath ? "unchanged" : "unchanged-empty";
+    if (!initialAvatarPath && avatarPath) return "uploaded";
+    if (initialAvatarPath && !avatarPath) return "removed";
+    return "replaced";
+  })();
 
   async function handleAvatarPick(file: File) {
     if (!user) return;
