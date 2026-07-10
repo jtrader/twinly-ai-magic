@@ -19,6 +19,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
+import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as StudioTwinRouteImport } from './routes/studio.twin'
 import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
 import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
@@ -41,6 +42,8 @@ import { Route as FanFlagsRouteImport } from './routes/fan.flags'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-image'
+import { Route as AccountSubscriptionsRouteImport } from './routes/account.subscriptions'
+import { Route as AccountFollowingRouteImport } from './routes/account.following'
 import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$packId'
 import { Route as CreatorsHandlePersonaRouteImport } from './routes/creators.$handle.$persona'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
@@ -98,6 +101,11 @@ const StudioIndexRoute = StudioIndexRouteImport.update({
   id: '/studio/',
   path: '/studio/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AccountIndexRoute = AccountIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AccountRoute,
 } as any)
 const StudioTwinRoute = StudioTwinRouteImport.update({
   id: '/studio/twin',
@@ -209,6 +217,16 @@ const ApiGenerateImageRoute = ApiGenerateImageRouteImport.update({
   path: '/api/generate-image',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountSubscriptionsRoute = AccountSubscriptionsRouteImport.update({
+  id: '/subscriptions',
+  path: '/subscriptions',
+  getParentRoute: () => AccountRoute,
+} as any)
+const AccountFollowingRoute = AccountFollowingRouteImport.update({
+  id: '/following',
+  path: '/following',
+  getParentRoute: () => AccountRoute,
+} as any)
 const StudioPacksPackIdRoute = StudioPacksPackIdRouteImport.update({
   id: '/$packId',
   path: '/$packId',
@@ -249,7 +267,7 @@ const ApiPublicCronHeygenPollRoute = ApiPublicCronHeygenPollRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/account': typeof AccountRoute
+  '/account': typeof AccountRouteWithChildren
   '/admin': typeof AdminRoute
   '/agency': typeof AgencyRoute
   '/app': typeof AppRoute
@@ -257,6 +275,8 @@ export interface FileRoutesByFullPath {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
+  '/account/following': typeof AccountFollowingRoute
+  '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
@@ -279,6 +299,7 @@ export interface FileRoutesByFullPath {
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/twin': typeof StudioTwinRoute
+  '/account/': typeof AccountIndexRoute
   '/studio/': typeof StudioIndexRoute
   '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
@@ -290,7 +311,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
   '/agency': typeof AgencyRoute
   '/app': typeof AppRoute
@@ -298,6 +318,8 @@ export interface FileRoutesByTo {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
+  '/account/following': typeof AccountFollowingRoute
+  '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
@@ -320,6 +342,7 @@ export interface FileRoutesByTo {
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/twin': typeof StudioTwinRoute
+  '/account': typeof AccountIndexRoute
   '/studio': typeof StudioIndexRoute
   '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
@@ -332,7 +355,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/account': typeof AccountRoute
+  '/account': typeof AccountRouteWithChildren
   '/admin': typeof AdminRoute
   '/agency': typeof AgencyRoute
   '/app': typeof AppRoute
@@ -340,6 +363,8 @@ export interface FileRoutesById {
   '/discover': typeof DiscoverRoute
   '/fan': typeof FanRouteWithChildren
   '/onboarding': typeof OnboardingRoute
+  '/account/following': typeof AccountFollowingRoute
+  '/account/subscriptions': typeof AccountSubscriptionsRoute
   '/api/generate-image': typeof ApiGenerateImageRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
@@ -362,6 +387,7 @@ export interface FileRoutesById {
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/personas': typeof StudioPersonasRoute
   '/studio/twin': typeof StudioTwinRoute
+  '/account/': typeof AccountIndexRoute
   '/studio/': typeof StudioIndexRoute
   '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
@@ -383,6 +409,8 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/account/following'
+    | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
@@ -405,6 +433,7 @@ export interface FileRouteTypes {
     | '/studio/payouts'
     | '/studio/personas'
     | '/studio/twin'
+    | '/account/'
     | '/studio/'
     | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
@@ -416,7 +445,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/account'
     | '/admin'
     | '/agency'
     | '/app'
@@ -424,6 +452,8 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/account/following'
+    | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
@@ -446,6 +476,7 @@ export interface FileRouteTypes {
     | '/studio/payouts'
     | '/studio/personas'
     | '/studio/twin'
+    | '/account'
     | '/studio'
     | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
@@ -465,6 +496,8 @@ export interface FileRouteTypes {
     | '/discover'
     | '/fan'
     | '/onboarding'
+    | '/account/following'
+    | '/account/subscriptions'
     | '/api/generate-image'
     | '/auth/callback'
     | '/creators/$handle'
@@ -487,6 +520,7 @@ export interface FileRouteTypes {
     | '/studio/payouts'
     | '/studio/personas'
     | '/studio/twin'
+    | '/account/'
     | '/studio/'
     | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
@@ -499,7 +533,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AccountRoute: typeof AccountRoute
+  AccountRoute: typeof AccountRouteWithChildren
   AdminRoute: typeof AdminRoute
   AgencyRoute: typeof AgencyRoute
   AppRoute: typeof AppRoute
@@ -605,6 +639,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/studio/'
       preLoaderRoute: typeof StudioIndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/account/': {
+      id: '/account/'
+      path: '/'
+      fullPath: '/account/'
+      preLoaderRoute: typeof AccountIndexRouteImport
+      parentRoute: typeof AccountRoute
     }
     '/studio/twin': {
       id: '/studio/twin'
@@ -760,6 +801,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGenerateImageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account/subscriptions': {
+      id: '/account/subscriptions'
+      path: '/subscriptions'
+      fullPath: '/account/subscriptions'
+      preLoaderRoute: typeof AccountSubscriptionsRouteImport
+      parentRoute: typeof AccountRoute
+    }
+    '/account/following': {
+      id: '/account/following'
+      path: '/following'
+      fullPath: '/account/following'
+      preLoaderRoute: typeof AccountFollowingRouteImport
+      parentRoute: typeof AccountRoute
+    }
     '/studio/packs/$packId': {
       id: '/studio/packs/$packId'
       path: '/$packId'
@@ -812,6 +867,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AccountRouteChildren {
+  AccountFollowingRoute: typeof AccountFollowingRoute
+  AccountSubscriptionsRoute: typeof AccountSubscriptionsRoute
+  AccountIndexRoute: typeof AccountIndexRoute
+}
+
+const AccountRouteChildren: AccountRouteChildren = {
+  AccountFollowingRoute: AccountFollowingRoute,
+  AccountSubscriptionsRoute: AccountSubscriptionsRoute,
+  AccountIndexRoute: AccountIndexRoute,
+}
+
+const AccountRouteWithChildren =
+  AccountRoute._addFileChildren(AccountRouteChildren)
+
 interface AuthRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
 }
@@ -860,7 +930,7 @@ const StudioPacksRouteWithChildren = StudioPacksRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AccountRoute: AccountRoute,
+  AccountRoute: AccountRouteWithChildren,
   AdminRoute: AdminRoute,
   AgencyRoute: AgencyRoute,
   AppRoute: AppRoute,
