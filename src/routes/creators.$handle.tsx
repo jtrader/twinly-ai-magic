@@ -1,12 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, useServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { PersonaCard } from "@/components/twinly/PersonaCard";
 import { AiDisclosureBanner } from "@/components/twinly/AiDisclosureBanner";
 import { ReportDialog } from "@/components/twinly/ReportDialog";
 import { BlockButton } from "@/components/twinly/BlockButton";
 import { FollowButton } from "@/components/twinly/FollowButton";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Rss } from "lucide-react";
+import { PostComposer, PostFeed } from "@/components/twinly/PostFeed";
+import { getCreatorPosts } from "@/lib/posts.functions";
+import { useSession } from "@/lib/session";
 
 const loadCreator = createServerFn({ method: "GET" })
   .validator((d: { handle: string }) => d)
@@ -42,6 +46,17 @@ function CreatorProfile() {
   if (!data) return <AppShell><div className="py-20 text-center text-muted-foreground">Creator not found.</div></AppShell>;
   const { creator, profile, personas } = data;
   const avatarUrl = profile?.avatar_url ?? null;
+  const { user } = useSession();
+  const isOwner = !!user && user.id === creator.user_id;
+  const [posts, setPosts] = useState<any[]>([]);
+  const loadPosts = useServerFn(getCreatorPosts);
+  const refreshPosts = async () => {
+    try {
+      const r = await loadPosts({ data: { handle: creator.handle } });
+      setPosts(r.items ?? []);
+    } catch {}
+  };
+  useEffect(() => { refreshPosts(); /* eslint-disable-line */ }, [creator.handle]);
   const now = Date.now();
   const visible = (personas as any[]).filter((p) => {
     if (p.starts_at && new Date(p.starts_at).getTime() > now) return false;
@@ -101,6 +116,25 @@ function CreatorProfile() {
       <p className="mt-6 text-xs text-muted-foreground">
         <Link to="/legal/ai-disclosure" className="underline">Learn how AI personas work →</Link>
       </p>
+
+      <section className="mt-10">
+        <div className="mb-3 flex items-center gap-2">
+          <Rss className="size-4 text-brand-glow" />
+          <h2 className="font-display text-xl font-semibold">Latest from {creator.stage_name}</h2>
+        </div>
+        {isOwner && (
+          <div className="mb-4">
+            <PostComposer creatorId={creator.id} onPosted={refreshPosts} />
+          </div>
+        )}
+        <PostFeed
+          posts={posts}
+          emptyText={isOwner
+            ? "You haven't posted yet. Share an update with your supporters."
+            : "No posts yet."}
+          onChanged={refreshPosts}
+        />
+      </section>
     </AppShell>
   );
 }
