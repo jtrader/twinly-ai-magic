@@ -4,9 +4,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, ExternalLink, Wallet, Loader2 } from "lucide-react";
+import { CreditCard, ExternalLink, Wallet, Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { listMySubscriptions } from "@/lib/subscriptions.functions";
-import { createBillingPortal } from "@/lib/checkout.functions";
+import { createBillingPortal, reactivateSubscription } from "@/lib/checkout.functions";
 import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 
 export const Route = createFileRoute("/account/subscriptions")({ component: SubscriptionsPage });
@@ -17,8 +17,10 @@ function SubscriptionsPage() {
   const [subs, setSubs] = useState<Sub[]>([]);
   const [loading, setLoading] = useState(true);
   const [portalBusy, setPortalBusy] = useState<string | "all" | null>(null);
+  const [reactivateBusy, setReactivateBusy] = useState<string | null>(null);
   const load = useServerFn(listMySubscriptions);
   const openPortal = useServerFn(createBillingPortal);
+  const reactivate = useServerFn(reactivateSubscription);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -40,6 +42,20 @@ function SubscriptionsPage() {
       window.open(res.url, "_blank", "noopener,noreferrer");
     } catch (e: any) { toast.error(e?.message ?? "Couldn't open billing portal — try again"); }
     finally { setPortalBusy(null); }
+  }
+
+  async function handleReactivate(sub: Sub) {
+    setReactivateBusy(sub.id);
+    const prev = subs;
+    setSubs((s) => s.map((r) => r.id === sub.id ? { ...r, cancelAtPeriodEnd: false } : r));
+    try {
+      const res = await reactivate({ data: { subscriptionId: sub.id, environment: sub.environment } });
+      if ("error" in res) throw new Error(res.error);
+      toast.success("Subscription reactivated");
+    } catch (e: any) {
+      setSubs(prev);
+      toast.error(e?.message ?? "Could not reactivate");
+    } finally { setReactivateBusy(null); }
   }
 
   const active = subs.filter((s) => s.status === "active");
@@ -81,13 +97,23 @@ function SubscriptionsPage() {
 
       {!loading && active.length > 0 && (
         <Section title="Active">
-          {active.map((s) => <SubRow key={s.id} sub={s} onManage={() => handlePortal(s.id)} busy={portalBusy === s.id || portalBusy === "all"} />)}
+          {active.map((s) => (
+            <SubRow key={s.id} sub={s}
+              onManage={() => handlePortal(s.id)}
+              busy={portalBusy === s.id || portalBusy === "all"}
+              onReactivate={() => handleReactivate(s)}
+              reactivating={reactivateBusy === s.id} />
+          ))}
         </Section>
       )}
 
       {!loading && inactive.length > 0 && (
         <Section title="Past" muted>
-          {inactive.map((s) => <SubRow key={s.id} sub={s} onManage={() => handlePortal(s.id)} busy={portalBusy === s.id || portalBusy === "all"} />)}
+          {inactive.map((s) => (
+            <SubRow key={s.id} sub={s}
+              onManage={() => handlePortal(s.id)}
+              busy={portalBusy === s.id || portalBusy === "all"} />
+          ))}
         </Section>
       )}
     </div>
@@ -103,8 +129,14 @@ function Section({ title, muted, children }: { title: string; muted?: boolean; c
   );
 }
 
-function SubRow({ sub, onManage, busy }: { sub: Sub; onManage: () => void; busy: boolean }) {
+function SubRow({
+  sub, onManage, busy, onReactivate, reactivating,
+}: {
+  sub: Sub; onManage: () => void; busy: boolean;
+  onReactivate?: () => void; reactivating?: boolean;
+}) {
   const canceled = sub.status !== "active";
+  const endingSoon = !canceled && sub.cancelAtPeriodEnd;
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3">
       <div className="flex min-w-0 items-center gap-3">
@@ -118,15 +150,26 @@ function SubRow({ sub, onManage, busy }: { sub: Sub; onManage: () => void; busy:
             <Badge variant="outline" className="capitalize text-[10px]">{sub.tier}</Badge>
             <span className={canceled ? "text-muted-foreground" : "text-brand-glow"}>{sub.status}</span>
             {sub.currentPeriodEnd && (
-              <span>· renews {new Date(sub.currentPeriodEnd).toLocaleDateString()}</span>
+              <span>· {endingSoon ? "ends" : "renews"} {new Date(sub.currentPeriodEnd).toLocaleDateString()}</span>
             )}
           </div>
+          {endingSoon && (
+            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-amber-300">
+              <AlertCircle className="size-3" /> Set to end at period close — you can reactivate below.
+            </div>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2">
         {sub.handle && (
           <Button asChild size="sm" variant="ghost">
             <Link to="/creators/$handle" params={{ handle: sub.handle }}><ExternalLink className="mr-1 size-3.5" />Visit</Link>
+          </Button>
+        )}
+        {endingSoon && onReactivate && (
+          <Button size="sm" variant="default" disabled={reactivating} onClick={onReactivate}>
+            {reactivating ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : <RotateCcw className="mr-1 size-3.5" />}
+            Reactivate
           </Button>
         )}
         {!canceled && (

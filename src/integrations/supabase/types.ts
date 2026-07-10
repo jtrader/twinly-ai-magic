@@ -1935,33 +1935,42 @@ export type Database = {
           asset_id: string | null
           created_at: string
           creator_id: string
+          environment: string
           fan_id: string
           id: string
           kind: Database["public"]["Enums"]["tx_kind"]
           persona_id: string | null
           status: Database["public"]["Enums"]["tx_status"]
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
         }
         Insert: {
           amount_cents?: number
           asset_id?: string | null
           created_at?: string
           creator_id: string
+          environment?: string
           fan_id: string
           id?: string
           kind: Database["public"]["Enums"]["tx_kind"]
           persona_id?: string | null
           status?: Database["public"]["Enums"]["tx_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
         }
         Update: {
           amount_cents?: number
           asset_id?: string | null
           created_at?: string
           creator_id?: string
+          environment?: string
           fan_id?: string
           id?: string
           kind?: Database["public"]["Enums"]["tx_kind"]
           persona_id?: string | null
           status?: Database["public"]["Enums"]["tx_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
         }
         Relationships: [
           {
@@ -2242,6 +2251,18 @@ export type Database = {
         | "escalation_requested"
         | "escalation_accepted"
         | "escalation_declined"
+        | "subscription_started"
+        | "subscription_changed"
+        | "subscription_ending"
+        | "subscription_reactivated"
+        | "new_subscriber"
+        | "subscriber_changed"
+        | "tip_sent"
+        | "tip_received"
+        | "unlock_purchased"
+        | "content_unlocked"
+        | "twinly_plus_active"
+        | "twinly_plus_ended"
       payout_status: "none" | "pending" | "active"
       permission_type: "included" | "ppv" | "restricted"
       persona_kind: "real_me" | "ai"
@@ -2439,6 +2460,18 @@ export const Constants = {
         "escalation_requested",
         "escalation_accepted",
         "escalation_declined",
+        "subscription_started",
+        "subscription_changed",
+        "subscription_ending",
+        "subscription_reactivated",
+        "new_subscriber",
+        "subscriber_changed",
+        "tip_sent",
+        "tip_received",
+        "unlock_purchased",
+        "content_unlocked",
+        "twinly_plus_active",
+        "twinly_plus_ended",
       ],
       payout_status: ["none", "pending", "active"],
       permission_type: ["included", "ppv", "restricted"],

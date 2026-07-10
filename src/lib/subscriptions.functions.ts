@@ -6,7 +6,7 @@ export const listMySubscriptions = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("subscriptions")
-      .select("id, creator_id, tier, status, current_period_end, created_at, creators:creator_id(id, handle, stage_name, avatar_url, verification_status)")
+      .select("id, creator_id, tier, status, current_period_end, cancel_at_period_end, environment, created_at, creators:creator_id(id, handle, stage_name, avatar_url, verification_status)")
       .eq("fan_id", context.userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
@@ -16,6 +16,8 @@ export const listMySubscriptions = createServerFn({ method: "GET" })
       tier: r.tier,
       status: r.status,
       currentPeriodEnd: r.current_period_end,
+      cancelAtPeriodEnd: !!r.cancel_at_period_end,
+      environment: (r.environment ?? "sandbox") as "sandbox" | "live",
       createdAt: r.created_at,
       handle: r.creators?.handle,
       stageName: r.creators?.stage_name,

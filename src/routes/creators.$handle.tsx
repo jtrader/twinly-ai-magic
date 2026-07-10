@@ -8,6 +8,7 @@ import { ReportDialog } from "@/components/twinly/ReportDialog";
 import { BlockButton } from "@/components/twinly/BlockButton";
 import { FollowButton } from "@/components/twinly/FollowButton";
 import { CreatorSubscribeButtons } from "@/components/twinly/CreatorSubscribeButtons";
+import { TipButton } from "@/components/twinly/TipButton";
 import { ShieldCheck, Rss, Sparkles } from "lucide-react";
 import { PostComposer, PostFeed } from "@/components/twinly/PostFeed";
 import { getCreatorPosts } from "@/lib/posts.functions";
@@ -93,6 +94,7 @@ function CreatorProfile() {
           {creator.bio && <p className="mt-2 text-sm text-muted-foreground">{creator.bio}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <FollowButton creatorId={creator.id} compact />
+            {!isOwner && <TipButton creatorId={creator.id} creatorName={creator.stage_name} />}
             <ReportDialog targetType="creator" targetId={creator.id} label="Report creator" variant="outline" />
             <BlockButton targetType="creator" targetId={creator.id} variant="outline" />
           </div>
