@@ -1935,33 +1935,42 @@ export type Database = {
           asset_id: string | null
           created_at: string
           creator_id: string
+          environment: string
           fan_id: string
           id: string
           kind: Database["public"]["Enums"]["tx_kind"]
           persona_id: string | null
           status: Database["public"]["Enums"]["tx_status"]
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
         }
         Insert: {
           amount_cents?: number
           asset_id?: string | null
           created_at?: string
           creator_id: string
+          environment?: string
           fan_id: string
           id?: string
           kind: Database["public"]["Enums"]["tx_kind"]
           persona_id?: string | null
           status?: Database["public"]["Enums"]["tx_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
         }
         Update: {
           amount_cents?: number
           asset_id?: string | null
           created_at?: string
           creator_id?: string
+          environment?: string
           fan_id?: string
           id?: string
           kind?: Database["public"]["Enums"]["tx_kind"]
           persona_id?: string | null
           status?: Database["public"]["Enums"]["tx_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
         }
         Relationships: [
           {
