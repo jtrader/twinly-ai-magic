@@ -10,6 +10,7 @@ export interface PersonaCardProps {
   kind: "real_me" | "ai";
   disclosureLabel: string;
   priceCents: number;
+  avatarUrl?: string | null;
   href?: string;
   onClick?: () => void;
   className?: string;
@@ -22,15 +23,28 @@ export function PersonaCard(p: PersonaCardProps) {
       p.className,
     )}>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="font-display text-lg font-semibold text-foreground">{p.displayName}</div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="font-display text-lg font-semibold text-foreground">{p.displayName}</div>
+            <PersonaBadge kind={p.kind} />
+          </div>
           <div className="mt-1 text-xs text-muted-foreground">{p.disclosureLabel}</div>
+          {p.description && (
+            <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{p.description}</p>
+          )}
         </div>
-        <PersonaBadge kind={p.kind} />
+        {p.avatarUrl && (
+          <div className="relative shrink-0 self-center">
+            <div className="absolute inset-0 rounded-full bg-brand-glow/40 blur-md" aria-hidden />
+            <img
+              src={p.avatarUrl}
+              alt={p.displayName}
+              loading="lazy"
+              className="relative size-16 rounded-full border-2 border-brand-glow/70 object-cover shadow-[0_0_18px_-2px_hsl(var(--brand-glow)/0.55)] sm:size-20"
+            />
+          </div>
+        )}
       </div>
-      {p.description && (
-        <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{p.description}</p>
-      )}
       <div className="mt-6 flex items-center justify-between">
         <span className="text-xs uppercase tracking-widest text-muted-foreground">
           {p.priceCents > 0 ? `$${(p.priceCents / 100).toFixed(2)}` : "Included"}
