@@ -220,6 +220,7 @@ function AccountSetupPage() {
                   </Button>
                 )}
               </div>
+              <AvatarStatePill state={avatarState} />
               <p className="text-xs text-muted-foreground">PNG, JPG, WebP or GIF · max 5 MB</p>
               {!avatarPath && (
                 <p className="text-xs text-muted-foreground">A profile picture is required to continue.</p>
