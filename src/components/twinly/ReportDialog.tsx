@@ -7,6 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { reportSubject, listMyReports } from "@/lib/moderation.functions";
+import { useSession } from "@/lib/session";
+import { AuthPromptDialog } from "@/components/twinly/AuthPromptDialog";
+
 
 type Target = "creator" | "persona" | "message" | "content_asset" | "conversation";
 
