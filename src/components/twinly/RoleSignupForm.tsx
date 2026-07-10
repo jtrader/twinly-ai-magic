@@ -116,7 +116,7 @@ export function RoleSignupForm() {
           <div className="rounded-xl border border-brand/30 bg-brand/10 p-3 text-xs text-muted-foreground">
             <p className="font-semibold text-foreground">AI persona setup is integrated after secure login.</p>
             <p className="mt-1">
-              Continue as a {role === "fan" ? "supporter" : role} and you will be routed to the protected persona setup hub for default personas, custom persona creation, training inputs, and content-pack setup.
+              Continue as a {role} and you will be routed to the protected persona setup hub for default personas, custom persona creation, training inputs, and content-pack setup.
             </p>
             <Link to="/secure/personas" className="mt-2 inline-block text-brand-glow underline underline-offset-4">
               Preview secure persona setup
