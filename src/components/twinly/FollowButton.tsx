@@ -57,7 +57,7 @@ export function FollowButton({ creatorId, compact = false }: { creatorId: string
         disabled={busy}
       >
         {following ? <UserCheck className="mr-1 size-4" /> : <UserPlus className="mr-1 size-4" />}
-        {following ? "Following" : "Follow"}
+        {following ? "Following" : "Follow · Free"}
       </Button>
       <Button
         size={compact ? "sm" : "default"}
