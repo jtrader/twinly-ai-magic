@@ -181,27 +181,27 @@ function NotificationPreferencesSection() {
   if (!prefs) return null;
 
   return (
-    <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
+    <div className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:p-5">
       <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Notifications</div>
       <div className="mt-3 space-y-3">
-        <label className="flex items-center justify-between">
-          <div>
+        <label className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
             <div className="text-sm font-medium">In-app notifications</div>
             <div className="text-xs text-muted-foreground">Turn off to silence everything below.</div>
           </div>
-          <Switch checked={prefs.in_app_enabled} disabled={busy} onCheckedChange={(v) => toggle("inAppEnabled", "in_app_enabled", v)} />
+          <Switch checked={prefs.in_app_enabled} disabled={busy} onCheckedChange={(v) => toggle("inAppEnabled", "in_app_enabled", v)} className="shrink-0" />
         </label>
-        <label className="flex items-center justify-between">
-          <div className="text-sm">New content from creators you follow</div>
-          <Switch checked={prefs.new_content} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("newContent", "new_content", v)} />
+        <label className="flex items-start justify-between gap-4">
+          <div className="min-w-0 text-sm">New content from creators you follow</div>
+          <Switch checked={prefs.new_content} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("newContent", "new_content", v)} className="shrink-0" />
         </label>
-        <label className="flex items-center justify-between">
-          <div className="text-sm">Replies from a Real Me creator</div>
-          <Switch checked={prefs.persona_reply} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("personaReply", "persona_reply", v)} />
+        <label className="flex items-start justify-between gap-4">
+          <div className="min-w-0 text-sm">Replies from a Real Me creator</div>
+          <Switch checked={prefs.persona_reply} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("personaReply", "persona_reply", v)} className="shrink-0" />
         </label>
-        <label className="flex items-center justify-between">
-          <div className="text-sm">Real Me request updates</div>
-          <Switch checked={prefs.escalation_updates} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("escalationUpdates", "escalation_updates", v)} />
+        <label className="flex items-start justify-between gap-4">
+          <div className="min-w-0 text-sm">Real Me request updates</div>
+          <Switch checked={prefs.escalation_updates} disabled={busy || !prefs.in_app_enabled} onCheckedChange={(v) => toggle("escalationUpdates", "escalation_updates", v)} className="shrink-0" />
         </label>
       </div>
       <p className="mt-3 text-[11px] text-muted-foreground">Email and push aren't wired up yet — in-app is the only channel that actually delivers right now.</p>
