@@ -169,6 +169,49 @@ export const createSetupIntentCheckout = createServerFn({ method: "POST" })
     }
   });
 
+type SavedCardResult =
+  | { card: { brand: string; last4: string; expMonth: number; expYear: number } | null }
+  | { error: string };
+
+/** Look up the fan's most recently saved card on their Stripe customer. */
+export const getSavedPaymentMethod = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { environment: StripeEnv }) => d)
+  .handler(async ({ data, context }): Promise<SavedCardResult> => {
+    try {
+      const { userId } = context;
+      if (!/^[a-zA-Z0-9_-]+$/.test(userId)) return { card: null };
+      const stripe = createStripeClient(data.environment);
+      const found = await stripe.customers.search({
+        query: `metadata['userId']:'${userId}'`,
+        limit: 1,
+      });
+      const customer = found.data[0];
+      if (!customer) return { card: null };
+
+      // Prefer the invoice-default PM, then any attached card, newest first.
+      const defaultPmId =
+        (customer as any).invoice_settings?.default_payment_method ??
+        (typeof customer.default_source === "string" ? customer.default_source : null);
+      if (defaultPmId && typeof defaultPmId === "string") {
+        try {
+          const pm = await stripe.paymentMethods.retrieve(defaultPmId);
+          if (pm.card) {
+            return { card: { brand: pm.card.brand, last4: pm.card.last4, expMonth: pm.card.exp_month, expYear: pm.card.exp_year } };
+          }
+        } catch { /* fall through to list */ }
+      }
+      const list = await stripe.paymentMethods.list({ customer: customer.id, type: "card", limit: 10 });
+      const newest = list.data
+        .filter((p) => !!p.card)
+        .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0];
+      if (!newest || !newest.card) return { card: null };
+      return { card: { brand: newest.card.brand, last4: newest.card.last4, expMonth: newest.card.exp_month, expYear: newest.card.exp_year } };
+    } catch (error) {
+      return { error: getStripeErrorMessage(error) };
+    }
+  });
+
 /** Twinly+ platform membership. */
 export const createTwinlyPlusCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

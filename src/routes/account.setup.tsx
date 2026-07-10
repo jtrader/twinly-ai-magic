@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
 import { useAvatarUrl } from "@/lib/useAvatarUrl";
 import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
-import { createBillingPortal, createSetupIntentCheckout } from "@/lib/checkout.functions";
+import { createBillingPortal, createSetupIntentCheckout, getSavedPaymentMethod } from "@/lib/checkout.functions";
 import { getStripe, getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 
 export const Route = createFileRoute("/account/setup")({ component: AccountSetupPage });
@@ -275,11 +275,27 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function PaymentStep() {
   const openPortal = useServerFn(createBillingPortal);
   const startSetup = useServerFn(createSetupIntentCheckout);
+  const loadCard = useServerFn(getSavedPaymentMethod);
   const [busy, setBusy] = useState(false);
   const [portalBusy, setPortalBusy] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [card, setCard] = useState<{ brand: string; last4: string; expMonth: number; expYear: number } | null>(null);
+  const [cardLoading, setCardLoading] = useState(true);
   const configured = isPaymentsConfigured();
+
+  async function refreshCard() {
+    if (!configured) { setCardLoading(false); return; }
+    setCardLoading(true);
+    try {
+      const res = await loadCard({ data: { environment: getStripeEnvironment() } });
+      if ("error" in res) { setCard(null); }
+      else { setCard(res.card); }
+    } catch { setCard(null); }
+    finally { setCardLoading(false); }
+  }
+
+  useEffect(() => { refreshCard(); /* eslint-disable-line */ }, []);
 
   async function handleAddCard() {
     if (!configured) { toast.error("Payments not configured yet"); return; }
@@ -310,10 +326,34 @@ function PaymentStep() {
 
   return (
     <div className="space-y-4">
+      {cardLoading ? (
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-elevated p-4 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" /> Checking for a saved card…
+        </div>
+      ) : card ? (
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-400/40 bg-emerald-500/10 p-4">
+          <Check className="mt-0.5 size-5 text-emerald-400" />
+          <div className="flex-1 text-sm">
+            <div className="font-medium text-emerald-100">Card saved</div>
+            <div className="mt-1 flex items-center gap-2 text-emerald-100/90">
+              <span className="rounded bg-black/30 px-2 py-0.5 font-mono text-xs uppercase tracking-wider">
+                {card.brand}
+              </span>
+              <span>•••• {card.last4}</span>
+              <span className="text-emerald-100/70">
+                exp {String(card.expMonth).padStart(2, "0")}/{String(card.expYear).slice(-2)}
+              </span>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex items-start gap-3 rounded-xl border border-border bg-surface-elevated p-4">
         <CreditCard className="mt-0.5 size-5 text-brand-glow" />
         <div className="flex-1 text-sm">
-          <div className="font-medium">Save a card for one-tap purchases</div>
+          <div className="font-medium">
+            {card ? "Add another payment method" : "Save a card for one-tap purchases"}
+          </div>
           <p className="mt-1 text-muted-foreground">
             We'll create your billing account with Stripe and save your card securely.
             No charge is made now — your card is only used when you subscribe or tip.
@@ -323,7 +363,7 @@ function PaymentStep() {
       </div>
       <Button onClick={handleAddCard} disabled={busy || !configured} className="w-full">
         <Wallet className="mr-2 size-4" />
-        {busy ? "Preparing…" : "Add payment method"}
+        {busy ? "Preparing…" : card ? "Add another card" : "Add payment method"}
       </Button>
       <Button variant="ghost" onClick={handlePortal} disabled={portalBusy || !configured} className="w-full">
         <ExternalLink className="mr-2 size-4" />
@@ -335,7 +375,7 @@ function PaymentStep() {
         </p>
       )}
 
-      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setClientSecret(null); }}>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setClientSecret(null); refreshCard(); } }}>
         <DialogContent className="max-w-lg overflow-hidden p-0">
           <DialogHeader className="px-6 pt-6">
             <DialogTitle>Add payment method</DialogTitle>
