@@ -27,13 +27,20 @@ const loadCreator = createServerFn({ method: "GET" })
       .select("id, display_name, avatar_url")
       .eq("id", creator.user_id)
       .maybeSingle();
-    const { data: personas } = await supabaseAdmin
-      .from("personas")
-      .select("id, slug, display_name, description, kind, disclosure_label, price_cents, visibility, starts_at, ends_at, sort_order, is_explicit, cover_url")
-      .eq("creator_id", creator.id)
-      .in("visibility", ["public", "subscribers", "vip"])
-      .order("sort_order", { ascending: true });
-    return { creator, profile: profile ?? null, personas: personas ?? [] };
+    const [{ data: personas }, { count: postCount }] = await Promise.all([
+      supabaseAdmin
+        .from("personas")
+        .select("id, slug, display_name, description, kind, disclosure_label, price_cents, visibility, starts_at, ends_at, sort_order, is_explicit, cover_url")
+        .eq("creator_id", creator.id)
+        .in("visibility", ["public", "subscribers", "vip"])
+        .order("sort_order", { ascending: true }),
+      supabaseAdmin
+        .from("creator_posts")
+        .select("id", { count: "exact", head: true })
+        .eq("creator_id", creator.id)
+        .eq("is_removed", false),
+    ]);
+    return { creator, profile: profile ?? null, personas: personas ?? [], postCount: postCount ?? 0 };
   });
 
 export const Route = createFileRoute("/creators/$handle")({
@@ -44,12 +51,22 @@ export const Route = createFileRoute("/creators/$handle")({
 function CreatorProfile() {
   const data = Route.useLoaderData();
   if (!data) return <AppShell><div className="py-20 text-center text-muted-foreground">Creator not found.</div></AppShell>;
-  const { creator, profile, personas } = data;
+  const { creator, profile, personas, postCount } = data;
   const avatarUrl = profile?.avatar_url ?? null;
   const { user } = useSession();
   const isOwner = !!user && user.id === creator.user_id;
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"latest" | "experiences">("latest");
+  const visiblePersonas = (personas as any[]).filter((p) => {
+    const now = Date.now();
+    if (p.starts_at && new Date(p.starts_at).getTime() > now) return false;
+    if (p.ends_at && new Date(p.ends_at).getTime() < now) return false;
+    return true;
+  });
+  const [tab, setTab] = useState<"latest" | "experiences">(() => {
+    if (postCount === 0 && visiblePersonas.length > 0) return "experiences";
+    if (visiblePersonas.length === 0 && postCount > 0) return "latest";
+    return "latest";
+  });
   const [posts, setPosts] = useState<any[]>([]);
   const loadPosts = useServerFn(getCreatorPosts);
   const refreshPosts = async () => {
@@ -59,12 +76,6 @@ function CreatorProfile() {
     } catch {}
   };
   useEffect(() => { refreshPosts(); /* eslint-disable-line */ }, [creator.handle]);
-  const now = Date.now();
-  const visible = (personas as any[]).filter((p) => {
-    if (p.starts_at && new Date(p.starts_at).getTime() > now) return false;
-    if (p.ends_at && new Date(p.ends_at).getTime() < now) return false;
-    return true;
-  });
   return (
     <AppShell>
       <div className="mb-6 flex items-center justify-between gap-4">
@@ -153,7 +164,7 @@ function CreatorProfile() {
       ) : (
         <section key="experiences" className="animate-fade-in">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {visible.map((p) => {
+            {visiblePersonas.map((p: any) => {
               const target = `/creators/${creator.handle}/${p.slug}`;
               const cardProps = user
                 ? { href: target }
