@@ -74,27 +74,6 @@ export function RoleSignupForm() {
     if (res.error) toast.error(res.error.message);
   }
 
-  // Microsoft OAuth (Azure AD) — only available when the project runs against
-  // a self-hosted / BYO Supabase with the `azure` provider configured. Flag
-  // it on with `VITE_ENABLE_MICROSOFT_OAUTH=1`.
-  const microsoftEnabled = import.meta.env.VITE_ENABLE_MICROSOFT_OAUTH === "1"
-    || import.meta.env.VITE_ENABLE_MICROSOFT_OAUTH === "true";
-
-  async function microsoft() {
-    try {
-      rememberPostAuthRedirect(postAuthPath);
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "azure",
-        options: {
-          redirectTo: window.location.origin + "/auth/callback",
-          scopes: "email openid profile",
-        },
-      });
-      if (error) throw error;
-    } catch (err: any) {
-      toast.error(err.message ?? "Microsoft sign-in isn't available on this deployment.");
-    }
-  }
 
   return (
     <div className="space-y-4">
