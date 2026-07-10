@@ -21,11 +21,8 @@ async function resolveDestination(fallback: string): Promise<string> {
     const { data: userRes } = await supabase.auth.getUser();
     const uid = userRes.user?.id;
     if (!uid) return fallback;
-    const { data } = await supabase
-      .from("profiles")
-      .select("profile_completed_at")
-      .eq("id", uid)
-      .maybeSingle();
+    const { data: rows } = await (supabase as any).rpc("get_my_profile_status");
+    const data = Array.isArray(rows) ? rows[0] : rows;
     if (!data || !data.profile_completed_at) return "/account/setup";
   } catch { /* fall through */ }
   return fallback;

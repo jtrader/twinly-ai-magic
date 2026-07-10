@@ -51,11 +51,11 @@ function FanDashboard() {
         supabase.from("conversations")
           .select("id, last_message_at, persona_id, creator_id, personas:persona_id(display_name, kind, slug), creators:creator_id(handle, stage_name)")
           .eq("fan_id", user.id).order("last_message_at", { ascending: false }).limit(10),
-        supabase.from("profiles").select("age_verified_at").eq("id", user.id).maybeSingle(),
+        (supabase as any).rpc("get_my_profile_status"),
       ]);
       setSubs(s ?? []);
       setConvos(c ?? []);
-      setProfile(p ?? null);
+      setProfile(Array.isArray(p) ? (p[0] ?? null) : (p ?? null));
       try {
         const [f, fol, ps] = await Promise.all([
           loadFeed({}),
