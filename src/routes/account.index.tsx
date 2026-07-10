@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { User as UserIcon, Pencil } from "lucide-react";
+import { User as UserIcon, Pencil, Heart, Users } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
