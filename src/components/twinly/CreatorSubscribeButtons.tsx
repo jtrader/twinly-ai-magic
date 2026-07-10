@@ -9,7 +9,7 @@ import { AuthPromptDialog } from "@/components/twinly/AuthPromptDialog";
 import { useSession } from "@/lib/session";
 import { getStripe, getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 import { getCreatorPricing, type Tier } from "@/lib/creator-pricing.functions";
-import { createCreatorSubscriptionCheckout, createBillingPortal } from "@/lib/checkout.functions";
+import { createCreatorSubscriptionCheckout, createBillingPortal, changeSubscriptionTier } from "@/lib/checkout.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 const TIER_META: Record<Tier, { label: string; blurb: string; icon: typeof Star; accent: string }> = {
@@ -19,12 +19,15 @@ const TIER_META: Record<Tier, { label: string; blurb: string; icon: typeof Star;
 };
 
 type Price = { tier: Tier; amountCents: number; currency: string };
+type ActiveSub = { id: string; tier: Tier };
+const TIER_RANK: Record<Tier, number> = { base: 1, plus: 2, vip: 3 };
 
 export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId: string; creatorName: string }) {
   const { user } = useSession();
   const [prices, setPrices] = useState<Price[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTiers, setActiveTiers] = useState<Set<Tier>>(new Set());
+  const [activeSub, setActiveSub] = useState<ActiveSub | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [busyTier, setBusyTier] = useState<Tier | null>(null);
@@ -33,6 +36,7 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
   const loadPricing = useServerFn(getCreatorPricing);
   const startCheckout = useServerFn(createCreatorSubscriptionCheckout);
   const openPortal = useServerFn(createBillingPortal);
+  const changeTier = useServerFn(changeSubscriptionTier);
 
   useEffect(() => {
     loadPricing({ data: { creatorId } })
@@ -46,24 +50,48 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
     (async () => {
       const { data } = await supabase
         .from("subscriptions")
-        .select("tier, status, current_period_end")
+        .select("id, tier, status, current_period_end")
         .eq("fan_id", user.id)
         .eq("creator_id", creatorId);
       const now = new Date();
       const s = new Set<Tier>();
+      let live: ActiveSub | null = null;
       for (const row of (data ?? []) as any[]) {
         const end = row.current_period_end ? new Date(row.current_period_end) : null;
         const stillValid = !end || end > now;
         if ((row.status === "active" || (row.status === "canceled" && stillValid)) && ["base","plus","vip"].includes(row.tier)) {
           s.add(row.tier as Tier);
+          if (row.status === "active") live = { id: row.id, tier: row.tier as Tier };
         }
       }
       setActiveTiers(s);
+      setActiveSub(live);
     })();
   }, [user, creatorId, checkoutOpen]);
 
   async function handleSubscribe(tier: Tier) {
     if (!isPaymentsConfigured()) { toast.error("Payments not configured yet."); return; }
+    // If already subscribed to a lower tier, this is an upgrade — apply proration.
+    if (activeSub && TIER_RANK[tier] > TIER_RANK[activeSub.tier]) {
+      setBusyTier(tier);
+      try {
+        const res = await changeTier({
+          data: { subscriptionId: activeSub.id, newTier: tier, environment: getStripeEnvironment() },
+        });
+        if ("error" in res) throw new Error(res.error);
+        toast.success(`Upgraded to ${tier.toUpperCase()} — prorated charge applied.`);
+        // Refresh
+        setCheckoutOpen((v) => v); // triggers effect via dependency
+      } catch (e: any) {
+        toast.error(e?.message ?? "Could not upgrade");
+      } finally { setBusyTier(null); }
+      return;
+    }
+    if (activeSub && TIER_RANK[tier] < TIER_RANK[activeSub.tier]) {
+      toast.info("For downgrades, open the billing portal — the change takes effect next renewal.");
+      handleManage();
+      return;
+    }
     setBusyTier(tier);
     try {
       const result = await startCheckout({
@@ -119,13 +147,24 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
             const meta = TIER_META[p.tier];
             const Icon = meta.icon;
             const subscribed = activeTiers.has(p.tier);
-            const label = subscribed ? "Subscribed" : `$${(p.amountCents / 100).toFixed(2)}/mo`;
+          const isCurrent = activeSub?.tier === p.tier;
+          const isUpgrade = !!activeSub && TIER_RANK[p.tier] > TIER_RANK[activeSub.tier];
+          const isDowngrade = !!activeSub && TIER_RANK[p.tier] < TIER_RANK[activeSub.tier];
+          const label = isCurrent
+            ? "Current plan"
+            : isUpgrade
+              ? `Upgrade · $${(p.amountCents / 100).toFixed(2)}/mo`
+              : isDowngrade
+                ? `Downgrade · $${(p.amountCents / 100).toFixed(2)}/mo`
+                : subscribed
+                  ? "Subscribed"
+                  : `$${(p.amountCents / 100).toFixed(2)}/mo`;
             const button = (
               <Button
                 key={p.tier}
-                variant={subscribed ? "secondary" : "outline"}
+              variant={isCurrent ? "secondary" : "outline"}
                 className="flex h-auto w-full flex-col items-start gap-1 rounded-xl border-border bg-surface p-3 text-left hover:bg-surface-elevated"
-                disabled={busyTier === p.tier || subscribed}
+              disabled={busyTier === p.tier || isCurrent}
                 onClick={() => user && handleSubscribe(p.tier)}
               >
                 <div className="flex w-full items-center justify-between">
