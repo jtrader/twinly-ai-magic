@@ -22,7 +22,7 @@ function AccountPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
   return (
-    <AppShell>
+    <>
       <h1 className="font-display text-3xl font-bold">Account</h1>
       <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
       {user && <ProfileSection />}
@@ -41,7 +41,7 @@ function AccountPage() {
       <div className="mt-6">
         <Button variant="outline" onClick={async () => { await supabase.auth.signOut(); navigate({ to: "/" }); }}>Sign out</Button>
       </div>
-    </AppShell>
+    </>
   );
 }
 
