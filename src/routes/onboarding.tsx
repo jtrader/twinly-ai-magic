@@ -189,7 +189,7 @@ function OnboardingPage() {
                 We seeded four default personas for you. Publish the ones you want live now — keep the rest as drafts and finish them from the Persona Studio later.
               </p>
               {realMePersona && (
-                <Field label="Real Me description" hint="How fans should think of your human persona.">
+                <Field label="Real Me description" hint="How supporters should think of your human persona.">
                   <Textarea
                     value={realMeDesc}
                     onChange={(e) => setRealMeDesc(e.target.value)}
@@ -233,7 +233,7 @@ function OnboardingPage() {
           {step === 3 && (
             <div className="space-y-5">
               <div className="rounded-xl border border-border bg-surface-elevated p-4 text-sm text-muted-foreground">
-                By signing, you confirm you are the person represented by these personas, and you consent to Twinly.life hosting official AI personas that clearly disclose themselves as AI to fans. You can revoke consent from your account at any time.
+                By signing, you confirm you are the person represented by these personas, and you consent to Twinly.life hosting official AI personas that clearly disclose themselves as AI to supporters. You can revoke consent from your account at any time.
               </div>
               <Field label="Type your legal name to sign" hint="This is recorded in your consent history.">
                 <Input value={consentName} onChange={(e) => setConsentName(e.target.value)} placeholder="Your legal name" maxLength={120} />
