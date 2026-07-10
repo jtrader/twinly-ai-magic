@@ -188,14 +188,14 @@ function PersonaGrid() {
     { name: "Custom", kind: "ai" as const, blurb: "Creators can spin up unlimited themed personas — VIP Fantasy, After Dark, XNurse and more.", image: personaCustom.url, alt: "Custom persona portrait — kaleidoscopic prism lighting" },
   ];
   return (
-    <section className="mx-auto max-w-6xl px-4 py-16">
+    <section className="mx-auto max-w-5xl px-4 py-16">
       <div className="mb-8 flex items-end justify-between gap-4">
         <div>
           <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Persona system</div>
           <h2 className="mt-2 font-display text-3xl font-bold tracking-tight md:text-4xl">One creator. Many disclosed personas.</h2>
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mx-auto grid max-w-4xl grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
         {items.map((p) => (
           <div key={p.name} className="overflow-hidden rounded-2xl border border-border bg-surface">
             <div className="aspect-[4/5] w-full overflow-hidden bg-black/40">
