@@ -1,75 +1,95 @@
-## Goal
-Let each creator set their own prices for Base / Plus / VIP tiers, and let fans subscribe to a specific creator at that creator's price via embedded Stripe checkout.
 
-## Data model
+## What's already there (keep as-is)
+- Per-creator subscriptions (Base / Plus / VIP) via dynamic `price_data` + embedded Checkout.
+- Stripe Billing Portal for saved cards & self-serve cancel.
+- Webhook at `/api/public/payments/webhook` writing `subscriptions` table.
 
-New table `public.creator_tier_prices`:
-- `creator_id`, `tier` (base|plus|vip), `amount_cents`, `currency` (default `usd`), `active`
-- Unique per (creator, tier)
-- RLS: creators manage own rows (via `can_manage_creator`), `anon` + `authenticated` read active rows
+## Card storage
+Stripe stores card details — we never touch PANs. Once a fan pays, the card lives on their Stripe Customer (identified by `metadata.userId`) and is reused for renewals and one-tap PPV / tips. Fans manage saved cards through the Billing Portal already wired in `AccountMenu`.
 
-Existing `subscriptions` table already has `fan_id`, `creator_id`, `tier`, `status`, `current_period_end`, `provider_ref` — reuse it. Add columns: `stripe_subscription_id`, `stripe_customer_id`, `environment` (sandbox|live), `cancel_at_period_end`, `amount_cents`, `currency`.
+---
 
-## Server-side
+## 1. Twinly+ platform membership
+Real Stripe **catalog** products (not dynamic pricing) so the go-live sync copies them to live.
 
-`src/lib/stripe.server.ts` — shared gateway-routed Stripe client + `verifyWebhook` + `getStripeErrorMessage` (per knowledge, verbatim).
+Products (via `payments--batch_create_product`, tax code `txcd_10000000` — general digital goods, eligible for full compliance handling):
+- `twinly_plus` → `twinly_plus_monthly` $9.99/mo, `twinly_plus_yearly` $99/yr
 
-`src/lib/creator-pricing.functions.ts`:
-- `getCreatorPricing({creatorId})` — public read of active prices
-- `upsertCreatorPrice({tier, amountCents})` — creator only (RLS)
-- `deactivateCreatorPrice({tier})` — creator only
+Perks (enforced server-side):
+- Ad-free (placeholder flag).
+- 10% discount on all creator tips (webhook applies).
+- "Twinly+" badge next to display name.
 
-`src/lib/checkout.functions.ts`:
-- `createCreatorSubscriptionCheckout({creatorId, tier, returnUrl, environment})` — auth-required
-  - Loads active price for (creator, tier)
-  - Resolves/creates Stripe Customer with `metadata.userId`
-  - Creates embedded Checkout session with dynamic `price_data` (recurring monthly), `subscription_data.metadata` = `{userId, creatorId, tier}`, `automatic_tax: { enabled: true }` (adult content → tax calc only, not full compliance)
-  - Returns `clientSecret`
-- `createBillingPortal({returnUrl, environment})` — auth-required, returns portal URL for the user's Stripe customer
+New surfaces:
+- `/pricing` — plan cards, embedded Checkout dialog.
+- `AccountMenu` → "Twinly+" link.
+- `useTwinlyPlus()` hook reads `subscriptions` filtered by `price_id IN ('twinly_plus_monthly','twinly_plus_yearly')` and `environment`.
 
-`src/routes/api/public/payments/webhook.ts` — verifies signature, handles `customer.subscription.{created,updated,deleted}`; upserts into `subscriptions` keyed off `stripe_subscription_id`, reads `creatorId`/`tier`/`userId` from subscription metadata.
+## 2. One-time content unlocks (PPV)
+Table `content_unlocks (user_id, unlockable_type, unlockable_id, amount_cents, stripe_payment_intent_id, environment, created_at)` — auth reads own, service_role writes.
 
-## Client-side / UI
+Server fn `createUnlockCheckout({ unlockableType: 'post'|'pack', unlockableId, environment })` — resolves creator + price from `creator_posts.unlock_price_cents` / `content_packs.unlock_price_cents` (new columns), embedded Checkout with dynamic `price_data`, `mode: 'payment'`, `payment_intent_data.description = "<Creator> — <Title>"`, metadata `{ userId, unlockableType, unlockableId, creatorId }`.
 
-`src/lib/stripe.ts` — `getStripe()` + `getStripeEnvironment()` derived from `VITE_PAYMENTS_CLIENT_TOKEN` prefix.
+Webhook handles `checkout.session.completed` for `mode:'payment'` → insert `content_unlocks` row.
 
-`src/components/twinly/PaymentTestModeBanner.tsx` — mount at `__root.tsx`.
+`PaywallModal.tsx` (exists) — swap placeholder for real embedded Checkout; `useHasUnlock(type,id)` hook gates content.
 
-`src/components/twinly/CreatorSubscribeButtons.tsx` — reads creator's active prices, shows tier cards (Base / Plus / VIP with amount + name), opens embedded checkout in a dialog. Signed-out users see the existing `AuthPromptDialog`. If a fan already has an active subscription to that creator+tier, show "Subscribed · Manage" that opens the billing portal.
+## 3. Tips / pay-what-you-want
+`TipButton` on `creators.$handle.tsx`. Amount picker ($3/$5/$10/custom, min $1). Server fn `createTipCheckout({ creatorId, amountCents })` — dynamic `price_data`, tax code inferred as digital service. Applies −10% for Twinly+ members (checked server-side from `subscriptions`).
 
-Wire it into `src/routes/creators.$handle.tsx` — new "Subscribe" section above / near the profile pills.
+`transactions` table already exists — reuse it to log tip receipts on webhook.
 
-`src/routes/checkout.return.tsx` — post-checkout landing that shows success + link back to creator or `/account/subscriptions`.
+## 4. Business-logic wiring (webhook side)
+Extend `/api/public/payments/webhook`:
 
-## Creator pricing management
+| Event | Action |
+|---|---|
+| `customer.subscription.created` (per-creator) | Upsert `subscriptions`; **auto-follow** via `creator_follows` upsert; **notify fan** ("You're subscribed to <creator> — <tier>"); **notify creator** ("<fan> just subscribed to <tier>"). |
+| `customer.subscription.created` (Twinly+) | Same but no auto-follow / creator notify; fan gets "Twinly+ active" notification. |
+| `customer.subscription.updated` (tier change) | Update row; if tier changed, notify fan + creator; `isActive` still driven by `status`/`current_period_end`. |
+| `customer.subscription.deleted` OR `cancel_at_period_end=true` | Keep `status='active'` until `current_period_end` (no immediate revoke — matches user's answer); mark `cancel_at_period_end`; notify fan of end-date. |
+| `checkout.session.completed` with `mode:'payment'` + `unlockableType` | Insert `content_unlocks`; notify fan. |
+| `checkout.session.completed` with `mode:'payment'` + tip metadata | Insert `transactions`; notify creator with amount. |
 
-`src/routes/studio.pricing.tsx` — creator studio page with a form for each tier: enable/disable + price input (USD, cents), warns 18+ tiers about extra visibility rules. Add nav link in the studio.
+Access check helper `hasActiveSubscription(userId, creatorId, tier)` — considers `status IN ('active','trialing') OR (status='canceled' AND current_period_end > now())`. This is the "keep access until end of period" rule you picked.
 
-## Account hub integration
+## 5. Upgrade with proration (Plus → VIP)
+New server fn `changeSubscriptionTier({ subscriptionId, newTier, environment })` — auth-required. Loads current sub, resolves new tier's price, calls `stripe.subscriptions.update(id, { items: [{ id: itemId, price_data: {...} }], proration_behavior: 'always_invoice' })` — Stripe charges the difference immediately and access flips right away.
 
-Update `src/routes/account.subscriptions.tsx` list rendering:
-- Show tier + creator + monthly amount + renewal date
-- Replace inline "Cancel" with "Manage in billing portal" that calls `createBillingPortal`
+UI: `CreatorSubscribeButtons` shows current tier with "Change plan" — clicking a higher tier calls upgrade fn (confirm dialog with prorated amount preview from `stripe.invoices.retrieveUpcoming`); a lower tier routes to the Billing Portal.
 
-Add "Billing portal" link in the hamburger menu when the user has any subscription.
+## 6. Polish existing subs
+- Prevent duplicate subscribe: subscribe buttons disabled + labeled "Current plan" when active row exists for that creator.
+- Saved-card indicator on Checkout dialog ("Using card ending in •••• 4242" if Stripe returns `payment_method`).
+- `PaymentTestModeBanner` already in place — no change.
+- `subscriptions` list on `/account/subscriptions` gets: cancel-scheduled banner ("Ends <date>") + "Reactivate" button when `cancel_at_period_end`.
 
-## Tax handling
+---
 
-Adult creator platform → Stripe full compliance handling not available. Use `automatic_tax: { enabled: true }` (Stripe calculates & collects, you handle registration/filing). Assign tax code `txcd_10000000` (general digital goods) to any shared product-level records if we create them.
+## Files touched
+- `payments--batch_create_product` — `twinly_plus` monthly + yearly.
+- Migration — `content_unlocks` table; `creator_posts.unlock_price_cents`, `content_packs.unlock_price_cents`; `has_creator_access(user_id, creator_id, tier)` SQL fn.
+- `src/lib/checkout.functions.ts` — add `createTwinlyPlusCheckout`, `createUnlockCheckout`, `createTipCheckout`, `changeSubscriptionTier`, `previewUpgradeInvoice`.
+- `src/routes/api/public/payments/webhook.ts` — extend event handlers per table above.
+- `src/routes/pricing.tsx` — new.
+- `src/lib/twinly-plus.ts` — hook + server fn.
+- `src/lib/unlocks.functions.ts` — `getMyUnlocks`, `hasUnlock`.
+- `src/lib/tips.functions.ts` — checkout + list-received.
+- `src/components/twinly/TipButton.tsx` — new.
+- `src/components/twinly/CreatorSubscribeButtons.tsx` — current-plan / change-plan / reactivate states.
+- `src/components/twinly/PaywallModal.tsx` — real embedded Checkout.
+- `src/routes/account.subscriptions.tsx` — cancel-scheduled banner + reactivate.
+- `src/routes/account.unlocks.tsx` — new list.
+- `src/components/twinly/AppShell.tsx` — Twinly+ menu link.
 
-## Out of scope for this pass
+## Out of scope (ask separately)
+- Multi-currency, coupons/promo codes, gift subscriptions, refund UI, chargeback tooling, invoice PDF branding.
 
-- One-time content unlocks (pay-per-post)
-- Tips
-- Refund UI
-- Multiple currencies (USD only)
-- Coupons / promo codes
-
-We can add any of these after the base flow is solid.
-
-## Technical notes
-
-- Uses dynamic `price_data` with `recurring: { interval: "month" }` per checkout — no per-creator Stripe Price object needed, so no admin work when a creator changes their price.
-- Uses `product_data.name` = `"{Creator stage_name} — {Tier}"` for readable dashboards / customer receipts.
-- Follows the "resolveOrCreateCustomer" pattern so lookups by userId work later.
-- Adds `stripe@22.0.2`, `@stripe/stripe-js@9.2.0`, `@stripe/react-stripe-js@6.2.0`.
+## Execution order (I'll ship in this order)
+1. Create Twinly+ Stripe product + migration (`content_unlocks`, unlock price columns, `has_creator_access` fn).
+2. Extend webhook (auto-follow, notifications, unlocks, tips, cancel-at-period-end semantics).
+3. `changeSubscriptionTier` + upgrade UI on subscribe buttons.
+4. `/pricing` page + Twinly+ checkout.
+5. PPV: `PaywallModal` real checkout + `content_unlocks` reads + `/account/unlocks`.
+6. Tips: `TipButton` on creator profile + receipts.
+7. Polish: current-plan state, cancel-scheduled banner, reactivate.
