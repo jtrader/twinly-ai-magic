@@ -326,6 +326,7 @@ export const createTwinlyPlusCheckout = createServerFn({ method: "POST" })
       const lookupKey = data.interval === "monthly" ? "twinly_plus_monthly" : "twinly_plus_yearly";
       const prices = await stripe.prices.list({ lookup_keys: [lookupKey], expand: ["data.product"] });
       if (!prices.data.length) return { error: "Twinly+ pricing not configured yet." };
+      const defaultPm = await getDefaultPaymentMethodId(stripe, customerId);
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         ui_mode: "embedded_page" as any,
@@ -334,6 +335,7 @@ export const createTwinlyPlusCheckout = createServerFn({ method: "POST" })
         line_items: [{ price: prices.data[0].id, quantity: 1 }],
         automatic_tax: { enabled: true },
         subscription_data: {
+          ...(defaultPm && { default_payment_method: defaultPm }),
           metadata: { userId, kind: "twinly_plus" },
         },
         metadata: { userId, kind: "twinly_plus" },
