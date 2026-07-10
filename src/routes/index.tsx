@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { AgeGateDialog } from "@/components/twinly/AgeGateDialog";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
+import { TwinlyWordmark } from "@/components/twinly/TwinlyWordmark";
 import { ShieldCheck, Sparkles, Bot, User2, Lock } from "lucide-react";
 import { ArrowRight, Heart } from "lucide-react";
 import heroAi from "@/assets/hero-ai.png.asset.json";
@@ -63,7 +64,7 @@ function TopNav() {
             height={28}
             className="h-7 w-7 rounded-md"
           />
-          <span>Twinly<span className="text-brand-glow">.life</span></span>
+          <TwinlyWordmark />
         </Link>
         <div className="flex items-center gap-2">
           <Link to="/discover" className="hidden text-sm text-muted-foreground hover:text-foreground md:block">Discover</Link>
@@ -280,7 +281,7 @@ function JoinBanner() {
           <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto md:flex-col md:items-end">
             <Link to="/auth">
               <Button size="lg" className="w-full sm:w-auto md:w-full">
-                Join Twinly<span className="text-brand-glow">.life</span> <ArrowRight className="ml-2 h-4 w-4" />
+                Join <TwinlyWordmark /> <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
             <Link to="/discover">
