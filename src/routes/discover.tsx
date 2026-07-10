@@ -1,10 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/twinly/AppShell";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
-import { Search, ShieldCheck } from "lucide-react";
+import { Heart, Loader2, Search, ShieldCheck } from "lucide-react";
 import comingSoon from "@/assets/creator-coming-soon.png.asset.json";
+import { useSession } from "@/lib/session";
+import { toggleFollow, listMyFollows } from "@/lib/follows.functions";
+import { useNavigate } from "@tanstack/react-router";
 
 const listCreators = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -25,6 +29,57 @@ export const Route = createFileRoute("/discover")({
 function Discover() {
   const creators = Route.useLoaderData();
   const [query, setQuery] = useState("");
+  const { user } = useSession();
+  const navigate = useNavigate();
+  const listFollowsFn = useServerFn(listMyFollows);
+  const toggleFollowFn = useServerFn(toggleFollow);
+  const [followed, setFollowed] = useState<Set<string>>(new Set());
+  const [pending, setPending] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!user) {
+      setFollowed(new Set());
+      return;
+    }
+    let cancelled = false;
+    listFollowsFn()
+      .then((rows) => {
+        if (cancelled) return;
+        setFollowed(new Set(rows.map((r) => r.creatorId)));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, listFollowsFn]);
+
+  async function handleFollowClick(creatorId: string) {
+    if (!user) {
+      navigate({ to: "/auth" });
+      return;
+    }
+    if (pending.has(creatorId)) return;
+    const isFollowing = followed.has(creatorId);
+    setPending((prev) => new Set(prev).add(creatorId));
+    try {
+      await toggleFollowFn({ data: { creatorId, follow: !isFollowing } });
+      setFollowed((prev) => {
+        const next = new Set(prev);
+        if (isFollowing) next.delete(creatorId);
+        else next.add(creatorId);
+        return next;
+      });
+    } catch {
+      // no-op; leave state as-is
+    } finally {
+      setPending((prev) => {
+        const next = new Set(prev);
+        next.delete(creatorId);
+        return next;
+      });
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return creators;
@@ -69,9 +124,11 @@ function Discover() {
           <p className="mt-2 text-sm text-muted-foreground">Try a different name or @username.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5">
           {filtered.map((c: any) => {
             const image = c.cover_url || c.avatar_url || comingSoon.url;
+            const isFollowing = followed.has(c.id);
+            const isPending = pending.has(c.id);
             return (
               <Link
                 key={c.id}
@@ -92,17 +149,45 @@ function Discover() {
                       <ShieldCheck className="size-3" /> Verified
                     </span>
                   )}
-                  <div className="absolute inset-x-0 bottom-0 p-4">
-                    <div className="font-display text-lg font-semibold text-white drop-shadow">{c.stage_name}</div>
-                    <div className="text-xs text-white/70">@{c.handle}</div>
+                  <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4">
+                    <div className="truncate font-display text-base font-semibold text-white drop-shadow sm:text-lg">{c.stage_name}</div>
+                    <div className="truncate text-xs text-white/70">@{c.handle}</div>
                   </div>
                 </div>
-                <div className="flex flex-1 flex-col p-4">
-                  {c.bio && <p className="line-clamp-2 text-sm text-muted-foreground">{c.bio}</p>}
-                  <div className="mt-auto flex gap-2 pt-3">
+                <div className="flex flex-1 flex-col p-3 sm:p-4">
+                  {c.bio && <p className="line-clamp-2 text-xs text-muted-foreground sm:text-sm">{c.bio}</p>}
+                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
                     <PersonaBadge kind="real_me" />
                     <PersonaBadge kind="ai" />
                   </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleFollowClick(c.id);
+                    }}
+                    disabled={isPending}
+                    aria-pressed={isFollowing}
+                    aria-label={isFollowing ? `Unfollow ${c.stage_name}` : `Follow ${c.stage_name}`}
+                    className={`mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
+                      isFollowing
+                        ? "border-brand-glow/60 bg-brand-glow/15 text-brand-glow hover:bg-brand-glow/25"
+                        : "border-border bg-surface-elevated text-foreground hover:border-brand-glow/60 hover:text-brand-glow"
+                    }`}
+                  >
+                    {isPending ? (
+                      <>
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                        <span>{isFollowing ? "Unfollowing…" : "Following…"}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Heart className={`size-3.5 ${isFollowing ? "fill-current" : ""}`} aria-hidden="true" />
+                        <span>{isFollowing ? "Following" : "Follow"}</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </Link>
             );
