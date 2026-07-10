@@ -37,7 +37,7 @@ function TopBar() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link to="/" className="flex items-center gap-1 font-display text-lg font-bold tracking-tight">
+        <Link to="/" className="font-display text-lg font-bold tracking-tight">
           Twinly<span className="text-brand-glow">.life</span>
         </Link>
         <div className="flex items-center gap-3">
