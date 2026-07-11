@@ -1,0 +1,1 @@
+ALTER TABLE public.personas ADD COLUMN IF NOT EXISTS avatar_url text;
