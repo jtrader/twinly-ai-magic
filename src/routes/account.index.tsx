@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession, useUserRoles } from "@/lib/session";
+import { cn } from "@/lib/utils";
 import { listMyBlocks, unblockUserId } from "@/lib/blocks.functions";
 import { getMyNotificationPreferences, updateMyNotificationPreferences } from "@/lib/notifications.functions";
 import { getMyProfile } from "@/lib/profile.functions";
@@ -30,9 +31,14 @@ function AccountPage() {
         <div className="mt-2 flex flex-wrap gap-2">
           {roles.length === 0
             ? <span className="text-sm text-muted-foreground">—</span>
-            : roles.map((r) => (
-                <span key={r} className="rounded-full border border-border bg-surface-elevated px-3 py-1 text-xs font-semibold uppercase tracking-widest">{r}</span>
-              ))}
+            : roles.map((r) => {
+                const badgeClass = "rounded-full border border-border bg-surface-elevated px-3 py-1 text-xs font-semibold uppercase tracking-widest";
+                return r === "admin" ? (
+                  <Link key={r} to="/admin" className={cn(badgeClass, "text-brand-glow hover:bg-brand/15 hover:border-brand/30 transition-colors")}>{r}</Link>
+                ) : (
+                  <span key={r} className={badgeClass}>{r}</span>
+                );
+              })}
         </div>
       </div>
       {user && <NotificationPreferencesSection />}
