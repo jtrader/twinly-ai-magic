@@ -913,6 +913,7 @@ export type Database = {
           away_mode: boolean
           away_started_at: string | null
           bio: string | null
+          content_persona_id: string | null
           cover_url: string | null
           created_at: string
           digital_twin_status: Database["public"]["Enums"]["twin_status"]
@@ -938,6 +939,7 @@ export type Database = {
           away_mode?: boolean
           away_started_at?: string | null
           bio?: string | null
+          content_persona_id?: string | null
           cover_url?: string | null
           created_at?: string
           digital_twin_status?: Database["public"]["Enums"]["twin_status"]
@@ -963,6 +965,7 @@ export type Database = {
           away_mode?: boolean
           away_started_at?: string | null
           bio?: string | null
+          content_persona_id?: string | null
           cover_url?: string | null
           created_at?: string
           digital_twin_status?: Database["public"]["Enums"]["twin_status"]
