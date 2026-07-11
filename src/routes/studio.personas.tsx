@@ -133,16 +133,24 @@ function PersonaStudioPage() {
 
   async function confirmDelete() {
     if (!deleting) return;
+    const snapshot = personas;
+    const target = deleting;
+    // Optimistic remove — card disappears instantly.
+    setPersonas((s) => s.filter((p) => p.id !== target.id));
     setBusy(true);
     try {
-      await remove({ data: { personaId: deleting.id } });
+      await remove({ data: { personaId: target.id } });
       toast.success("Persona deleted");
       setDeleting(null);
-      refresh();
     } catch (e: any) {
+      setPersonas(snapshot); // rollback
       toast.error(e.message ?? "Could not delete persona");
     } finally { setBusy(false); }
   }
+
+  const patchPersona = useCallback((id: string, patch: Partial<Persona>) => {
+    setPersonas((s) => s.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }, []);
 
   if (loading || !ready) {
     return <AppShell><div className="text-sm text-muted-foreground">Loading…</div></AppShell>;
@@ -266,6 +274,7 @@ function PersonaStudioPage() {
         persona={editing}
         onOpenChange={(o) => { if (!o) setEditing(null); }}
         onSaved={() => { setEditing(null); refresh(); }}
+        onLocalPatch={patchPersona}
       />
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => { if (!o) setDeleting(null); }}>
