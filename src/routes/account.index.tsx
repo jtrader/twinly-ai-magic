@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession, useUserRoles } from "@/lib/session";
+import { cn } from "@/lib/utils";
 import { listMyBlocks, unblockUserId } from "@/lib/blocks.functions";
 import { getMyNotificationPreferences, updateMyNotificationPreferences } from "@/lib/notifications.functions";
 import { getMyProfile } from "@/lib/profile.functions";
