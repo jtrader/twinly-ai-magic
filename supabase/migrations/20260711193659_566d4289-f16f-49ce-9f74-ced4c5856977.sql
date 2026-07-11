@@ -1,0 +1,1 @@
+ALTER TABLE public.creators ADD COLUMN IF NOT EXISTS content_persona_id text;
