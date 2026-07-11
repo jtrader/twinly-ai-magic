@@ -794,6 +794,20 @@ function EditPersonaDialog({
             <Input className="mt-1.5" value={displayName} onChange={(e) => setName(e.target.value)} maxLength={60} />
           </div>
           <div>
+            <Label>Visibility</Label>
+            <Select value={visibility} onValueChange={(v) => changeVisibilityInline(v as Visibility)} disabled={visBusy}>
+              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(VISIBILITY_LABEL) as Visibility[]).map((v) => (
+                  <SelectItem key={v} value={v}>{VISIBILITY_LABEL[v]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Applies instantly. Draft & Hidden are only visible to you. Public shows to everyone; Subscribers & VIP only to fans in that tier.
+            </p>
+          </div>
+          <div>
             <Label>Description</Label>
             <Textarea className="mt-1.5" rows={2} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
