@@ -150,6 +150,7 @@ export const updatePersona = createServerFn({ method: "POST" })
     linkedTwinRefIds?: string[];
     heygenAvatarId?: string | null;
     heygenVoiceId?: string | null;
+    avatarUrl?: string | null;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -172,6 +173,7 @@ export const updatePersona = createServerFn({ method: "POST" })
       linked_twin_ref_ids?: string[];
       heygen_avatar_id?: string | null;
       heygen_voice_id?: string | null;
+      avatar_url?: string | null;
     } = {};
     if (data.displayName !== undefined) {
       const v = data.displayName.trim();
@@ -217,6 +219,10 @@ export const updatePersona = createServerFn({ method: "POST" })
     if (data.heygenVoiceId !== undefined) {
       const v = (data.heygenVoiceId ?? "").trim();
       patch.heygen_voice_id = v ? v.slice(0, 120) : null;
+    }
+    if (data.avatarUrl !== undefined) {
+      const v = (data.avatarUrl ?? "").trim();
+      patch.avatar_url = v ? v.slice(0, 500) : null;
     }
 
     if (Object.keys(patch).length === 0) return { ok: true };
