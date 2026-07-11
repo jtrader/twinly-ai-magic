@@ -44,6 +44,11 @@ function AdminPage() {
   const [allCreators, setAllCreators] = useState<{ creators: any[]; emails: Record<string, string | null> } | null>(null);
   const [allAgencies, setAllAgencies] = useState<{ agencies: any[] } | null>(null);
   const [platformSettings, setPlatformSettings] = useState<{ max_explicitness_ceiling: string } | null>(null);
+  const [creatorsQuery, setCreatorsQuery] = useState("");
+  const [creatorsPage, setCreatorsPage] = useState(1);
+  const [agenciesQuery, setAgenciesQuery] = useState("");
+  const [agenciesPage, setAgenciesPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const overview = useServerFn(adminOverview);
   const listVer = useServerFn(adminListVerifications);
@@ -225,12 +230,12 @@ function AdminPage() {
     finally { setBusy(null); }
   }
 
-  async function signInAs(creatorId: string, handle: string) {
+  async function signInAs(creatorId: string, handle: string, stageName?: string) {
     if (!window.confirm(`Sign in as @${handle}?\n\nYour admin session will be replaced in this tab. A "Return to admin" banner will appear so you can bounce back with one click.`)) return;
     setBusy(creatorId);
     try {
       const { url, returnUrl, adminEmail } = await impersonate({ data: { creatorId } });
-      setImpersonationContext({ returnUrl, adminEmail, handle });
+      setImpersonationContext({ returnUrl, adminEmail, handle, kind: "creator", targetName: stageName ?? null });
       toast.success(`Signing in as @${handle}…`);
       window.location.href = url;
     } catch (e: any) { toast.error(e?.message ?? "Failed"); setBusy(null); }
@@ -241,7 +246,7 @@ function AdminPage() {
     setBusy(userId);
     try {
       const { url, returnUrl, adminEmail } = await impersonateUserFn({ data: { userId, redirectPath: "/agency", label: `agency:${name}` } });
-      setImpersonationContext({ returnUrl, adminEmail, handle: name });
+      setImpersonationContext({ returnUrl, adminEmail, handle: name, kind: "agency", targetName: name });
       toast.success(`Signing in as ${name}…`);
       window.location.href = url;
     } catch (e: any) { toast.error(e?.message ?? "Failed"); setBusy(null); }
@@ -508,14 +513,37 @@ function AdminPage() {
           <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100">
             <span className="font-semibold">Impersonation:</span> Sign in as any creator to access their studio, personas, content, and payouts. Your admin session is replaced in this tab — use the return banner to bounce back.
           </div>
-          {allCreators && (
+          {allCreators && (() => {
+            const q = creatorsQuery.trim().toLowerCase();
+            const filtered = q
+              ? allCreators.creators.filter((c: any) =>
+                  (c.handle ?? "").toLowerCase().includes(q) ||
+                  (c.stage_name ?? "").toLowerCase().includes(q) ||
+                  (allCreators.emails[c.id] ?? "").toLowerCase().includes(q))
+              : allCreators.creators;
+            const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+            const page = Math.min(creatorsPage, totalPages);
+            const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+            return (
+            <>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                className="max-w-xs"
+                placeholder="Search handle, stage name, or email…"
+                value={creatorsQuery}
+                onChange={(e) => { setCreatorsQuery(e.target.value); setCreatorsPage(1); }}
+              />
+              <div className="text-xs text-muted-foreground">
+                {filtered.length} of {allCreators.creators.length}
+              </div>
+            </div>
             <div className="overflow-hidden rounded-2xl border border-border bg-surface">
               <table className="w-full text-sm">
                 <thead className="border-b border-border bg-surface-elevated text-left text-xs uppercase tracking-widest text-muted-foreground">
                   <tr><th className="px-4 py-2">Creator</th><th className="px-4 py-2">Email</th><th className="px-4 py-2">Status</th><th className="px-4 py-2 text-right">Actions</th></tr>
                 </thead>
                 <tbody>
-                  {allCreators.creators.map((c: any) => (
+                  {rows.map((c: any) => (
                     <tr key={c.id} className="border-b border-border/50">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -529,17 +557,20 @@ function AdminPage() {
                       <td className="px-4 py-3 font-mono text-xs">{allCreators.emails[c.id] ?? "—"}</td>
                       <td className="px-4 py-3"><Pill value={c.verification_status} /></td>
                       <td className="px-4 py-3 text-right">
-                        <Button size="sm" variant="outline" disabled={busy === c.id || !c.user_id} onClick={() => signInAs(c.id, c.handle)}>
+                        <Button size="sm" variant="outline" disabled={busy === c.id || !c.user_id} onClick={() => signInAs(c.id, c.handle, c.stage_name)}>
                           {busy === c.id ? "Minting…" : "Sign in as"}
                         </Button>
                       </td>
                     </tr>
                   ))}
-                  {allCreators.creators.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No creators yet.</td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">{q ? "No creators match this search." : "No creators yet."}</td></tr>}
                 </tbody>
               </table>
             </div>
-          )}
+            <Pager page={page} totalPages={totalPages} onChange={setCreatorsPage} />
+            </>
+            );
+          })()}
         </div>
       )}
 
@@ -548,14 +579,36 @@ function AdminPage() {
           <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100">
             <span className="font-semibold">Impersonation:</span> Sign in as any agency owner to access their dashboard and managed creators.
           </div>
-          {allAgencies && (
+          {allAgencies && (() => {
+            const q = agenciesQuery.trim().toLowerCase();
+            const filtered = q
+              ? allAgencies.agencies.filter((a: any) =>
+                  (a.name ?? "").toLowerCase().includes(q) ||
+                  (a.owner_email ?? "").toLowerCase().includes(q))
+              : allAgencies.agencies;
+            const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+            const page = Math.min(agenciesPage, totalPages);
+            const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+            return (
+            <>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                className="max-w-xs"
+                placeholder="Search agency name or owner email…"
+                value={agenciesQuery}
+                onChange={(e) => { setAgenciesQuery(e.target.value); setAgenciesPage(1); }}
+              />
+              <div className="text-xs text-muted-foreground">
+                {filtered.length} of {allAgencies.agencies.length}
+              </div>
+            </div>
             <div className="overflow-hidden rounded-2xl border border-border bg-surface">
               <table className="w-full text-sm">
                 <thead className="border-b border-border bg-surface-elevated text-left text-xs uppercase tracking-widest text-muted-foreground">
                   <tr><th className="px-4 py-2">Agency</th><th className="px-4 py-2">Owner email</th><th className="px-4 py-2">Creators</th><th className="px-4 py-2 text-right">Actions</th></tr>
                 </thead>
                 <tbody>
-                  {allAgencies.agencies.map((a: any) => (
+                  {rows.map((a: any) => (
                     <tr key={a.id} className="border-b border-border/50">
                       <td className="px-4 py-3 font-semibold">{a.name}</td>
                       <td className="px-4 py-3 font-mono text-xs">{a.owner_email ?? "—"}</td>
@@ -567,11 +620,14 @@ function AdminPage() {
                       </td>
                     </tr>
                   ))}
-                  {allAgencies.agencies.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No agencies yet.</td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">{q ? "No agencies match this search." : "No agencies yet."}</td></tr>}
                 </tbody>
               </table>
             </div>
-          )}
+            <Pager page={page} totalPages={totalPages} onChange={setAgenciesPage} />
+            </>
+            );
+          })()}
         </div>
       )}
 
@@ -645,4 +701,15 @@ function Pill({ value }: { value: string }) {
     : value === "rejected" || value === "revoked" || value === "high" || value === "critical" ? "border-rose-400/30 bg-rose-400/10 text-rose-300"
     : "border-border bg-surface text-muted-foreground";
   return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${tone}`}>{value}</span>;
+}
+
+function Pager({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onChange(page - 1)}>← Prev</Button>
+      <div className="text-muted-foreground">Page {page} of {totalPages}</div>
+      <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>Next →</Button>
+    </div>
+  );
 }
