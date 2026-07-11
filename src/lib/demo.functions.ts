@@ -428,3 +428,59 @@ export const adminImpersonateUser = createServerFn({ method: "POST" })
     await logAudit(context.userId, "admin.impersonate_user", { type: "user", id: data.userId }, { label: data.label ?? null });
     return { url: link.properties.action_link, returnUrl, adminEmail: adminEmail ?? null };
   });
+
+// Impersonate a creator user account when the caller can manage that creator
+// (admin OR agency owner OR the creator themselves via can_manage_creator RPC).
+// Used by the agency dashboard's "Enter Studio" action.
+export const impersonateManagedCreator = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { creatorId: string; redirectPath?: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: canManage, error: rpcErr } = await context.supabase
+      .rpc("can_manage_creator", { _creator_id: data.creatorId });
+    if (rpcErr) throw rpcErr;
+    if (!canManage) throw new Error("You don't have access to this creator.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { logAudit } = await import("@/lib/audit.server");
+
+    const { data: creator, error: cErr } = await supabaseAdmin
+      .from("creators").select("id, handle, stage_name, user_id").eq("id", data.creatorId).maybeSingle();
+    if (cErr || !creator?.user_id) throw new Error("Creator not found");
+
+    const { data: userRes } = await supabaseAdmin.auth.admin.getUserById(creator.user_id);
+    const email = userRes?.user?.email;
+    if (!email) throw new Error("Target user has no email");
+
+    const { data: callerRes } = await supabaseAdmin.auth.admin.getUserById(context.userId);
+    const callerEmail = callerRes?.user?.email;
+
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const req = getRequest();
+    const origin = req.headers.get("origin")
+      || req.headers.get("referer")?.replace(/(https?:\/\/[^/]+).*/, "$1")
+      || "";
+    const path = (data.redirectPath && data.redirectPath.startsWith("/")) ? data.redirectPath : "/studio";
+    const redirectTo = `${origin}${path}`;
+
+    const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+      type: "magiclink", email, options: { redirectTo },
+    });
+    if (linkErr || !link?.properties?.action_link) throw new Error(linkErr?.message ?? "Failed to mint link");
+
+    let returnUrl: string | null = null;
+    if (callerEmail) {
+      const { data: retLink } = await supabaseAdmin.auth.admin.generateLink({
+        type: "magiclink", email: callerEmail, options: { redirectTo: `${origin}/agency` },
+      });
+      returnUrl = retLink?.properties?.action_link ?? null;
+    }
+
+    await logAudit(context.userId, "agency.impersonate_creator", { type: "creator", id: creator.id }, { handle: creator.handle });
+    return {
+      url: link.properties.action_link,
+      returnUrl,
+      callerEmail: callerEmail ?? null,
+      creator: { handle: creator.handle, stage_name: creator.stage_name },
+    };
+  });
