@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/lib/session";
 import {
-  listCreatorFlags, loadFlagContext, resolveFlag, handoffFlagToRealMe,
+  listCreatorFlags, loadFlagContext, resolveFlag, handoffFlag,
 } from "@/lib/conversation-flags.functions";
 import { ArrowLeft, Flag, CheckCircle2, XCircle, UserCheck, Clock, MessageCircle } from "lucide-react";
 
@@ -83,7 +83,7 @@ function FlagsPage() {
         </div>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Supporters can flag an AI conversation for your review. Acknowledge to close the loop, dismiss if it's a non-issue, or hand off to your Real Me thread to take over.
+        Supporters can flag an AI conversation for your review. Acknowledge to close the loop, dismiss if it's a non-issue, or take over the chat directly — the AI stops replying and it moves to your direct inbox.
       </p>
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,320px)_1fr]">
@@ -159,7 +159,7 @@ function FlagList({
 function FlagDetail({ flag, onChanged }: { flag: Flag; onChanged: () => void }) {
   const loadCtx = useServerFn(loadFlagContext);
   const resolve = useServerFn(resolveFlag);
-  const handoff = useServerFn(handoffFlagToRealMe);
+  const handoff = useServerFn(handoffFlag);
   const [ctx, setCtx] = useState<Awaited<ReturnType<typeof loadFlagContext>> | null>(null);
   const [busy, setBusy] = useState<"acknowledge" | "dismiss" | "handoff" | null>(null);
   const [note, setNote] = useState("");
@@ -191,14 +191,11 @@ function FlagDetail({ flag, onChanged }: { flag: Flag; onChanged: () => void }) 
   async function doHandoff() {
     setBusy("handoff");
     try {
-      const res = await handoff({ data: { flagId: flag.id, note: note.trim() || undefined } });
-      toast.success("Handed off to Real Me — a thread is ready for you.", {
-        description: "Open your Real Me inbox to reply.",
+      await handoff({ data: { flagId: flag.id, note: note.trim() || undefined } });
+      toast.success("You've taken over this chat.", {
+        description: "The AI won't reply here anymore — open your direct inbox to reply.",
       });
       onChanged();
-      if (res.creatorHandle && res.realMeSlug) {
-        // Give the user an obvious next click via the inbox — nav is optional.
-      }
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to hand off");
     } finally { setBusy(null); }
@@ -268,7 +265,7 @@ function FlagDetail({ flag, onChanged }: { flag: Flag; onChanged: () => void }) 
           />
           <div className="flex flex-wrap gap-2">
             <Button onClick={doHandoff} disabled={!!busy}>
-              <UserCheck className="mr-1 size-4" /> {busy === "handoff" ? "Opening…" : "Hand off to Real Me"}
+              <UserCheck className="mr-1 size-4" /> {busy === "handoff" ? "Taking over…" : "Take over this chat"}
             </Button>
             <Button variant="outline" onClick={() => act("acknowledge")} disabled={!!busy}>
               <CheckCircle2 className="mr-1 size-4" /> Acknowledge
@@ -285,7 +282,7 @@ function FlagDetail({ flag, onChanged }: { flag: Flag; onChanged: () => void }) 
         </div>
       ) : flag.status === "handed_off" ? (
         <Link to="/studio/inbox">
-          <Button variant="outline"><MessageCircle className="mr-1 size-4" /> Open Real Me inbox</Button>
+          <Button variant="outline"><MessageCircle className="mr-1 size-4" /> Open direct inbox</Button>
         </Link>
       ) : null}
     </div>

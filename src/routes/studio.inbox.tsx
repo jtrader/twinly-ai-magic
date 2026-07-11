@@ -19,7 +19,7 @@ export const Route = createFileRoute("/studio/inbox")({
   component: InboxPage,
   head: () => ({
     meta: [
-      { title: "Real Me inbox — Twinly.life" },
+      { title: "Direct inbox — Twinly.life" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -60,9 +60,12 @@ function InboxPage() {
         </Link>
         <div>
           <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Creator studio</div>
-          <h1 className="font-display text-2xl font-bold">Real Me inbox</h1>
+          <h1 className="font-display text-2xl font-bold">Direct inbox</h1>
         </div>
       </div>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Real Me conversations, plus any AI chat you've taken over directly from <Link to="/studio/flags" className="underline">Flagged AI chats</Link>.
+      </p>
 
       <div className="grid gap-4 md:grid-cols-[320px_1fr]">
         <aside className="rounded-2xl border border-border bg-surface">
@@ -76,7 +79,7 @@ function InboxPage() {
             {loadingList && <div className="p-4 text-sm text-muted-foreground">Loading…</div>}
             {!loadingList && convos.length === 0 && (
               <div className="p-4 text-sm text-muted-foreground">
-                No inbound Real Me messages yet. When a fan messages your Real Me persona, it will appear here.
+                Nothing here yet. Real Me messages and any AI chats you take over directly will appear here.
               </div>
             )}
             {convos.map((c) => (
@@ -97,6 +100,7 @@ function InboxPage() {
                       <div className="truncate text-sm font-semibold">{c.fan?.display_name ?? "Fan"}</div>
                       <div className="truncate text-[11px] text-muted-foreground">
                         {c.creator?.stage_name} · {c.persona?.display_name}
+                        {(c as any).persona?.kind === "ai" && (c as any).ai_suspended && " · handed off"}
                       </div>
                     </div>
                   </div>
@@ -220,7 +224,8 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold">{fan?.display_name ?? "Fan"}</div>
           <div className="truncate text-[11px] text-muted-foreground">
-            {convo.creators?.stage_name} · Real Me — {convo.personas?.display_name}
+            {convo.creators?.stage_name} ·{" "}
+            {convo.personas?.kind === "ai" ? `${convo.personas?.display_name} (handed off)` : `Real Me — ${convo.personas?.display_name}`}
           </div>
         </div>
         <BlockButton targetType="fan" targetId={fan?.id} size="sm" variant="ghost" />

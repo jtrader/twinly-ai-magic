@@ -72,7 +72,7 @@ function MyFlagsPage() {
         </div>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Chats you've flagged for creator review. If a creator hands off, you'll see a link to their Real Me thread.
+        Chats you've flagged for creator review. If a creator takes one over, you'll see a link back to that chat.
       </p>
 
       {flags.length === 0 ? (
@@ -105,13 +105,13 @@ function MyFlagsPage() {
                       {f.resolved_at && ` · updated ${new Date(f.resolved_at).toLocaleString()}`}
                     </div>
                   </div>
-                  {f.status === "handed_off" && f.creator?.handle && (
+                  {f.status === "handed_off" && f.creator?.handle && f.persona?.slug && (
                     <Link
                       to="/chat/$handle/$persona"
-                      params={{ handle: f.creator.handle, persona: "real-me" }}
+                      params={{ handle: f.creator.handle, persona: f.persona.slug }}
                     >
                       <Button size="sm" variant="outline">
-                        <MessageCircle className="mr-1 size-3.5" /> Open Real Me
+                        <MessageCircle className="mr-1 size-3.5" /> Open chat
                       </Button>
                     </Link>
                   )}

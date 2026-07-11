@@ -41,14 +41,17 @@ const loadPersonaChat = createServerFn({ method: "GET" })
       .neq("slug", data.persona)
       .order("sort_order", { ascending: true });
     const { data: convo } = await supabase.from("conversations")
-      .select("id").eq("fan_id", userId).eq("persona_id", persona.id).maybeSingle();
+      .select("id, ai_suspended").eq("fan_id", userId).eq("persona_id", persona.id).maybeSingle();
     let messages: any[] = [];
     if (convo) {
       const { data: m } = await supabase.from("messages").select("*").eq("conversation_id", convo.id).order("created_at", { ascending: true });
       messages = m ?? [];
     }
     const availability = await getCreatorAvailability({ data: { handle: data.handle } });
-    return { creator, persona, conversationId: convo?.id ?? null, messages, availability, aiPersonas: aiPersonas ?? [] };
+    return {
+      creator, persona, conversationId: convo?.id ?? null, messages, availability, aiPersonas: aiPersonas ?? [],
+      aiSuspended: !!(convo as any)?.ai_suspended,
+    };
   });
 
 export const Route = createFileRoute("/chat/$handle/$persona")({
@@ -66,6 +69,7 @@ function ChatPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [switchedFrom, setSwitchedFrom] = useState<string | null>(null);
+  const [aiSuspended, setAiSuspended] = useState(!!initial?.aiSuspended);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -108,10 +112,13 @@ function ChatPage() {
     try {
       const res = await sendPersonaMessage({ data: { conversationId: conversationId ?? undefined, creatorHandle: params.handle, personaSlug: params.persona, content } });
       setConversationId(res.conversationId);
+      if (res.aiSuspended) setAiSuspended(true);
       if (res.assistantText) {
         setMessages((m) => [...m, { id: crypto.randomUUID(), sender_type: "ai", body: res.assistantText, ai_generated: true, created_at: new Date().toISOString() }]);
       } else if (res.kind === "real_me" && !res.awayAutoReply) {
         toast.message("Message delivered to creator", { description: "Real Me replies come from the verified creator directly." });
+      } else if (res.aiSuspended) {
+        toast.message("Message delivered to creator", { description: "A team member is handling this conversation directly now." });
       }
     } catch (err: any) {
       toast.error(err.message ?? "Failed to send");
@@ -170,7 +177,7 @@ function ChatPage() {
             {persona.kind === "ai" && (
               <RequestRealMeButton creatorHandle={creator.handle} personaSlug={persona.slug} />
             )}
-            {persona.kind === "ai" && authed && (
+            {persona.kind === "ai" && authed && !aiSuspended && (
               <FlagConversationButton conversationId={conversationId} />
             )}
             <ReportDialog targetType="persona" targetId={persona.id} label="Report" />
@@ -208,6 +215,11 @@ function ChatPage() {
         {aiPaused && (
           <div className="mb-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">
             <span className="font-semibold">{creator.stage_name}</span> has paused AI personas while away.
+          </div>
+        )}
+        {aiSuspended && persona.kind === "ai" && (
+          <div className="mb-3 rounded-xl border border-real/30 bg-real/5 p-3 text-xs text-foreground/85">
+            <span className="font-semibold">{creator.stage_name}</span> is handling this conversation directly — {persona.display_name} won't auto-reply here.
           </div>
         )}
 

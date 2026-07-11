@@ -74,6 +74,7 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
 
     // Create-or-fetch conversation (RLS-scoped user client)
     let conversationId = data.conversationId;
+    let aiSuspended = false;
     if (!conversationId) {
       const { data: convo, error } = await supabase
         .from("conversations")
@@ -81,6 +82,10 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
         .select("id").single();
       if (error) throw error;
       conversationId = convo.id;
+    } else {
+      const { data: convoRow } = await supabase
+        .from("conversations").select("ai_suspended").eq("id", conversationId).maybeSingle();
+      aiSuspended = !!(convoRow as any)?.ai_suspended;
     }
 
     await supabase.from("messages").insert({
@@ -112,7 +117,10 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
       });
     }
 
-    if (persona.kind === "ai") {
+    if (persona.kind === "ai" && aiSuspended) {
+      // A moderator has taken this conversation over (design doc item 4) —
+      // the message just sits here for the creator to answer in their inbox.
+    } else if (persona.kind === "ai") {
       if (creator.away_mode && !creator.away_allow_ai_personas) {
         awayAutoReply = true;
         assistantText = creator.away_message || "The creator is away and has paused AI personas.";
@@ -229,7 +237,7 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
       away_auto_reply: awayAutoReply,
     });
 
-    return { conversationId, assistantText, assistantVoiceUrl, isSynthetic, kind: persona.kind, awayAutoReply };
+    return { conversationId, assistantText, assistantVoiceUrl, isSynthetic, kind: persona.kind, awayAutoReply, aiSuspended };
   });
 
 async function generateAiReply(persona: any, userMessage: string, fewshot: Array<{ label: string; body: string | null }> = [], memorySummary?: string | null): Promise<string> {

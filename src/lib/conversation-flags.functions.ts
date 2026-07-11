@@ -247,11 +247,15 @@ export const resolveFlag = createServerFn({ method: "POST" })
   });
 
 /**
- * Creator hands the flagged supporter off to their Real Me thread.
- * Ensures (does not relabel) a separate Real Me conversation exists for that
- * supporter, links it on the flag, and marks the flag as handed_off.
+ * Creator takes over the flagged conversation directly, in place.
+ * This is a same-thread handoff, not a new conversation: AI auto-reply is
+ * suspended on this conversation, a system message announces the takeover,
+ * and the thread moves into the creator's inbox for manual replies. This is
+ * deliberately different from escalation_requests, which opens a separate
+ * Real Me thread — repurposing that pattern here would break the AI/Real-Me
+ * disclosure-history separation escalation_requests exists to preserve.
  */
-export const handoffFlagToRealMe = createServerFn({ method: "POST" })
+export const handoffFlag = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: { flagId: string; note?: string }) => {
     if (d.note && d.note.length > 500) throw new Error("Note must be 500 characters or fewer.");
@@ -263,33 +267,25 @@ export const handoffFlagToRealMe = createServerFn({ method: "POST" })
     if (flag.status !== "open") throw new Error("This flag has already been resolved.");
     const s = supabase as any;
 
-    const { data: realMe } = await s
+    const { data: persona } = await s
       .from("personas")
-      .select("id, slug")
-      .eq("creator_id", creator.id)
-      .eq("kind", "real_me")
+      .select("display_name")
+      .eq("id", flag.persona_id)
       .maybeSingle();
-    if (!realMe) throw new Error("You haven't set up a Real Me persona yet.");
 
-    // Get-or-create the Real Me conversation for this supporter.
-    let handoffConversationId: string;
-    const { data: existingConvo } = await s
+    const { error: suspendErr } = await s
       .from("conversations")
-      .select("id")
-      .eq("fan_id", flag.flagged_by)
-      .eq("persona_id", realMe.id)
-      .maybeSingle();
-    if (existingConvo) {
-      handoffConversationId = existingConvo.id;
-    } else {
-      const { data: newConvo, error: convoErr } = await s
-        .from("conversations")
-        .insert({ fan_id: flag.flagged_by, creator_id: creator.id, persona_id: realMe.id })
-        .select("id")
-        .single();
-      if (convoErr) throw convoErr;
-      handoffConversationId = newConvo.id;
-    }
+      .update({ ai_suspended: true })
+      .eq("id", flag.conversation_id);
+    if (suspendErr) throw suspendErr;
+
+    await s.from("messages").insert({
+      conversation_id: flag.conversation_id,
+      sender_type: "system",
+      body: `${creator.handle} has taken over this conversation directly. ${persona?.display_name ?? "The AI persona"} won't reply here anymore.`,
+      ai_generated: false,
+      persona_id: flag.persona_id,
+    });
 
     const { error } = await s
       .from("conversation_flags")
@@ -298,16 +294,16 @@ export const handoffFlagToRealMe = createServerFn({ method: "POST" })
         resolution_note: data.note?.trim() || null,
         resolved_by: userId,
         resolved_at: new Date().toISOString(),
-        handoff_conversation_id: handoffConversationId,
+        handoff_conversation_id: flag.conversation_id,
       })
       .eq("id", flag.id);
     if (error) throw error;
 
     await logAudit(userId, "conversation_flag.handed_off", { type: "conversation_flag", id: flag.id }, {
-      handoffConversationId,
+      conversationId: flag.conversation_id,
     });
 
-    return { ok: true, handoffConversationId, realMeSlug: realMe.slug, creatorHandle: creator.handle };
+    return { ok: true, conversationId: flag.conversation_id, creatorHandle: creator.handle };
   });
 
 /** Small helper used by the studio dashboard to badge the queue. */

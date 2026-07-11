@@ -638,6 +638,7 @@ export type Database = {
       }
       conversations: {
         Row: {
+          ai_suspended: boolean
           creator_id: string
           fan_id: string
           id: string
@@ -646,6 +647,7 @@ export type Database = {
           started_at: string
         }
         Insert: {
+          ai_suspended?: boolean
           creator_id: string
           fan_id: string
           id?: string
@@ -654,6 +656,7 @@ export type Database = {
           started_at?: string
         }
         Update: {
+          ai_suspended?: boolean
           creator_id?: string
           fan_id?: string
           id?: string
