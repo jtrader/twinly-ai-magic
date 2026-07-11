@@ -2,9 +2,11 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Trash2, Camera, X as XIcon } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
+import { supabase } from "@/integrations/supabase/client";
+import { useAvatarUrl } from "@/lib/useAvatarUrl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -181,6 +183,7 @@ function PersonaStudioPage() {
                     aria-label="Move down"
                   ><ArrowDown className="size-3.5" /></button>
                 </div>
+                <PersonaCardAvatar path={(p as any).avatar_url ?? null} name={p.display_name} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-display text-lg font-semibold">{p.display_name}</span>
@@ -404,8 +407,12 @@ function CreatePersonaDialog({
 function EditPersonaDialog({
   persona, onOpenChange, onSaved,
 }: { persona: Persona | null; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
+  const { user } = useSession();
   const update = useServerFn(updatePersona);
   const [displayName, setName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const avatarSrc = useAvatarUrl(avatarUrl);
   const [description, setDescription] = useState("");
   const [disclosureLabel, setDisclosure] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
@@ -537,6 +544,7 @@ function EditPersonaDialog({
       setLinkedRefIds(((persona as any).linked_twin_ref_ids as string[] | null) ?? []);
       setHeygenAvatarId(((persona as any).heygen_avatar_id as string | null) ?? "");
       setHeygenVoiceId(((persona as any).heygen_voice_id as string | null) ?? "");
+      setAvatarUrl(((persona as any).avatar_url as string | null) ?? null);
       setTwinRefs(null);
       setSavedItems(null);
       setTab("basics");
@@ -603,12 +611,46 @@ function EditPersonaDialog({
         linkedTwinRefIds: twinLinkMode === "selected" ? linkedRefIds : [],
         heygenAvatarId,
         heygenVoiceId,
+        avatarUrl,
       }});
       toast.success("Persona saved");
       onSaved();
     } catch (e: any) {
       toast.error(e.message ?? "Could not save persona");
     } finally { setBusy(false); }
+  }
+
+  async function handleAvatarPick(file: File) {
+    if (!persona || !user) return;
+    if (!/^image\//.test(file.type)) { toast.error("Please choose an image file."); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error("Image must be under 5MB."); return; }
+    setAvatarBusy(true);
+    try {
+      const ext = (file.name.split(".").pop() || "png").toLowerCase().slice(0, 5);
+      const path = `${user.id}/personas/${persona.id}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      });
+      if (upErr) throw upErr;
+      setAvatarUrl(path);
+      await update({ data: { personaId: persona.id, avatarUrl: path } });
+      toast.success("Avatar updated");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Upload failed");
+    } finally { setAvatarBusy(false); }
+  }
+
+  async function handleAvatarRemove() {
+    if (!persona) return;
+    setAvatarBusy(true);
+    try {
+      setAvatarUrl(null);
+      await update({ data: { personaId: persona.id, avatarUrl: null } });
+      toast.success("Avatar removed");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not remove avatar");
+    } finally { setAvatarBusy(false); }
   }
 
   return (
@@ -632,6 +674,39 @@ function EditPersonaDialog({
         </div>
         {tab === "basics" && (
         <div className="space-y-4">
+          <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-3">
+            <div className="relative size-16 shrink-0 overflow-hidden rounded-full border border-border bg-surface-elevated">
+              {avatarSrc ? (
+                <img src={avatarSrc} alt="" className="size-full object-cover" />
+              ) : (
+                <div className="flex size-full items-center justify-center text-lg font-semibold text-muted-foreground">
+                  {(displayName || "?").slice(0, 1).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Profile picture</div>
+              <p className="mt-0.5 text-xs text-muted-foreground">PNG or JPG, up to 5MB. Shown on this persona's card and chat header.</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <label className="inline-flex cursor-pointer items-center rounded-md border border-border bg-surface-elevated px-3 py-1.5 text-xs font-medium hover:border-brand/40">
+                  <Camera className="mr-1 size-3.5" />
+                  {avatarBusy ? "Uploading…" : avatarUrl ? "Replace" : "Upload"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={avatarBusy}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarPick(f); e.target.value = ""; }}
+                  />
+                </label>
+                {avatarUrl && (
+                  <Button type="button" size="sm" variant="ghost" disabled={avatarBusy} onClick={handleAvatarRemove}>
+                    <XIcon className="mr-1 size-3.5" /> Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
           <div>
             <Label>Name</Label>
             <Input className="mt-1.5" value={displayName} onChange={(e) => setName(e.target.value)} maxLength={60} />
