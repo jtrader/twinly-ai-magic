@@ -380,20 +380,6 @@ function CreatePersonaDialog({
             <Input className="mt-1.5" value={displayName} onChange={(e) => setName(e.target.value)} maxLength={60} />
           </div>
           <div>
-            <Label>Visibility</Label>
-            <Select value={visibility} onValueChange={(v) => changeVisibilityInline(v as Visibility)} disabled={visBusy}>
-              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {(Object.keys(VISIBILITY_LABEL) as Visibility[]).map((v) => (
-                  <SelectItem key={v} value={v}>{VISIBILITY_LABEL[v]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Changes apply immediately. Draft & Hidden are only visible to you; Public, Subscribers, and VIP appear to the matching fan roles.
-            </p>
-          </div>
-          <div>
             <Label>Kind</Label>
             <Select value={kind} onValueChange={(v) => setKind(v as any)}>
               <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
