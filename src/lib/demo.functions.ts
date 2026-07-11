@@ -283,7 +283,7 @@ export const adminSeedDemoCreators = createServerFn({ method: "POST" })
 
 export const adminImpersonateCreator = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { creatorId: string }) => d)
+  .validator((d: { creatorId: string; redirectPath?: string }) => d)
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -305,7 +305,8 @@ export const adminImpersonateCreator = createServerFn({ method: "POST" })
     const { getRequest } = await import("@tanstack/react-start/server");
     const req = getRequest();
     const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/(https?:\/\/[^/]+).*/, "$1") || "";
-    const redirectTo = `${origin}/studio`;
+    const path = (data.redirectPath && data.redirectPath.startsWith("/")) ? data.redirectPath : "/studio";
+    const redirectTo = `${origin}${path}`;
 
     const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
       type: "magiclink",
@@ -332,4 +333,98 @@ export const adminImpersonateCreator = createServerFn({ method: "POST" })
       adminEmail: adminEmail ?? null,
       creator: { handle: creator.handle, stage_name: creator.stage_name },
     };
+  });
+
+// List every creator on the platform (admin-only) for impersonation UI.
+export const adminListAllCreators = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: creators, error } = await supabaseAdmin
+      .from("creators")
+      .select("id, handle, stage_name, avatar_url, verification_status, user_id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    const emails: Record<string, string | null> = {};
+    for (const c of creators ?? []) {
+      if (!c.user_id) continue;
+      const { data: u } = await supabaseAdmin.auth.admin.getUserById(c.user_id);
+      emails[c.id] = u?.user?.email ?? null;
+    }
+    return { creators: creators ?? [], emails };
+  });
+
+// List every agency + owner (admin-only) for impersonation UI.
+export const adminListAllAgencies = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: agencies, error } = await supabaseAdmin
+      .from("agencies")
+      .select("id, name, owner_user_id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    const ownerIds = Array.from(new Set((agencies ?? []).map((a: any) => a.owner_user_id).filter(Boolean)));
+    const emails: Record<string, string | null> = {};
+    for (const uid of ownerIds) {
+      const { data: u } = await supabaseAdmin.auth.admin.getUserById(uid);
+      emails[uid] = u?.user?.email ?? null;
+    }
+    // Count linked creators per agency
+    const agencyIds = (agencies ?? []).map((a: any) => a.id);
+    const { data: links } = agencyIds.length
+      ? await supabaseAdmin.from("agency_creators").select("agency_id").in("agency_id", agencyIds)
+      : { data: [] as any[] };
+    const counts = new Map<string, number>();
+    for (const l of links ?? []) counts.set(l.agency_id, (counts.get(l.agency_id) ?? 0) + 1);
+    return {
+      agencies: (agencies ?? []).map((a: any) => ({
+        ...a,
+        owner_email: a.owner_user_id ? emails[a.owner_user_id] ?? null : null,
+        creator_count: counts.get(a.id) ?? 0,
+      })),
+    };
+  });
+
+// Impersonate any user by user_id (used for agency owners); admin-only.
+export const adminImpersonateUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { userId: string; redirectPath?: string; label?: string }) => d)
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { logAudit } = await import("@/lib/audit.server");
+
+    const { data: userRes } = await supabaseAdmin.auth.admin.getUserById(data.userId);
+    const email = userRes?.user?.email;
+    if (!email) throw new Error("Target user has no email");
+
+    const { data: adminUserRes } = await supabaseAdmin.auth.admin.getUserById(context.userId);
+    const adminEmail = adminUserRes?.user?.email;
+
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const req = getRequest();
+    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/(https?:\/\/[^/]+).*/, "$1") || "";
+    const path = (data.redirectPath && data.redirectPath.startsWith("/")) ? data.redirectPath : "/app";
+    const redirectTo = `${origin}${path}`;
+
+    const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+      type: "magiclink", email, options: { redirectTo },
+    });
+    if (linkErr || !link?.properties?.action_link) throw new Error(linkErr?.message ?? "Failed to mint link");
+
+    let returnUrl: string | null = null;
+    if (adminEmail) {
+      const { data: retLink } = await supabaseAdmin.auth.admin.generateLink({
+        type: "magiclink", email: adminEmail, options: { redirectTo: `${origin}/admin` },
+      });
+      returnUrl = retLink?.properties?.action_link ?? null;
+    }
+
+    await logAudit(context.userId, "admin.impersonate_user", { type: "user", id: data.userId }, { label: data.label ?? null });
+    return { url: link.properties.action_link, returnUrl, adminEmail: adminEmail ?? null };
   });

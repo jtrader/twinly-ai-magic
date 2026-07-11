@@ -11,7 +11,7 @@ import { adminListModeration, adminResolveModeration } from "@/lib/moderation.fu
 import { adminListPendingAssets, adminSetAssetApproval } from "@/lib/admin.functions";
 import { adminListPendingPacks, adminSetPackApproval } from "@/lib/admin.functions";
 import { adminListPendingTwinRefs, adminSetTwinRefReview, adminGetTwinRefSignedUrl } from "@/lib/twin.functions";
-import { adminListDemoCreators, adminSeedDemoCreators, adminImpersonateCreator } from "@/lib/demo.functions";
+import { adminListDemoCreators, adminSeedDemoCreators, adminImpersonateCreator, adminListAllCreators, adminListAllAgencies, adminImpersonateUser } from "@/lib/demo.functions";
 import { setImpersonationContext } from "@/components/twinly/ImpersonationBanner";
 
 export const Route = createFileRoute("/admin")({
@@ -30,7 +30,7 @@ function AdminPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
-  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo" | "settings">("overview");
+  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo" | "creators" | "agencies" | "settings">("overview");
   const [stats, setStats] = useState<any>(null);
   const [creators, setCreators] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
@@ -41,6 +41,8 @@ function AdminPage() {
   const [twinPreviews, setTwinPreviews] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [demo, setDemo] = useState<{ seeded: any[]; available: any[]; emails: Record<string, string | null> } | null>(null);
+  const [allCreators, setAllCreators] = useState<{ creators: any[]; emails: Record<string, string | null> } | null>(null);
+  const [allAgencies, setAllAgencies] = useState<{ agencies: any[] } | null>(null);
   const [platformSettings, setPlatformSettings] = useState<{ max_explicitness_ceiling: string } | null>(null);
 
   const overview = useServerFn(adminOverview);
@@ -60,6 +62,9 @@ function AdminPage() {
   const listDemo = useServerFn(adminListDemoCreators);
   const seedDemo = useServerFn(adminSeedDemoCreators);
   const impersonate = useServerFn(adminImpersonateCreator);
+  const listAllCreatorsFn = useServerFn(adminListAllCreators);
+  const listAllAgenciesFn = useServerFn(adminListAllAgencies);
+  const impersonateUserFn = useServerFn(adminImpersonateUser);
   const getSettings = useServerFn(adminGetPlatformSettings);
   const setSettings = useServerFn(adminSetPlatformSettings);
   const verifyLedger = useServerFn(adminVerifyConsentLedger);
@@ -86,6 +91,8 @@ function AdminPage() {
           setTwinPreviews(Object.fromEntries(entries));
         }
         if (tab === "demo") setDemo(await listDemo({}));
+        if (tab === "creators") setAllCreators(await listAllCreatorsFn({}));
+        if (tab === "agencies") setAllAgencies(await listAllAgenciesFn({}));
         if (tab === "settings") setPlatformSettings((await getSettings({})).settings);
       } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
     })();
@@ -229,6 +236,17 @@ function AdminPage() {
     } catch (e: any) { toast.error(e?.message ?? "Failed"); setBusy(null); }
   }
 
+  async function signInAsAgencyOwner(userId: string, name: string) {
+    if (!window.confirm(`Sign in as owner of "${name}"?\n\nYour admin session will be replaced in this tab. Use the "Return to admin" banner to bounce back.`)) return;
+    setBusy(userId);
+    try {
+      const { url, returnUrl, adminEmail } = await impersonateUserFn({ data: { userId, redirectPath: "/agency", label: `agency:${name}` } });
+      setImpersonationContext({ returnUrl, adminEmail, handle: name });
+      toast.success(`Signing in as ${name}…`);
+      window.location.href = url;
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); setBusy(null); }
+  }
+
   return (
     <AppShell>
       <div className="mb-4">
@@ -237,7 +255,7 @@ function AdminPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-2">
-        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo","settings"] as const).map((t) => (
+        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo","creators","agencies","settings"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -478,6 +496,78 @@ function AdminPage() {
                     </tr>
                   ))}
                   {demo.seeded.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No demo creators yet — click "Seed demo creators" above.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "creators" && (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100">
+            <span className="font-semibold">Impersonation:</span> Sign in as any creator to access their studio, personas, content, and payouts. Your admin session is replaced in this tab — use the return banner to bounce back.
+          </div>
+          {allCreators && (
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-surface-elevated text-left text-xs uppercase tracking-widest text-muted-foreground">
+                  <tr><th className="px-4 py-2">Creator</th><th className="px-4 py-2">Email</th><th className="px-4 py-2">Status</th><th className="px-4 py-2 text-right">Actions</th></tr>
+                </thead>
+                <tbody>
+                  {allCreators.creators.map((c: any) => (
+                    <tr key={c.id} className="border-b border-border/50">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {c.avatar_url && <img src={c.avatar_url} alt="" className="size-9 rounded-full object-cover" />}
+                          <div className="min-w-0">
+                            <Link to="/creators/$handle" params={{ handle: c.handle }} className="font-semibold hover:text-brand-glow">{c.stage_name}</Link>
+                            <div className="text-xs text-muted-foreground">@{c.handle}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">{allCreators.emails[c.id] ?? "—"}</td>
+                      <td className="px-4 py-3"><Pill value={c.verification_status} /></td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="outline" disabled={busy === c.id || !c.user_id} onClick={() => signInAs(c.id, c.handle)}>
+                          {busy === c.id ? "Minting…" : "Sign in as"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {allCreators.creators.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No creators yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "agencies" && (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100">
+            <span className="font-semibold">Impersonation:</span> Sign in as any agency owner to access their dashboard and managed creators.
+          </div>
+          {allAgencies && (
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-surface-elevated text-left text-xs uppercase tracking-widest text-muted-foreground">
+                  <tr><th className="px-4 py-2">Agency</th><th className="px-4 py-2">Owner email</th><th className="px-4 py-2">Creators</th><th className="px-4 py-2 text-right">Actions</th></tr>
+                </thead>
+                <tbody>
+                  {allAgencies.agencies.map((a: any) => (
+                    <tr key={a.id} className="border-b border-border/50">
+                      <td className="px-4 py-3 font-semibold">{a.name}</td>
+                      <td className="px-4 py-3 font-mono text-xs">{a.owner_email ?? "—"}</td>
+                      <td className="px-4 py-3">{a.creator_count}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="outline" disabled={busy === a.owner_user_id || !a.owner_user_id} onClick={() => signInAsAgencyOwner(a.owner_user_id, a.name)}>
+                          {busy === a.owner_user_id ? "Minting…" : "Sign in as owner"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {allAgencies.agencies.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No agencies yet.</td></tr>}
                 </tbody>
               </table>
             </div>
