@@ -73,6 +73,33 @@ function dollarsInputToCents(input: string): number {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
 }
 
+/** Downscale an image to fit within maxSize (px, longest edge) and encode as JPEG. */
+async function resizeImageToBlob(file: File, maxSize = 512, quality = 0.9): Promise<Blob> {
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+  const img: HTMLImageElement = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("Could not decode image"));
+    i.src = dataUrl;
+  });
+  const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas unsupported");
+  ctx.drawImage(img, 0, 0, w, h);
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => b ? resolve(b) : reject(new Error("Encode failed")), "image/jpeg", quality);
+  });
+}
+
 function PersonaStudioPage() {
   const { user, loading } = useSession();
   const navigate = useNavigate();
@@ -133,16 +160,24 @@ function PersonaStudioPage() {
 
   async function confirmDelete() {
     if (!deleting) return;
+    const snapshot = personas;
+    const target = deleting;
+    // Optimistic remove — card disappears instantly.
+    setPersonas((s) => s.filter((p) => p.id !== target.id));
     setBusy(true);
     try {
-      await remove({ data: { personaId: deleting.id } });
+      await remove({ data: { personaId: target.id } });
       toast.success("Persona deleted");
       setDeleting(null);
-      refresh();
     } catch (e: any) {
+      setPersonas(snapshot); // rollback
       toast.error(e.message ?? "Could not delete persona");
     } finally { setBusy(false); }
   }
+
+  const patchPersona = useCallback((id: string, patch: Partial<Persona>) => {
+    setPersonas((s) => s.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }, []);
 
   if (loading || !ready) {
     return <AppShell><div className="text-sm text-muted-foreground">Loading…</div></AppShell>;
@@ -266,6 +301,7 @@ function PersonaStudioPage() {
         persona={editing}
         onOpenChange={(o) => { if (!o) setEditing(null); }}
         onSaved={() => { setEditing(null); refresh(); }}
+        onLocalPatch={patchPersona}
       />
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => { if (!o) setDeleting(null); }}>
@@ -420,13 +456,21 @@ function CreatePersonaDialog({
 }
 
 function EditPersonaDialog({
-  persona, onOpenChange, onSaved,
-}: { persona: Persona | null; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
+  persona, onOpenChange, onSaved, onLocalPatch,
+}: {
+  persona: Persona | null;
+  onOpenChange: (v: boolean) => void;
+  onSaved: () => void;
+  onLocalPatch?: (id: string, patch: Partial<Persona>) => void;
+}) {
   const { user } = useSession();
   const update = useServerFn(updatePersona);
+  const setVis = useServerFn(setPersonaVisibility);
   const [displayName, setName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [visibility, setVisibility] = useState<Visibility>("draft");
+  const [visBusy, setVisBusy] = useState(false);
   const avatarSrc = useAvatarUrl(avatarUrl);
   const [description, setDescription] = useState("");
   const [disclosureLabel, setDisclosure] = useState("");
@@ -560,6 +604,7 @@ function EditPersonaDialog({
       setHeygenAvatarId(((persona as any).heygen_avatar_id as string | null) ?? "");
       setHeygenVoiceId(((persona as any).heygen_voice_id as string | null) ?? "");
       setAvatarUrl(((persona as any).avatar_url as string | null) ?? null);
+      setVisibility(persona.visibility);
       setTwinRefs(null);
       setSavedItems(null);
       setTab("basics");
@@ -637,19 +682,24 @@ function EditPersonaDialog({
 
   async function handleAvatarPick(file: File) {
     if (!persona || !user) return;
-    if (!/^image\//.test(file.type)) { toast.error("Please choose an image file."); return; }
-    if (file.size > 5 * 1024 * 1024) { toast.error("Image must be under 5MB."); return; }
+    const allowed = ["image/png", "image/jpeg", "image/webp"];
+    if (!allowed.includes(file.type)) { toast.error("Use a PNG, JPG, or WebP image."); return; }
+    if (file.size > 8 * 1024 * 1024) { toast.error("Image must be under 8MB."); return; }
     setAvatarBusy(true);
     try {
-      const ext = (file.name.split(".").pop() || "png").toLowerCase().slice(0, 5);
+      const resized = await resizeImageToBlob(file, 512, 0.9).catch(() => null);
+      const blob: Blob = resized ?? file;
+      const contentType = resized ? "image/jpeg" : file.type;
+      const ext = resized ? "jpg" : (file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg");
       const path = `${user.id}/personas/${persona.id}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, blob, {
         upsert: true,
-        contentType: file.type,
+        contentType,
       });
       if (upErr) throw upErr;
       setAvatarUrl(path);
       await update({ data: { personaId: persona.id, avatarUrl: path } });
+      onLocalPatch?.(persona.id, { avatar_url: path } as any);
       toast.success("Avatar updated");
     } catch (e: any) {
       toast.error(e?.message ?? "Upload failed");
@@ -662,10 +712,27 @@ function EditPersonaDialog({
     try {
       setAvatarUrl(null);
       await update({ data: { personaId: persona.id, avatarUrl: null } });
+      onLocalPatch?.(persona.id, { avatar_url: null } as any);
       toast.success("Avatar removed");
     } catch (e: any) {
       toast.error(e?.message ?? "Could not remove avatar");
     } finally { setAvatarBusy(false); }
+  }
+
+  async function changeVisibilityInline(v: Visibility) {
+    if (!persona || v === visibility) return;
+    const prev = visibility;
+    setVisibility(v); // optimistic
+    onLocalPatch?.(persona.id, { visibility: v });
+    setVisBusy(true);
+    try {
+      await setVis({ data: { personaId: persona.id, visibility: v } });
+      toast.success(`Set to ${VISIBILITY_LABEL[v].toLowerCase()}`);
+    } catch (e: any) {
+      setVisibility(prev);
+      onLocalPatch?.(persona.id, { visibility: prev });
+      toast.error(e?.message ?? "Could not update visibility");
+    } finally { setVisBusy(false); }
   }
 
   return (
@@ -725,6 +792,20 @@ function EditPersonaDialog({
           <div>
             <Label>Name</Label>
             <Input className="mt-1.5" value={displayName} onChange={(e) => setName(e.target.value)} maxLength={60} />
+          </div>
+          <div>
+            <Label>Visibility</Label>
+            <Select value={visibility} onValueChange={(v) => changeVisibilityInline(v as Visibility)} disabled={visBusy}>
+              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(VISIBILITY_LABEL) as Visibility[]).map((v) => (
+                  <SelectItem key={v} value={v}>{VISIBILITY_LABEL[v]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Applies instantly. Draft & Hidden are only visible to you. Public shows to everyone; Subscribers & VIP only to fans in that tier.
+            </p>
           </div>
           <div>
             <Label>Description</Label>
