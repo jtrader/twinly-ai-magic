@@ -33,11 +33,11 @@ function AccountPage() {
             ? <span className="text-sm text-muted-foreground">—</span>
             : roles.map((r) => {
                 const badgeClass = "rounded-full border border-border bg-surface-elevated px-3 py-1 text-xs font-semibold uppercase tracking-widest";
-                return r === "admin" ? (
-                  <Link key={r} to="/admin" className={cn(badgeClass, "text-brand-glow hover:bg-brand/15 hover:border-brand/30 transition-colors")}>{r}</Link>
-                ) : (
-                  <span key={r} className={badgeClass}>{r}</span>
-                );
+                const linkClass = cn(badgeClass, "text-brand-glow hover:bg-brand/15 hover:border-brand/30 transition-colors");
+                if (r === "admin") return <Link key={r} to="/admin" className={linkClass}>{r}</Link>;
+                if (r === "creator") return <Link key={r} to="/studio" className={linkClass}>{r}</Link>;
+                if (r === "agency") return <Link key={r} to="/agency" className={linkClass}>{r}</Link>;
+                return <span key={r} className={badgeClass}>{r}</span>;
               })}
         </div>
       </div>
