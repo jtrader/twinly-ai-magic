@@ -702,3 +702,14 @@ function Pill({ value }: { value: string }) {
     : "border-border bg-surface text-muted-foreground";
   return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${tone}`}>{value}</span>;
 }
+
+function Pager({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onChange(page - 1)}>← Prev</Button>
+      <div className="text-muted-foreground">Page {page} of {totalPages}</div>
+      <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>Next →</Button>
+    </div>
+  );
+}
