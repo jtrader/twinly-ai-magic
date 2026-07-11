@@ -1537,6 +1537,7 @@ export type Database = {
       }
       personas: {
         Row: {
+          avatar_url: string | null
           boundary_rules: Json
           cover_url: string | null
           created_at: string
@@ -1568,6 +1569,7 @@ export type Database = {
           voice_reply_enabled: boolean
         }
         Insert: {
+          avatar_url?: string | null
           boundary_rules?: Json
           cover_url?: string | null
           created_at?: string
@@ -1599,6 +1601,7 @@ export type Database = {
           voice_reply_enabled?: boolean
         }
         Update: {
+          avatar_url?: string | null
           boundary_rules?: Json
           cover_url?: string | null
           created_at?: string

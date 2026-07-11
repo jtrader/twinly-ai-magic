@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, LogOut, Settings, LogIn, Wallet, Sparkles } from "lucide-react";
+import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, LogOut, Settings, LogIn, Wallet, Sparkles, Palette, Building2, ShieldCheck } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { createBillingPortal } from "@/lib/checkout.functions";
 import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
@@ -10,7 +10,7 @@ import { ImpersonationBanner } from "@/components/twinly/ImpersonationBanner";
 import { NotificationBell } from "@/components/twinly/NotificationBell";
 import { PaymentTestModeBanner } from "@/components/twinly/PaymentTestModeBanner";
 import { supabase } from "@/integrations/supabase/client";
-import { useSession } from "@/lib/session";
+import { useSession, useUserRoles } from "@/lib/session";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +54,7 @@ function TopBar() {
 
 function AccountMenu() {
   const { user } = useSession();
+  const roles = useUserRoles(user?.id);
   const navigate = useNavigate();
   return (
     <DropdownMenu>
@@ -83,6 +84,26 @@ function AccountMenu() {
               <Link to="/account/following"><Heart className="mr-2 size-4" />Following & Favorites</Link>
             </DropdownMenuItem>
             <BillingPortalMenuItem />
+            {(roles.includes("creator") || roles.includes("agency") || roles.includes("admin")) && (
+              <>
+                <DropdownMenuSeparator />
+                {(roles.includes("creator") || roles.includes("admin")) && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/studio"><Palette className="mr-2 size-4" />Creator Studio</Link>
+                  </DropdownMenuItem>
+                )}
+                {(roles.includes("agency") || roles.includes("admin")) && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/agency"><Building2 className="mr-2 size-4" />Agency</Link>
+                  </DropdownMenuItem>
+                )}
+                {roles.includes("admin") && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin"><ShieldCheck className="mr-2 size-4" />Admin</Link>
+                  </DropdownMenuItem>
+                )}
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link to="/account"><Settings className="mr-2 size-4" />Settings</Link>
