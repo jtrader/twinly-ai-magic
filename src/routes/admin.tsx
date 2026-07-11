@@ -44,6 +44,11 @@ function AdminPage() {
   const [allCreators, setAllCreators] = useState<{ creators: any[]; emails: Record<string, string | null> } | null>(null);
   const [allAgencies, setAllAgencies] = useState<{ agencies: any[] } | null>(null);
   const [platformSettings, setPlatformSettings] = useState<{ max_explicitness_ceiling: string } | null>(null);
+  const [creatorsQuery, setCreatorsQuery] = useState("");
+  const [creatorsPage, setCreatorsPage] = useState(1);
+  const [agenciesQuery, setAgenciesQuery] = useState("");
+  const [agenciesPage, setAgenciesPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const overview = useServerFn(adminOverview);
   const listVer = useServerFn(adminListVerifications);
@@ -225,12 +230,12 @@ function AdminPage() {
     finally { setBusy(null); }
   }
 
-  async function signInAs(creatorId: string, handle: string) {
+  async function signInAs(creatorId: string, handle: string, stageName?: string) {
     if (!window.confirm(`Sign in as @${handle}?\n\nYour admin session will be replaced in this tab. A "Return to admin" banner will appear so you can bounce back with one click.`)) return;
     setBusy(creatorId);
     try {
       const { url, returnUrl, adminEmail } = await impersonate({ data: { creatorId } });
-      setImpersonationContext({ returnUrl, adminEmail, handle });
+      setImpersonationContext({ returnUrl, adminEmail, handle, kind: "creator", targetName: stageName ?? null });
       toast.success(`Signing in as @${handle}…`);
       window.location.href = url;
     } catch (e: any) { toast.error(e?.message ?? "Failed"); setBusy(null); }
@@ -241,7 +246,7 @@ function AdminPage() {
     setBusy(userId);
     try {
       const { url, returnUrl, adminEmail } = await impersonateUserFn({ data: { userId, redirectPath: "/agency", label: `agency:${name}` } });
-      setImpersonationContext({ returnUrl, adminEmail, handle: name });
+      setImpersonationContext({ returnUrl, adminEmail, handle: name, kind: "agency", targetName: name });
       toast.success(`Signing in as ${name}…`);
       window.location.href = url;
     } catch (e: any) { toast.error(e?.message ?? "Failed"); setBusy(null); }
