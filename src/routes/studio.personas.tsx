@@ -429,13 +429,21 @@ function CreatePersonaDialog({
 }
 
 function EditPersonaDialog({
-  persona, onOpenChange, onSaved,
-}: { persona: Persona | null; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
+  persona, onOpenChange, onSaved, onLocalPatch,
+}: {
+  persona: Persona | null;
+  onOpenChange: (v: boolean) => void;
+  onSaved: () => void;
+  onLocalPatch?: (id: string, patch: Partial<Persona>) => void;
+}) {
   const { user } = useSession();
   const update = useServerFn(updatePersona);
+  const setVis = useServerFn(setPersonaVisibility);
   const [displayName, setName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [visibility, setVisibility] = useState<Visibility>("draft");
+  const [visBusy, setVisBusy] = useState(false);
   const avatarSrc = useAvatarUrl(avatarUrl);
   const [description, setDescription] = useState("");
   const [disclosureLabel, setDisclosure] = useState("");
@@ -569,6 +577,7 @@ function EditPersonaDialog({
       setHeygenAvatarId(((persona as any).heygen_avatar_id as string | null) ?? "");
       setHeygenVoiceId(((persona as any).heygen_voice_id as string | null) ?? "");
       setAvatarUrl(((persona as any).avatar_url as string | null) ?? null);
+      setVisibility(persona.visibility);
       setTwinRefs(null);
       setSavedItems(null);
       setTab("basics");
@@ -646,19 +655,24 @@ function EditPersonaDialog({
 
   async function handleAvatarPick(file: File) {
     if (!persona || !user) return;
-    if (!/^image\//.test(file.type)) { toast.error("Please choose an image file."); return; }
-    if (file.size > 5 * 1024 * 1024) { toast.error("Image must be under 5MB."); return; }
+    const allowed = ["image/png", "image/jpeg", "image/webp"];
+    if (!allowed.includes(file.type)) { toast.error("Use a PNG, JPG, or WebP image."); return; }
+    if (file.size > 8 * 1024 * 1024) { toast.error("Image must be under 8MB."); return; }
     setAvatarBusy(true);
     try {
-      const ext = (file.name.split(".").pop() || "png").toLowerCase().slice(0, 5);
+      const resized = await resizeImageToBlob(file, 512, 0.9).catch(() => null);
+      const blob: Blob = resized ?? file;
+      const contentType = resized ? "image/jpeg" : file.type;
+      const ext = resized ? "jpg" : (file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg");
       const path = `${user.id}/personas/${persona.id}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, blob, {
         upsert: true,
-        contentType: file.type,
+        contentType,
       });
       if (upErr) throw upErr;
       setAvatarUrl(path);
       await update({ data: { personaId: persona.id, avatarUrl: path } });
+      onLocalPatch?.(persona.id, { avatar_url: path } as any);
       toast.success("Avatar updated");
     } catch (e: any) {
       toast.error(e?.message ?? "Upload failed");
@@ -671,10 +685,27 @@ function EditPersonaDialog({
     try {
       setAvatarUrl(null);
       await update({ data: { personaId: persona.id, avatarUrl: null } });
+      onLocalPatch?.(persona.id, { avatar_url: null } as any);
       toast.success("Avatar removed");
     } catch (e: any) {
       toast.error(e?.message ?? "Could not remove avatar");
     } finally { setAvatarBusy(false); }
+  }
+
+  async function changeVisibilityInline(v: Visibility) {
+    if (!persona || v === visibility) return;
+    const prev = visibility;
+    setVisibility(v); // optimistic
+    onLocalPatch?.(persona.id, { visibility: v });
+    setVisBusy(true);
+    try {
+      await setVis({ data: { personaId: persona.id, visibility: v } });
+      toast.success(`Set to ${VISIBILITY_LABEL[v].toLowerCase()}`);
+    } catch (e: any) {
+      setVisibility(prev);
+      onLocalPatch?.(persona.id, { visibility: prev });
+      toast.error(e?.message ?? "Could not update visibility");
+    } finally { setVisBusy(false); }
   }
 
   return (
