@@ -38,6 +38,21 @@ import {
 
 export const Route = createFileRoute("/studio/personas")({ component: PersonaStudioPage });
 
+function PersonaCardAvatar({ path, name }: { path: string | null; name: string }) {
+  const src = useAvatarUrl(path);
+  return (
+    <div className="size-12 shrink-0 overflow-hidden rounded-full border border-border bg-surface-elevated">
+      {src ? (
+        <img src={src} alt="" className="size-full object-cover" />
+      ) : (
+        <div className="flex size-full items-center justify-center text-sm font-semibold text-muted-foreground">
+          {(name || "?").slice(0, 1).toUpperCase()}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type Persona = Awaited<ReturnType<typeof listMyPersonas>>["personas"][number];
 type Visibility = Persona["visibility"];
 
