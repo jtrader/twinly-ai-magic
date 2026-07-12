@@ -43,6 +43,7 @@ import { matchesRealName } from "@/lib/persona-name-privacy";
 import { getPersonaVisibilityPolicy, setPersonaDefaultVisibility } from "@/lib/feed-visibility.functions";
 import type { FeedVisibilityTier } from "@/lib/feed-visibility-access.server";
 import { nextFeedTierForToggle } from "@/lib/feed-visibility-tier-toggle";
+import { lookupVeniceCharacter } from "@/lib/venice-character.functions";
 
 export const Route = createFileRoute("/studio/personas")({ component: PersonaStudioPage });
 
@@ -378,6 +379,7 @@ function CreatePersonaDialog({
   const [voiceSimilarityBoost, setVoiceSimilarityBoost] = useState(0.75);
   const [voiceStyle, setVoiceStyle] = useState(0);
   const [requireIdVerification, setRequireIdVerification] = useState(false);
+  const [veniceCharacterSlug, setVeniceCharacterSlug] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -387,6 +389,7 @@ function CreatePersonaDialog({
       setContentThemeOverrides({});
       setUseClonedVoice(false); setVoiceStability(0.5); setVoiceSimilarityBoost(0.75); setVoiceStyle(0);
       setRequireIdVerification(false);
+      setVeniceCharacterSlug("");
     }
   }, [open]);
 
@@ -410,6 +413,7 @@ function CreatePersonaDialog({
           voiceSimilarityBoost: kind === "ai" && useClonedVoice ? voiceSimilarityBoost : undefined,
           voiceStyle: kind === "ai" && useClonedVoice ? voiceStyle : undefined,
           requireIdVerification: kind === "ai" ? requireIdVerification : undefined,
+          veniceCharacterSlug: kind === "ai" ? veniceCharacterSlug : undefined,
         },
       });
       toast.success("Persona created — it's in draft.");
@@ -472,6 +476,11 @@ function CreatePersonaDialog({
           </div>
           {kind === "ai" && (
             <>
+              <VeniceCharacterField
+                idPrefix="create-persona"
+                value={veniceCharacterSlug}
+                onChange={setVeniceCharacterSlug}
+              />
               <div>
                 <Label htmlFor="create-persona-system-prompt">System prompt</Label>
                 <Textarea id="create-persona-system-prompt" className="mt-1.5" rows={4} maxLength={4000} value={systemPrompt}
@@ -612,6 +621,68 @@ function VoiceSettingSlider({
   );
 }
 
+function VeniceCharacterField({
+  idPrefix, value, onChange,
+}: { idPrefix: string; value: string; onChange: (v: string) => void }) {
+  const lookup = useServerFn(lookupVeniceCharacter);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<Awaited<ReturnType<typeof lookupVeniceCharacter>> | null>(null);
+  const [checkedSlug, setCheckedSlug] = useState<string | null>(null);
+
+  async function check() {
+    const slug = value.trim();
+    if (!slug) return;
+    setBusy(true);
+    try {
+      const r = await lookup({ data: { slug } });
+      setResult(r);
+      setCheckedSlug(slug);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not look up that character");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div>
+      <Label htmlFor={`${idPrefix}-venice-character`}>Quick-start from a Venice Character (optional)</Label>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Already published a Character on Venice? Paste its slug (the "Public ID" shown on the character's page) to
+        give this persona an established look and voice to draw from, instead of starting from a blank system
+        prompt. Only takes effect on replies actually routed through Venice.
+      </p>
+      <div className="mt-1.5 flex gap-2">
+        <Input
+          id={`${idPrefix}-venice-character`}
+          value={value}
+          onChange={(e) => { onChange(e.target.value); setResult(null); }}
+          placeholder="e.g. alan-watts"
+          maxLength={120}
+        />
+        <Button type="button" variant="outline" size="sm" disabled={busy || !value.trim()} onClick={check}>
+          {busy ? "Checking…" : "Preview"}
+        </Button>
+      </div>
+      {result && checkedSlug === value.trim() && (
+        result.found ? (
+          <div className="mt-2 flex items-center gap-3 rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-2.5">
+            {result.character.photoUrl && (
+              <img src={result.character.photoUrl} alt="" className="size-10 shrink-0 rounded-full object-cover" />
+            )}
+            <div className="min-w-0 text-xs">
+              <div className="font-semibold text-emerald-300">{result.character.name}</div>
+              <div className="truncate text-muted-foreground">
+                by {result.character.author || "unknown"}{result.character.adult ? " · 18+" : ""}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-rose-300">No published Venice Character found with that slug.</p>
+        )
+      )}
+    </div>
+  );
+}
+
 function EditPersonaDialog({
   persona, onOpenChange, onSaved, onLocalPatch, elevenlabsVoiceId,
 }: {
@@ -648,6 +719,7 @@ function EditPersonaDialog({
   const [voiceSimilarityBoost, setVoiceSimilarityBoost] = useState(0.75);
   const [voiceStyle, setVoiceStyle] = useState(0);
   const [requireIdVerification, setRequireIdVerification] = useState(false);
+  const [veniceCharacterSlug, setVeniceCharacterSlug] = useState("");
   const [busy, setBusy] = useState(false);
   const [toneExamples, setToneExamples] = useState("");
   const [dos, setDos] = useState("");
@@ -814,6 +886,7 @@ function EditPersonaDialog({
       setVoiceSimilarityBoost(((persona as any).voice_similarity_boost as number | null) ?? 0.75);
       setVoiceStyle(((persona as any).voice_style as number | null) ?? 0);
       setRequireIdVerification(!!(persona as any).require_id_verification);
+      setVeniceCharacterSlug(((persona as any).venice_character_slug as string | null) ?? "");
       const tn = ((persona as any).training_notes ?? {}) as Record<string, string>;
       setToneExamples(tn.tone_examples ?? "");
       setDos(tn.dos ?? "");
@@ -920,6 +993,7 @@ function EditPersonaDialog({
         voiceSimilarityBoost: persona.kind === "ai" && useClonedVoice ? voiceSimilarityBoost : undefined,
         voiceStyle: persona.kind === "ai" && useClonedVoice ? voiceStyle : undefined,
         requireIdVerification: persona.kind === "ai" ? requireIdVerification : undefined,
+        veniceCharacterSlug: persona.kind === "ai" ? veniceCharacterSlug : undefined,
         trainingNotes: {
           tone_examples: toneExamples,
           dos, donts,
@@ -1101,6 +1175,11 @@ function EditPersonaDialog({
           </div>
           {persona?.kind === "ai" && (
             <>
+              <VeniceCharacterField
+                idPrefix="edit-persona"
+                value={veniceCharacterSlug}
+                onChange={setVeniceCharacterSlug}
+              />
               <div>
                 <Label htmlFor="edit-persona-system-prompt">System prompt</Label>
                 <Textarea id="edit-persona-system-prompt" className="mt-1.5" rows={5} maxLength={4000} value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} />

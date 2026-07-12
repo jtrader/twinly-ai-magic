@@ -403,6 +403,8 @@ export async function generateVeniceChatReply(input: {
   systemPrompt: string;
   userMessage: string;
   model?: string;
+  /** Slug of a published Venice Character to bias this reply toward — see getVeniceCharacter. */
+  characterSlug?: string | null;
 }): Promise<string> {
   const key = process.env.VENICE_API_KEY;
   if (!key) throw new Error("VENICE_API_KEY is not configured.");
@@ -418,6 +420,7 @@ export async function generateVeniceChatReply(input: {
         { role: "system", content: input.systemPrompt },
         { role: "user", content: input.userMessage },
       ],
+      ...(input.characterSlug ? { venice_parameters: { character_slug: input.characterSlug } } : {}),
     }),
   });
 
@@ -439,4 +442,60 @@ export async function generateVeniceChatReply(input: {
     throw new Error("Venice chat completion returned no content.");
   }
   return content;
+}
+
+export type VeniceCharacter = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  photoUrl: string | null;
+  author: string;
+  adult: boolean;
+};
+
+/**
+ * Looks up a published Venice Character by its public slug — GET
+ * /characters/{slug}. Venice has no general media-library/asset-by-ID API
+ * (verified against their docs); this is the one real, documented lookup
+ * that lets a creator "import" an existing Venice identity by ID rather
+ * than starting a persona from a blank slate. Returns null on a genuine
+ * 404 (not found) rather than throwing, since that's an expected outcome
+ * a caller needs to render, not an error condition.
+ */
+export async function getVeniceCharacter(slug: string): Promise<VeniceCharacter | null> {
+  const key = process.env.VENICE_API_KEY;
+  if (!key) throw new Error("VENICE_API_KEY is not configured.");
+
+  const res = await fetch(`${API_BASE}/characters/${encodeURIComponent(slug)}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${key}` },
+  });
+
+  if (res.status === 404) return null;
+  const text = await res.text();
+  if (!res.ok) {
+    if (res.status === 429) throw new Error("Venice rate limit hit — try again shortly.");
+    throw new Error(`Venice character lookup failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+
+  let json: any;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error("Venice returned a non-JSON response.");
+  }
+  const c = json?.data;
+  if (!c?.slug || !c?.name) {
+    throw new Error("Venice character response missing expected fields.");
+  }
+  return {
+    id: String(c.id),
+    slug: String(c.slug),
+    name: String(c.name),
+    description: c.description ?? null,
+    photoUrl: c.photoUrl ?? null,
+    author: String(c.author ?? ""),
+    adult: !!c.adult,
+  };
 }

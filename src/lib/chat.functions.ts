@@ -80,7 +80,7 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
     const { data: persona } = await supabaseAdmin
       .from("personas")
       .select(
-        "id, kind, display_name, disclosure_label, system_prompt, tone_rules, boundary_rules, training_notes, voice_reply_enabled, tts_voice, memory_enabled, explicitness_ceiling, venice_chat_opt_in, visibility, content_theme_overrides, use_cloned_voice, voice_stability, voice_similarity_boost, voice_style, require_id_verification",
+        "id, kind, display_name, disclosure_label, system_prompt, tone_rules, boundary_rules, training_notes, voice_reply_enabled, tts_voice, memory_enabled, explicitness_ceiling, venice_chat_opt_in, visibility, content_theme_overrides, use_cloned_voice, voice_stability, voice_similarity_boost, voice_style, require_id_verification, venice_character_slug",
       )
       .eq("creator_id", creator.id)
       .eq("slug", data.personaSlug)
@@ -449,7 +449,11 @@ async function generateAiReply(
       };
     }
     const { generateVeniceChatReply } = await import("./venice.server");
-    const text = await generateVeniceChatReply({ systemPrompt: system, userMessage });
+    const text = await generateVeniceChatReply({
+      systemPrompt: system,
+      userMessage,
+      characterSlug: (persona as any).venice_character_slug || undefined,
+    });
     return { text, systemPrompt: system };
   }
 

@@ -73,6 +73,7 @@ export const createPersona = createServerFn({ method: "POST" })
     voiceSimilarityBoost?: number | null;
     voiceStyle?: number | null;
     requireIdVerification?: boolean;
+    veniceCharacterSlug?: string | null;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -159,6 +160,7 @@ export const createPersona = createServerFn({ method: "POST" })
         voice_similarity_boost: data.voiceSimilarityBoost ?? null,
         voice_style: data.voiceStyle ?? null,
         require_id_verification: !!data.requireIdVerification,
+        venice_character_slug: data.veniceCharacterSlug?.trim().slice(0, 120) || null,
         visibility: "draft" as Visibility,
         sort_order: nextOrder,
       })
@@ -202,6 +204,7 @@ export const updatePersona = createServerFn({ method: "POST" })
     voiceSimilarityBoost?: number | null;
     voiceStyle?: number | null;
     requireIdVerification?: boolean;
+    veniceCharacterSlug?: string | null;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -232,6 +235,7 @@ export const updatePersona = createServerFn({ method: "POST" })
       voice_similarity_boost?: number | null;
       voice_style?: number | null;
       require_id_verification?: boolean;
+      venice_character_slug?: string | null;
     } = {};
     if (data.displayName !== undefined) {
       const v = data.displayName.trim();
@@ -295,6 +299,10 @@ export const updatePersona = createServerFn({ method: "POST" })
       patch.voice_style = data.voiceStyle === null ? null : clampVoiceSetting(data.voiceStyle) ?? null;
     }
     if (data.requireIdVerification !== undefined) patch.require_id_verification = !!data.requireIdVerification;
+    if (data.veniceCharacterSlug !== undefined) {
+      const v = (data.veniceCharacterSlug ?? "").trim();
+      patch.venice_character_slug = v ? v.slice(0, 120) : null;
+    }
 
     // Per-persona save-time regression gate: re-check the freshly-merged
     // config against known hardening-regression patterns whenever any of

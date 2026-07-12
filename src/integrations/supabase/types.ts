@@ -1822,6 +1822,7 @@ export type Database = {
           twin_link_mode: string
           updated_at: string
           use_cloned_voice: boolean
+          venice_character_slug: string | null
           venice_chat_opt_in: boolean
           visibility: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled: boolean
@@ -1862,6 +1863,7 @@ export type Database = {
           twin_link_mode?: string
           updated_at?: string
           use_cloned_voice?: boolean
+          venice_character_slug?: string | null
           venice_chat_opt_in?: boolean
           visibility?: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled?: boolean
@@ -1902,6 +1904,7 @@ export type Database = {
           twin_link_mode?: string
           updated_at?: string
           use_cloned_voice?: boolean
+          venice_character_slug?: string | null
           venice_chat_opt_in?: boolean
           visibility?: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled?: boolean
