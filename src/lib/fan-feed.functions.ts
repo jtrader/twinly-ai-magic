@@ -21,6 +21,7 @@ function assetAccess(opts: {
   permission: "included" | "ppv" | "restricted";
   personaVisibility: "public" | "subscribers" | "vip" | string;
   isExplicit: boolean;
+  requireIdVerification: boolean;
   priceCents: number;
   isAuthed: boolean;
   isAdult: boolean;
@@ -35,8 +36,9 @@ function assetAccess(opts: {
   // Explicit content gets an additional, un-spoofable bar beyond self-attested
   // age: real ID verification (see identity-verification.functions.ts). This
   // sits after the age_gate check so a not-yet-age-attested viewer sees the
-  // simpler prompt first, not both at once.
-  if (opts.isExplicit && !opts.idVerified) return { state: "locked", reason: "id_verification" };
+  // simpler prompt first, not both at once. A persona can also opt into
+  // requiring ID verification independent of explicitness tier.
+  if ((opts.isExplicit || opts.requireIdVerification) && !opts.idVerified) return { state: "locked", reason: "id_verification" };
 
   // invite_only doesn't additionally require a subscription tier — the
   // whole-persona invite check (getPersonaFeed) already gated the caller in;
@@ -78,7 +80,7 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
 
     const { data: persona } = await supabaseAdmin
       .from("personas")
-      .select("id, slug, display_name, description, kind, disclosure_label, visibility, is_explicit, price_cents")
+      .select("id, slug, display_name, description, kind, disclosure_label, visibility, is_explicit, price_cents, require_id_verification")
       .eq("creator_id", creator.id)
       .eq("slug", data.personaSlug)
       .maybeSingle();
@@ -165,6 +167,7 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
           permission,
           personaVisibility: persona.visibility as any,
           isExplicit: !!persona.is_explicit,
+          requireIdVerification: !!persona.require_id_verification,
           priceCents: a.price_cents ?? 0,
           isAuthed,
           isAdult,
@@ -209,6 +212,7 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
         disclosureLabel: persona.disclosure_label,
         visibility: persona.visibility as "public" | "subscribers" | "vip",
         isExplicit: !!persona.is_explicit,
+        requireIdVerification: !!persona.require_id_verification,
         priceCents: persona.price_cents ?? 0,
       },
       viewer: { isAuthed, isAdult, idVerified, subTier, isOwner },

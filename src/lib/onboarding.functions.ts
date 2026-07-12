@@ -76,7 +76,7 @@ export const listMyPersonas = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { data: creator } = await supabase
-      .from("creators").select("id, handle, stage_name, onboarding_completed_at, verification_status")
+      .from("creators").select("id, handle, stage_name, onboarding_completed_at, verification_status, elevenlabs_voice_id")
       .eq("user_id", userId).maybeSingle();
     if (!creator) return { creator: null, personas: [] };
     // Real (legal) name, distinct from the public stage_name — used only for
@@ -84,12 +84,20 @@ export const listMyPersonas = createServerFn({ method: "GET" })
     // sent anywhere else.
     const { data: profile } = await supabase
       .from("profiles").select("full_name").eq("id", userId).maybeSingle();
+    // Read-only existence check — never call getRealMeProfile here, it lazily
+    // creates the row as a side effect, which we don't want triggered just
+    // by viewing the persona list.
+    const { data: realMe } = await supabase
+      .from("real_me_profiles").select("id").eq("creator_id", creator.id).maybeSingle();
     const { data: personas } = await supabase
       .from("personas")
-      .select("id, slug, display_name, kind, description, disclosure_label, visibility, sort_order, twin_link_mode, linked_twin_ref_ids, training_notes, system_prompt, is_explicit, explicitness_ceiling, tone_rules, boundary_rules, price_cents, is_default_seed")
+      .select("id, slug, display_name, kind, description, disclosure_label, visibility, sort_order, twin_link_mode, linked_twin_ref_ids, training_notes, system_prompt, is_explicit, explicitness_ceiling, tone_rules, boundary_rules, price_cents, is_default_seed, use_cloned_voice, voice_stability, voice_similarity_boost, voice_style, require_id_verification")
       .eq("creator_id", creator.id)
       .order("sort_order", { ascending: true });
-    return { creator: { ...creator, fullName: (profile as any)?.full_name ?? null }, personas: personas ?? [] };
+    return {
+      creator: { ...creator, fullName: (profile as any)?.full_name ?? null, hasRealMeProfile: !!realMe },
+      personas: personas ?? [],
+    };
   });
 
 export const updatePersonaBasics = createServerFn({ method: "POST" })

@@ -85,12 +85,15 @@ describe("identity webhook uses a distinct signing secret from payments (structu
 });
 
 describe("explicit-tier gating wiring (structural)", () => {
-  it("sendPersonaMessage requires ID verification only for explicitness_ceiling='explicit', and exempts the owning creator", () => {
+  it("sendPersonaMessage requires ID verification for explicitness_ceiling='explicit' OR a persona-level require_id_verification opt-in, and exempts the owning creator", () => {
     const start = chatSrc.indexOf("export const sendPersonaMessage");
     const end = chatSrc.indexOf("export const loadConversation");
     const body = chatSrc.slice(start, end);
-    expect(body).toContain('userId !== creator.user_id && (persona as any).explicitness_ceiling === "explicit"');
+    expect(body).toContain(
+      'userId !== creator.user_id && ((persona as any).explicitness_ceiling === "explicit" || (persona as any).require_id_verification)',
+    );
     expect(body).toContain("assertIdVerified");
+    expect(body).toContain("require_id_verification");
   });
 
   it("assetAccess gates isExplicit content behind id_verification, layered after the self-attested age_gate check", () => {
@@ -105,5 +108,20 @@ describe("explicit-tier gating wiring (structural)", () => {
     const idVerIdx = fanFeedSrc.indexOf('reason: "id_verification"');
     expect(ownerIdx).toBeGreaterThan(-1);
     expect(ownerIdx).toBeLessThan(idVerIdx);
+  });
+
+  it("assetAccess's locked-state branch checks requireIdVerification in addition to isExplicit, independent of explicitness tier", () => {
+    const start = fanFeedSrc.indexOf("function assetAccess");
+    const end = fanFeedSrc.indexOf('reason: "id_verification"');
+    const body = fanFeedSrc.slice(start, end);
+    expect(body).toContain("requireIdVerification: boolean");
+    expect(fanFeedSrc.slice(start, end + 60)).toContain(
+      '(opts.isExplicit || opts.requireIdVerification) && !opts.idVerified',
+    );
+  });
+
+  it("a persona opting into require_id_verification is reflected end-to-end: fetched, passed into assetAccess, and returned to the viewer", () => {
+    expect(fanFeedSrc).toContain("require_id_verification");
+    expect(fanFeedSrc).toContain("requireIdVerification: !!persona.require_id_verification");
   });
 });

@@ -65,7 +65,7 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
     const { data: creator } = await supabaseAdmin
       .from("creators")
       .select(
-        "id, user_id, verification_status, away_mode, away_message, away_auto_reply_enabled, away_allow_ai_personas",
+        "id, user_id, verification_status, away_mode, away_message, away_auto_reply_enabled, away_allow_ai_personas, elevenlabs_voice_id",
       )
       .eq("handle", data.creatorHandle)
       .maybeSingle();
@@ -80,7 +80,7 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
     const { data: persona } = await supabaseAdmin
       .from("personas")
       .select(
-        "id, kind, display_name, disclosure_label, system_prompt, tone_rules, boundary_rules, training_notes, voice_reply_enabled, tts_voice, memory_enabled, explicitness_ceiling, venice_chat_opt_in, visibility, content_theme_overrides",
+        "id, kind, display_name, disclosure_label, system_prompt, tone_rules, boundary_rules, training_notes, voice_reply_enabled, tts_voice, memory_enabled, explicitness_ceiling, venice_chat_opt_in, visibility, content_theme_overrides, use_cloned_voice, voice_stability, voice_similarity_boost, voice_style, require_id_verification",
       )
       .eq("creator_id", creator.id)
       .eq("slug", data.personaSlug)
@@ -92,7 +92,7 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
         throw new Error("This persona is invite-only.");
       }
     }
-    if (userId !== creator.user_id && (persona as any).explicitness_ceiling === "explicit") {
+    if (userId !== creator.user_id && ((persona as any).explicitness_ceiling === "explicit" || (persona as any).require_id_verification)) {
       const { assertIdVerified } = await import("./identity-verification.functions");
       await assertIdVerified({ supabase, userId });
     }
@@ -218,6 +218,13 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
             { type: "conversation", id: conversationId },
             { severity: replySeverity, personaId: persona.id },
           );
+          import("./conversation-flags.functions").then(({ autoFlagConversation }) =>
+            autoFlagConversation({
+              conversationId, creatorId: creator.id, personaId: persona.id,
+              reason: "auto_high_severity", severity: "critical",
+              note: `Blocked AI reply: ${assistantText!.slice(0, 200)}`,
+            }),
+          ).catch(() => {});
           assistantText = "I can't continue with that one — let's try something else.";
         }
 
@@ -245,6 +252,13 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
             { type: "conversation", id: conversationId },
             { ceiling, personaId: persona.id },
           );
+          import("./conversation-flags.functions").then(({ autoFlagConversation }) =>
+            autoFlagConversation({
+              conversationId, creatorId: creator.id, personaId: persona.id,
+              reason: "auto_high_severity", severity: "high",
+              note: `Ceiling "${ceiling}" exceeded: ${conformance.reason}`.slice(0, 500),
+            }),
+          ).catch(() => {});
           assistantText = "I can't continue with that one — let's try something else.";
         }
 
@@ -264,18 +278,39 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
               { type: "conversation", id: conversationId },
               { personaId: persona.id },
             );
+            import("./conversation-flags.functions").then(({ autoFlagConversation }) =>
+              autoFlagConversation({
+                conversationId, creatorId: creator.id, personaId: persona.id,
+                reason: "auto_prompt_leak", severity: "high",
+              }),
+            ).catch(() => {});
             assistantText = "I can't continue with that one — let's try something else.";
           }
         }
 
-        // Optional TTS voice reply
+        // Optional TTS voice reply. Personas that opted into the creator's
+        // real cloned voice (and have one available) use ElevenLabs;
+        // everyone else falls back to the existing generic OpenAI preset.
+        // No cross-fallback between the two if one fails — that would make
+        // a persona's voice unpredictably switch identity mid-conversation.
         if ((persona as any).voice_reply_enabled) {
           try {
-            const { synthesizeSpeech } = await import("./voice.server");
-            const { bytes } = await synthesizeSpeech(
-              assistantText,
-              (persona as any).tts_voice ?? "alloy",
-            );
+            const useCloned = (persona as any).use_cloned_voice && creator.elevenlabs_voice_id;
+            const { bytes } = useCloned
+              ? await (async () => {
+                  const { synthesizeSpeechElevenLabs } = await import("./elevenlabs.server");
+                  return synthesizeSpeechElevenLabs({
+                    text: assistantText,
+                    voiceId: creator.elevenlabs_voice_id as string,
+                    stability: (persona as any).voice_stability,
+                    similarityBoost: (persona as any).voice_similarity_boost,
+                    style: (persona as any).voice_style,
+                  });
+                })()
+              : await (async () => {
+                  const { synthesizeSpeech } = await import("./voice.server");
+                  return synthesizeSpeech(assistantText, (persona as any).tts_voice ?? "alloy");
+                })();
             const path = `${conversationId}/${userId}/ai-${crypto.randomUUID()}.mp3`;
             const { error: upErr } = await supabaseAdmin.storage
               .from("voice-messages")

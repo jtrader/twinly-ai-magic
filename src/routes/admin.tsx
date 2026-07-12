@@ -14,6 +14,7 @@ import { adminListPendingTwinRefs, adminSetTwinRefReview, adminGetTwinRefSignedU
 import { adminListDemoCreators, adminSeedDemoCreators, adminImpersonateCreator, adminListAllCreators, adminListAllAgencies, adminImpersonateUser } from "@/lib/demo.functions";
 import { setImpersonationContext } from "@/components/twinly/ImpersonationBanner";
 import { adminListProviderDataHandlingRecords, adminUpsertProviderDataHandlingRecord, isReviewOverdue } from "@/lib/provider-data-handling.functions";
+import { adminTestVeniceConnection, type VeniceConnectionResult } from "@/lib/venice-health.functions";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -31,7 +32,7 @@ function AdminPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
-  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo" | "creators" | "agencies" | "settings" | "providers">("overview");
+  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo" | "creators" | "agencies" | "settings" | "providers" | "venice">("overview");
   const [stats, setStats] = useState<any>(null);
   const [creators, setCreators] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
@@ -79,6 +80,20 @@ function AdminPage() {
   const listProviderRecords = useServerFn(adminListProviderDataHandlingRecords);
   const upsertProviderRecord = useServerFn(adminUpsertProviderDataHandlingRecord);
   const [providerRecords, setProviderRecords] = useState<any[]>([]);
+  const testVenice = useServerFn(adminTestVeniceConnection);
+  const [veniceResult, setVeniceResult] = useState<VeniceConnectionResult | null>(null);
+  const [veniceBusy, setVeniceBusy] = useState(false);
+
+  async function runVeniceTest() {
+    setVeniceBusy(true);
+    try {
+      setVeniceResult(await testVenice({}));
+    } catch (e: any) {
+      toast.error(e?.message ?? "Test failed");
+    } finally {
+      setVeniceBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!user || !roles.includes("admin")) return;
@@ -287,7 +302,7 @@ function AdminPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-2">
-        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo","creators","agencies","settings","providers"] as const).map((t) => (
+        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo","creators","agencies","settings","providers","venice"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -748,6 +763,34 @@ function AdminPage() {
           })}
           {providerRecords.length === 0 && (
             <p className="text-sm text-muted-foreground">No provider records yet.</p>
+          )}
+        </div>
+      )}
+      {tab === "venice" && (
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Checks env presence, then makes one minimal real chat completion call to confirm auth and connectivity end-to-end.
+            Image and video generation share the same API key and base URL, so a successful chat check confirms auth is valid —
+            but image/video are not separately tested here, since that would incur real generation cost and take longer.
+          </p>
+          <Button onClick={runVeniceTest} disabled={veniceBusy}>
+            {veniceBusy ? "Testing…" : "Test Venice AI connection"}
+          </Button>
+          {veniceResult && (
+            <div
+              className={
+                "rounded-2xl border p-4 text-sm " +
+                (veniceResult.ok
+                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                  : "border-rose-400/30 bg-rose-400/10 text-rose-300")
+              }
+            >
+              {veniceResult.ok
+                ? `Chat endpoint verified (${veniceResult.latencyMs}ms).`
+                : veniceResult.missing.length
+                  ? `Not configured — missing: ${veniceResult.missing.join(", ")}`
+                  : `Connectivity/auth failed: ${veniceResult.error}`}
+            </div>
           )}
         </div>
       )}

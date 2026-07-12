@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { logAudit } from "./audit.server";
+import { clampVoiceSetting } from "./elevenlabs.server";
 
 type PersonaKind = "real_me" | "ai";
 type Visibility = "draft" | "public" | "subscribers" | "vip" | "hidden" | "invite_only";
@@ -67,6 +68,11 @@ export const createPersona = createServerFn({ method: "POST" })
     personaType?: PersonaType;
     veniceChatOptIn?: boolean;
     contentThemeOverrides?: Record<string, boolean>;
+    useClonedVoice?: boolean;
+    voiceStability?: number | null;
+    voiceSimilarityBoost?: number | null;
+    voiceStyle?: number | null;
+    requireIdVerification?: boolean;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -148,6 +154,11 @@ export const createPersona = createServerFn({ method: "POST" })
         // where Venice is never used for chat).
         venice_chat_opt_in: !!data.veniceChatOptIn,
         content_theme_overrides: data.contentThemeOverrides ?? {},
+        use_cloned_voice: !!data.useClonedVoice,
+        voice_stability: data.voiceStability ?? null,
+        voice_similarity_boost: data.voiceSimilarityBoost ?? null,
+        voice_style: data.voiceStyle ?? null,
+        require_id_verification: !!data.requireIdVerification,
         visibility: "draft" as Visibility,
         sort_order: nextOrder,
       })
@@ -186,6 +197,11 @@ export const updatePersona = createServerFn({ method: "POST" })
     avatarUrl?: string | null;
     veniceChatOptIn?: boolean;
     contentThemeOverrides?: Record<string, boolean>;
+    useClonedVoice?: boolean;
+    voiceStability?: number | null;
+    voiceSimilarityBoost?: number | null;
+    voiceStyle?: number | null;
+    requireIdVerification?: boolean;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -211,6 +227,11 @@ export const updatePersona = createServerFn({ method: "POST" })
       avatar_url?: string | null;
       venice_chat_opt_in?: boolean;
       content_theme_overrides?: Record<string, boolean>;
+      use_cloned_voice?: boolean;
+      voice_stability?: number | null;
+      voice_similarity_boost?: number | null;
+      voice_style?: number | null;
+      require_id_verification?: boolean;
     } = {};
     if (data.displayName !== undefined) {
       const v = data.displayName.trim();
@@ -263,6 +284,17 @@ export const updatePersona = createServerFn({ method: "POST" })
     }
     if (data.veniceChatOptIn !== undefined) patch.venice_chat_opt_in = !!data.veniceChatOptIn;
     if (data.contentThemeOverrides !== undefined) patch.content_theme_overrides = data.contentThemeOverrides;
+    if (data.useClonedVoice !== undefined) patch.use_cloned_voice = !!data.useClonedVoice;
+    if (data.voiceStability !== undefined) {
+      patch.voice_stability = data.voiceStability === null ? null : clampVoiceSetting(data.voiceStability) ?? null;
+    }
+    if (data.voiceSimilarityBoost !== undefined) {
+      patch.voice_similarity_boost = data.voiceSimilarityBoost === null ? null : clampVoiceSetting(data.voiceSimilarityBoost) ?? null;
+    }
+    if (data.voiceStyle !== undefined) {
+      patch.voice_style = data.voiceStyle === null ? null : clampVoiceSetting(data.voiceStyle) ?? null;
+    }
+    if (data.requireIdVerification !== undefined) patch.require_id_verification = !!data.requireIdVerification;
 
     // Per-persona save-time regression gate: re-check the freshly-merged
     // config against known hardening-regression patterns whenever any of

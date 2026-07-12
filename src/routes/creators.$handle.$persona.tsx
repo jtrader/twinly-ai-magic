@@ -136,7 +136,7 @@ function PersonaFeedPage() {
           This persona contains 18+ content. Confirm your age from your account to unlock media.
         </div>
       )}
-      {persona.isExplicit && viewer.isAdult && !(viewer as any).idVerified && (
+      {(persona.isExplicit || (persona as any).requireIdVerification) && viewer.isAdult && !(viewer as any).idVerified && (
         <div className="mb-6 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-200">
           This persona's most explicit content requires identity verification.{" "}
           <Link to="/account" className="underline">Verify your identity →</Link>

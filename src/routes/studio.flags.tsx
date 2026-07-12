@@ -30,7 +30,15 @@ const REASON_LABEL: Record<string, string> = {
   uncomfortable: "Uncomfortable",
   wants_human: "Wants creator",
   other: "Other",
+  auto_high_severity: "High severity (auto)",
+  auto_prompt_leak: "Prompt leak (auto)",
 };
+
+const SEVERITY_RANK: Record<string, number> = { critical: 3, high: 2, medium: 1, low: 0 };
+
+function isAutoFlag(f: Flag): boolean {
+  return f.reason.startsWith("auto_");
+}
 
 const STATUS_META: Record<string, { icon: any; cls: string; label: string }> = {
   open: { icon: Clock, cls: "border-amber-400/30 bg-amber-400/10 text-amber-300", label: "Open" },
@@ -63,7 +71,14 @@ function FlagsPage() {
 
   useEffect(() => { if (user) refresh(); }, [user, refresh]);
 
-  const open = useMemo(() => flags.filter((f) => f.status === "open"), [flags]);
+  const open = useMemo(() =>
+    flags
+      .filter((f) => f.status === "open")
+      .sort((a, b) =>
+        (SEVERITY_RANK[(b as any).severity ?? ""] ?? -1) - (SEVERITY_RANK[(a as any).severity ?? ""] ?? -1)
+        || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      ),
+    [flags]);
   const history = useMemo(() => flags.filter((f) => f.status !== "open"), [flags]);
   const selected = flags.find((f) => f.id === selectedId) ?? null;
 
@@ -83,7 +98,7 @@ function FlagsPage() {
         </div>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Supporters can flag an AI conversation for your review. Acknowledge to close the loop, dismiss if it's a non-issue, or take over the chat directly — the AI stops replying and it moves to your direct inbox.
+        Your control centre for AI chats that need a human look — supporter-reported issues and automatically detected ones (unsafe replies, ceiling violations, prompt leaks) land in the same queue, sorted most severe first. Acknowledge to close the loop, dismiss if it's a non-issue, or take over the chat directly — the AI stops replying and it moves to your direct inbox.
       </p>
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,320px)_1fr]">
@@ -133,9 +148,16 @@ function FlagList({
                 ) + (muted && !active ? " opacity-80" : "")}
               >
                 <div className="flex items-center justify-between gap-2 text-xs">
-                  <Badge variant="outline" className={"gap-1 text-[10px] uppercase " + meta.cls}>
-                    <Icon className="size-3" /> {meta.label}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant="outline" className={"gap-1 text-[10px] uppercase " + meta.cls}>
+                      <Icon className="size-3" /> {meta.label}
+                    </Badge>
+                    {isAutoFlag(f) && (
+                      <Badge variant="outline" className="border-rose-400/40 text-[10px] uppercase text-rose-300">
+                        Auto-detected{(f as any).severity ? ` · ${(f as any).severity}` : ""}
+                      </Badge>
+                    )}
+                  </div>
                   <span className="text-muted-foreground">{new Date(f.created_at).toLocaleDateString()}</span>
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-sm">
@@ -144,7 +166,7 @@ function FlagList({
                   <span className="truncate text-xs text-muted-foreground">via {(f as any).persona?.display_name ?? "AI persona"}</span>
                 </div>
                 <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                  From {(f as any).supporter?.display_name ?? "supporter"}
+                  {isAutoFlag(f) ? "Detected automatically" : `From ${(f as any).supporter?.display_name ?? "supporter"}`}
                 </div>
                 {f.note && <div className="mt-1 line-clamp-2 text-xs text-foreground/80">"{f.note}"</div>}
               </button>
@@ -205,15 +227,20 @@ function FlagDetail({ flag, onChanged }: { flag: Flag; onChanged: () => void }) 
     <div className="space-y-4 rounded-2xl border border-border bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <Flag className="size-4 text-brand-glow" />
             <span className="font-semibold">{REASON_LABEL[flag.reason] ?? flag.reason}</span>
             <span className="text-xs text-muted-foreground">
-              from {(flag as any).supporter?.display_name ?? "supporter"} · via {(flag as any).persona?.display_name ?? "AI persona"}
+              {isAutoFlag(flag) ? "detected automatically" : `from ${(flag as any).supporter?.display_name ?? "supporter"}`} · via {(flag as any).persona?.display_name ?? "AI persona"}
             </span>
             <Badge variant="outline" className={"gap-1 text-[10px] uppercase " + meta.cls}>
               <Icon className="size-3" /> {meta.label}
             </Badge>
+            {isAutoFlag(flag) && (
+              <Badge variant="outline" className="border-rose-400/40 text-[10px] uppercase text-rose-300">
+                Auto-detected{(flag as any).severity ? ` · ${(flag as any).severity}` : ""}
+              </Badge>
+            )}
           </div>
           {flag.note && <p className="mt-2 text-sm text-foreground/85">"{flag.note}"</p>}
           <div className="mt-1 text-[11px] text-muted-foreground">

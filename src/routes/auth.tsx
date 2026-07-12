@@ -48,9 +48,9 @@ function AuthPage() {
         <div className="rounded-2xl border border-border bg-surface p-6">
           <h1 className="font-display text-2xl font-bold"><TwinlyWordmark /></h1>
           <p className="mt-1 text-sm text-muted-foreground">18+ only. Every AI persona is clearly disclosed.</p>
-          <div className="mt-4 rounded-xl border border-brand/25 bg-brand/10 p-3 text-xs text-muted-foreground">
+          <div className="mt-4 rounded-xl border border-brand/25 bg-brand/10 p-3 text-xs">
             <p className="font-semibold text-foreground">Creators: secure persona setup is connected.</p>
-            <p className="mt-1">
+            <p className="mt-1 text-foreground/80">
               Choose creator or agency during signup to continue into default persona creation, custom persona setup, training inputs, and content-pack assignment.
             </p>
           </div>

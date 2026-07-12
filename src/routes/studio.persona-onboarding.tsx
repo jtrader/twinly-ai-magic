@@ -531,6 +531,7 @@ const STATUS_TONE: Record<string, string> = {
   pending_validation: "border-amber-400/30 bg-amber-400/10 text-amber-300",
   validated: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
   rejected: "border-rose-400/30 bg-rose-400/10 text-rose-300",
+  cloned: "border-brand/30 bg-brand/10 text-brand-glow",
 };
 
 function VoiceSamplesPanel({ creatorId, personaId }: { creatorId: string; personaId: string }) {

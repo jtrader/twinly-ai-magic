@@ -5,6 +5,59 @@ import { logAudit } from "./audit.server";
 type Reason = "off_tone" | "inaccurate" | "uncomfortable" | "wants_human" | "other";
 const REASONS: Reason[] = ["off_tone", "inaccurate", "uncomfortable", "wants_human", "other"];
 
+/**
+ * Sentinel `flagged_by` actor for auto-detected flags — never a real
+ * `auth.uid()`, so the existing "Supporter can view own flags" RLS policy
+ * (flagged_by = auth.uid()) can never match it and expose an auto-flag to
+ * the fan whose message triggered it.
+ */
+export const SYSTEM_FLAG_ACTOR_ID = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * Creates (or reuses, if one is already open for the same conversation +
+ * reason) an auto-detected flag, feeding automatic AI-misbehavior detection
+ * (severity screening, prompt-leak detection — see chat.functions.ts) into
+ * the same creator-facing queue supporter-reported flags already use,
+ * rather than building a second, parallel review surface.
+ *
+ * Fire-and-forget by design: never throws, so a detection failure can never
+ * break the chat response path it's called from. Writes via supabaseAdmin
+ * because the RLS insert policy requires flagged_by = auth.uid(), which the
+ * system sentinel can never satisfy.
+ */
+export async function autoFlagConversation(params: {
+  conversationId: string;
+  creatorId: string;
+  personaId: string;
+  reason: "auto_high_severity" | "auto_prompt_leak";
+  severity?: "high" | "critical";
+  note?: string;
+}): Promise<void> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existing } = await supabaseAdmin
+      .from("conversation_flags")
+      .select("id")
+      .eq("conversation_id", params.conversationId)
+      .eq("flagged_by", SYSTEM_FLAG_ACTOR_ID)
+      .eq("reason", params.reason)
+      .eq("status", "open")
+      .maybeSingle();
+    if (existing) return;
+    await supabaseAdmin.from("conversation_flags").insert({
+      conversation_id: params.conversationId,
+      creator_id: params.creatorId,
+      persona_id: params.personaId,
+      flagged_by: SYSTEM_FLAG_ACTOR_ID,
+      reason: params.reason,
+      severity: params.severity ?? null,
+      note: params.note?.slice(0, 500) ?? null,
+    });
+  } catch (e) {
+    console.error("[twinly] autoFlagConversation failed (non-fatal):", e);
+  }
+}
+
 async function requireCreatorForUser(supabase: any, userId: string) {
   const { data, error } = await supabase
     .from("creators")
@@ -147,7 +200,7 @@ export const listCreatorFlags = createServerFn({ method: "GET" })
 
     const { data, error } = await s
       .from("conversation_flags")
-      .select("id, status, reason, note, created_at, resolved_at, resolution_note, handoff_conversation_id, conversation_id, message_id, persona_id, flagged_by")
+      .select("id, status, reason, note, severity, created_at, resolved_at, resolution_note, handoff_conversation_id, conversation_id, message_id, persona_id, flagged_by")
       .eq("creator_id", creator.id)
       .order("status", { ascending: true })
       .order("created_at", { ascending: false })

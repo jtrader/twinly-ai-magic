@@ -193,10 +193,19 @@ describe("rejected recordings never reach the voice-clone job queue (structural)
     const start = src.indexOf("export const submitVoiceCloneJob");
     const body = src.slice(start);
     const guardIdx = body.indexOf('r.status !== "validated"');
-    const updateIdx = body.indexOf("submitted_for_clone_at: new Date()");
+    const updateIdx = body.indexOf('status: "cloned"');
     expect(guardIdx).toBeGreaterThan(-1);
     expect(updateIdx).toBeGreaterThan(-1);
     expect(guardIdx).toBeLessThan(updateIdx);
+  });
+
+  it("only marks recordings 'cloned' after ElevenLabs actually accepts the submission, not before", () => {
+    const start = src.indexOf("export const submitVoiceCloneJob");
+    const body = src.slice(start);
+    const cloneCallIdx = body.indexOf("await cloneVoice(");
+    const statusUpdateIdx = body.indexOf('status: "cloned"');
+    expect(cloneCallIdx).toBeGreaterThan(-1);
+    expect(statusUpdateIdx).toBeGreaterThan(cloneCallIdx);
   });
 
   it("submitVoiceCloneJob re-checks consent before submission, not just at upload time", () => {

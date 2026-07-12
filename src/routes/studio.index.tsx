@@ -24,6 +24,7 @@ function StudioHome() {
   const [creator, setCreator] = useState<any>(null);
   const [counts, setCounts] = useState({ personas: 0, assets: 0 });
   const [openFlags, setOpenFlags] = useState(0);
+  const [realMeCompletion, setRealMeCompletion] = useState<number | null>(null);
   const countFlags = useServerFn(countOpenCreatorFlags);
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
@@ -39,6 +40,20 @@ function StudioHome() {
         ]);
         setCounts({ personas: personas ?? 0, assets: assets ?? 0 });
         countFlags({}).then((r) => setOpenFlags(r.count)).catch(() => {});
+
+        // Read-only — never call getRealMeProfile here, it lazily creates
+        // the row as a side effect just from viewing the dashboard.
+        const { data: rm } = await supabase
+          .from("real_me_profiles").select("current_version_id").eq("creator_id", c.id).maybeSingle();
+        if (!rm) {
+          setRealMeCompletion(0);
+        } else if (!rm.current_version_id) {
+          setRealMeCompletion(0);
+        } else {
+          const { data: v } = await supabase
+            .from("real_me_profile_versions").select("completion_percentage").eq("id", rm.current_version_id).maybeSingle();
+          setRealMeCompletion(v?.completion_percentage ?? 0);
+        }
       }
     })();
   }, [user, countFlags]);
@@ -68,6 +83,20 @@ function StudioHome() {
           <StatusBadge label="Digital twin" value={creator.digital_twin_status} />
         </div>
       </div>
+
+      {realMeCompletion !== null && realMeCompletion < 100 && (
+        <Link to="/studio/real-me" className="mb-4 flex items-center justify-between gap-4 rounded-2xl border border-brand/30 bg-brand/10 p-5 hover:border-brand/50">
+          <div>
+            <div className="font-display text-lg font-semibold text-brand-glow">
+              {realMeCompletion === 0 ? "Set up your Real Me baseline first" : "Finish your Real Me baseline"}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Your tone, voice, and baseline answers — every AI persona you create can auto-generate its tone and opening lines from this. {realMeCompletion}% complete.
+            </p>
+          </div>
+          <Button>{realMeCompletion === 0 ? "Get started" : "Continue"}</Button>
+        </Link>
+      )}
 
       {creator.digital_twin_status === "none" && (
         <Link to="/studio/twin-onboarding" className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-brand/30 bg-brand/10 p-5 hover:border-brand/50">
@@ -109,7 +138,7 @@ function StudioHome() {
         <Tile to="/studio/generate" icon={<Sparkles className="size-5 text-brand-glow" />} title="AI generate (preview)" desc="Prototype live generation — images, voice notes & talking-head clips." />
         <Tile to="/studio/inbox" icon={<MessageCircle className="size-5 text-brand-glow" />} title="Real Me inbox" desc="Reply to fans on your Real Me persona." />
         <Tile to="/studio/ai-review" icon={<Flag className="size-5 text-brand-glow" />} title="AI persona review" desc="Review AI chats, flag bad replies, save corrections as training." />
-        <Tile to="/studio/flags" icon={<Flag className="size-5 text-brand-glow" />} title="Flagged AI chats" desc="Supporter-flagged AI conversations for your review or handoff to Real Me." badge={openFlags} />
+        <Tile to="/studio/flags" icon={<Flag className="size-5 text-brand-glow" />} title="Flagged AI chats" desc="Your control centre for AI chats needing review — supporter reports and auto-detected issues, together." badge={openFlags} />
         <Tile to="/studio/escalations" icon={<UserCheck className="size-5 text-brand-glow" />} title="Real Me requests" desc="Accept or decline supporters asking to talk to you directly." />
         <Tile to="/studio/payouts" icon={<Wallet className="size-5 text-brand-glow" />} title="Payouts" desc="Payment history, subscribers, next payout." />
         <Tile to="/studio/pricing" icon={<DollarSign className="size-5 text-brand-glow" />} title="Subscription pricing" desc="Set your monthly Base / Plus / VIP tier prices." />

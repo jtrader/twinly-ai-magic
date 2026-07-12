@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
@@ -39,6 +40,9 @@ import {
   createPersonaInvite, listPersonaInvites, revokePersonaInvite,
 } from "@/lib/persona-invites.functions";
 import { matchesRealName } from "@/lib/persona-name-privacy";
+import { getPersonaVisibilityPolicy, setPersonaDefaultVisibility } from "@/lib/feed-visibility.functions";
+import type { FeedVisibilityTier } from "@/lib/feed-visibility-access.server";
+import { nextFeedTierForToggle } from "@/lib/feed-visibility-tier-toggle";
 
 export const Route = createFileRoute("/studio/personas")({ component: PersonaStudioPage });
 
@@ -125,7 +129,7 @@ function PersonaStudioPage() {
   const { user, loading } = useSession();
   const navigate = useNavigate();
   const [personas, setPersonas] = useState<Persona[]>([]);
-  const [creator, setCreator] = useState<{ handle: string; verification_status?: string; fullName?: string | null } | null>(null);
+  const [creator, setCreator] = useState<{ handle: string; verification_status?: string; fullName?: string | null; elevenlabsVoiceId?: string | null; hasRealMeProfile?: boolean } | null>(null);
   const [ready, setReady] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Persona | null>(null);
@@ -145,7 +149,13 @@ function PersonaStudioPage() {
       navigate({ to: "/onboarding" });
       return;
     }
-    setCreator({ handle: res.creator.handle, verification_status: (res.creator as any).verification_status, fullName: (res.creator as any).fullName ?? null });
+    setCreator({
+      handle: res.creator.handle,
+      verification_status: (res.creator as any).verification_status,
+      fullName: (res.creator as any).fullName ?? null,
+      elevenlabsVoiceId: (res.creator as any).elevenlabs_voice_id ?? null,
+      hasRealMeProfile: !!(res.creator as any).hasRealMeProfile,
+    });
     setPersonas(res.personas);
     setReady(true);
   }, [load, navigate]);
@@ -318,12 +328,15 @@ function PersonaStudioPage() {
         onOpenChange={setCreateOpen}
         onCreated={() => { setCreateOpen(false); refresh(); }}
         realFullName={creator?.fullName ?? null}
+        elevenlabsVoiceId={creator?.elevenlabsVoiceId ?? null}
+        hasRealMeProfile={creator?.hasRealMeProfile ?? false}
       />
       <EditPersonaDialog
         persona={editing}
         onOpenChange={(o) => { if (!o) setEditing(null); }}
         onSaved={() => { setEditing(null); refresh(); }}
         onLocalPatch={patchPersona}
+        elevenlabsVoiceId={creator?.elevenlabsVoiceId ?? null}
       />
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => { if (!o) setDeleting(null); }}>
@@ -347,8 +360,8 @@ function PersonaStudioPage() {
 }
 
 function CreatePersonaDialog({
-  open, onOpenChange, onCreated, realFullName,
-}: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void; realFullName?: string | null }) {
+  open, onOpenChange, onCreated, realFullName, elevenlabsVoiceId, hasRealMeProfile,
+}: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void; realFullName?: string | null; elevenlabsVoiceId?: string | null; hasRealMeProfile?: boolean }) {
   const create = useServerFn(createPersona);
   const [displayName, setName] = useState("");
   const [kind, setKind] = useState<"real_me" | "ai">("ai");
@@ -360,6 +373,11 @@ function CreatePersonaDialog({
   const [priceDollars, setPriceDollars] = useState("");
   const [veniceChatOptIn, setVeniceChatOptIn] = useState(false);
   const [contentThemeOverrides, setContentThemeOverrides] = useState<Record<string, boolean>>({});
+  const [useClonedVoice, setUseClonedVoice] = useState(false);
+  const [voiceStability, setVoiceStability] = useState(0.5);
+  const [voiceSimilarityBoost, setVoiceSimilarityBoost] = useState(0.75);
+  const [voiceStyle, setVoiceStyle] = useState(0);
+  const [requireIdVerification, setRequireIdVerification] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -367,6 +385,8 @@ function CreatePersonaDialog({
       setName(""); setKind("ai"); setDescription(""); setSystemPrompt(""); setExplicitnessCeiling("sfw");
       setPersonality(""); setHardLimitsText(""); setPriceDollars(""); setVeniceChatOptIn(false);
       setContentThemeOverrides({});
+      setUseClonedVoice(false); setVoiceStability(0.5); setVoiceSimilarityBoost(0.75); setVoiceStyle(0);
+      setRequireIdVerification(false);
     }
   }, [open]);
 
@@ -385,6 +405,11 @@ function CreatePersonaDialog({
           toneRules: kind === "ai" ? { personality } : undefined,
           boundaryRules: kind === "ai" ? { hardLimits } : undefined,
           veniceChatOptIn: kind === "ai" ? veniceChatOptIn : undefined,
+          useClonedVoice: kind === "ai" ? useClonedVoice : undefined,
+          voiceStability: kind === "ai" && useClonedVoice ? voiceStability : undefined,
+          voiceSimilarityBoost: kind === "ai" && useClonedVoice ? voiceSimilarityBoost : undefined,
+          voiceStyle: kind === "ai" && useClonedVoice ? voiceStyle : undefined,
+          requireIdVerification: kind === "ai" ? requireIdVerification : undefined,
         },
       });
       toast.success("Persona created — it's in draft.");
@@ -403,8 +428,8 @@ function CreatePersonaDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label>Name</Label>
-            <Input className="mt-1.5" value={displayName} onChange={(e) => setName(e.target.value)} maxLength={60} />
+            <Label htmlFor="create-persona-name">Name</Label>
+            <Input id="create-persona-name" className="mt-1.5" value={displayName} onChange={(e) => setName(e.target.value)} maxLength={60} />
             {matchesRealName(displayName, realFullName) && (
               <p className="mt-1.5 text-xs text-amber-500">
                 This name may reduce your privacy separation between Real Me and this persona.
@@ -412,9 +437,9 @@ function CreatePersonaDialog({
             )}
           </div>
           <div>
-            <Label>Kind</Label>
+            <Label htmlFor="create-persona-kind">Kind</Label>
             <Select value={kind} onValueChange={(v) => setKind(v as any)}>
-              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="create-persona-kind" className="mt-1.5"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ai">AI persona</SelectItem>
                 <SelectItem value="real_me">Real Me (human-led)</SelectItem>
@@ -426,15 +451,21 @@ function CreatePersonaDialog({
                 : "Human replies only. AI Gateway is not used."}
             </p>
           </div>
+          {kind === "ai" && !hasRealMeProfile && (
+            <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
+              Complete your Real Me baseline first — AI personas can auto-generate their tone and opening lines from it.{" "}
+              <Link to="/studio/real-me" className="underline">Set up Real Me →</Link>
+            </div>
+          )}
           <div>
-            <Label>Description</Label>
-            <Textarea className="mt-1.5" rows={2} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} />
+            <Label htmlFor="create-persona-description">Description</Label>
+            <Textarea id="create-persona-description" className="mt-1.5" rows={2} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
           <div>
-            <Label>Price</Label>
+            <Label htmlFor="create-persona-price">Price</Label>
             <div className="relative mt-1.5">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-              <Input className="pl-6" type="number" min="0" step="0.01" value={priceDollars}
+              <Input id="create-persona-price" className="pl-6" type="number" min="0" step="0.01" value={priceDollars}
                 onChange={(e) => setPriceDollars(e.target.value)} placeholder="0.00" />
             </div>
             <p className="mt-1 text-xs text-muted-foreground">Shown to fans on this persona's card. Leave blank for "Included".</p>
@@ -442,19 +473,19 @@ function CreatePersonaDialog({
           {kind === "ai" && (
             <>
               <div>
-                <Label>System prompt</Label>
-                <Textarea className="mt-1.5" rows={4} maxLength={4000} value={systemPrompt}
+                <Label htmlFor="create-persona-system-prompt">System prompt</Label>
+                <Textarea id="create-persona-system-prompt" className="mt-1.5" rows={4} maxLength={4000} value={systemPrompt}
                   onChange={(e) => setSystemPrompt(e.target.value)}
                   placeholder="Define voice, tone, and hard limits." />
               </div>
               <div>
-                <Label>Personality / tone</Label>
-                <Input className="mt-1.5" maxLength={300} value={personality} onChange={(e) => setPersonality(e.target.value)}
+                <Label htmlFor="create-persona-personality">Personality / tone</Label>
+                <Input id="create-persona-personality" className="mt-1.5" maxLength={300} value={personality} onChange={(e) => setPersonality(e.target.value)}
                   placeholder="e.g. Playful, teasing, warm — never sarcastic." />
               </div>
               <div>
-                <Label>Boundary ceiling — one hard limit per line</Label>
-                <Textarea className="mt-1.5" rows={3} maxLength={6000} value={hardLimitsText}
+                <Label htmlFor="create-persona-boundary">Boundary ceiling — one hard limit per line</Label>
+                <Textarea id="create-persona-boundary" className="mt-1.5" rows={3} maxLength={6000} value={hardLimitsText}
                   onChange={(e) => setHardLimitsText(e.target.value)}
                   placeholder={"Never discuss meeting in person\nNever claim to be human"} />
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -462,9 +493,9 @@ function CreatePersonaDialog({
                 </p>
               </div>
               <div>
-                <Label>Explicitness level</Label>
+                <Label htmlFor="create-persona-explicitness">Explicitness level</Label>
                 <Select value={explicitnessCeiling} onValueChange={(v) => setExplicitnessCeiling(v as any)}>
-                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="create-persona-explicitness" className="mt-1.5"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="sfw">SFW</SelectItem>
                     <SelectItem value="suggestive">Suggestive</SelectItem>
@@ -486,14 +517,23 @@ function CreatePersonaDialog({
               {explicitnessCeiling === "suggestive" && (
                 <div className="flex items-center justify-between rounded-lg border p-3">
                   <div>
-                    <Label>Use Venice AI for chat</Label>
+                    <Label htmlFor="create-persona-venice-opt-in">Use Venice AI for chat</Label>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Optional at this tier. Off uses the default AI Gateway.
                     </p>
                   </div>
-                  <Switch checked={veniceChatOptIn} onCheckedChange={setVeniceChatOptIn} />
+                  <Switch id="create-persona-venice-opt-in" checked={veniceChatOptIn} onCheckedChange={setVeniceChatOptIn} />
                 </div>
               )}
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <Label htmlFor="create-persona-require-id-verification">Require ID verification</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Fans must complete identity verification before chatting or viewing this persona's feed content — regardless of explicitness tier.
+                  </p>
+                </div>
+                <Switch id="create-persona-require-id-verification" checked={requireIdVerification} onCheckedChange={setRequireIdVerification} />
+              </div>
               <div>
                 <Label>Content categories</Label>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -511,6 +551,33 @@ function CreatePersonaDialog({
                   })}
                 </div>
               </div>
+              <div>
+                <Label>Voice replies</Label>
+                {elevenlabsVoiceId ? (
+                  <div className="mt-1.5 space-y-3 rounded-lg border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-sm">Use your cloned voice</div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Off falls back to a generic preset voice for this persona's spoken replies.
+                        </p>
+                      </div>
+                      <Switch checked={useClonedVoice} onCheckedChange={setUseClonedVoice} />
+                    </div>
+                    {useClonedVoice && (
+                      <div className="space-y-3 border-t pt-3">
+                        <VoiceSettingSlider label="Closeness to your voice" value={voiceSimilarityBoost} onChange={setVoiceSimilarityBoost} />
+                        <VoiceSettingSlider label="Stability" value={voiceStability} onChange={setVoiceStability} />
+                        <VoiceSettingSlider label="Style exaggeration" value={voiceStyle} onChange={setVoiceStyle} />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Record and clone your voice first from this persona's onboarding page ("Voice samples" step) to enable spoken replies that sound like you.
+                  </p>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -523,17 +590,44 @@ function CreatePersonaDialog({
   );
 }
 
+function VoiceSettingSlider({
+  label, value, onChange,
+}: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs">
+        <Label className="text-xs">{label}</Label>
+        <span className="tabular-nums text-muted-foreground">{value.toFixed(2)}</span>
+      </div>
+      <Slider
+        className="mt-2"
+        aria-label={label}
+        value={[value]}
+        min={0}
+        max={1}
+        step={0.05}
+        onValueChange={([v]) => onChange(v)}
+      />
+    </div>
+  );
+}
+
 function EditPersonaDialog({
-  persona, onOpenChange, onSaved, onLocalPatch,
+  persona, onOpenChange, onSaved, onLocalPatch, elevenlabsVoiceId,
 }: {
   persona: Persona | null;
   onOpenChange: (v: boolean) => void;
   onSaved: () => void;
   onLocalPatch?: (id: string, patch: Partial<Persona>) => void;
+  elevenlabsVoiceId?: string | null;
 }) {
   const { user } = useSession();
   const update = useServerFn(updatePersona);
   const setVis = useServerFn(setPersonaVisibility);
+  const getFeedPolicy = useServerFn(getPersonaVisibilityPolicy);
+  const setFeedPolicy = useServerFn(setPersonaDefaultVisibility);
+  const [feedTier, setFeedTier] = useState<FeedVisibilityTier>("subscribers_only");
+  const [feedTierBusy, setFeedTierBusy] = useState(false);
   const [displayName, setName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -549,6 +643,11 @@ function EditPersonaDialog({
   const [priceDollars, setPriceDollars] = useState("");
   const [veniceChatOptIn, setVeniceChatOptIn] = useState(false);
   const [contentThemeOverrides, setContentThemeOverrides] = useState<Record<string, boolean>>({});
+  const [useClonedVoice, setUseClonedVoice] = useState(false);
+  const [voiceStability, setVoiceStability] = useState(0.5);
+  const [voiceSimilarityBoost, setVoiceSimilarityBoost] = useState(0.75);
+  const [voiceStyle, setVoiceStyle] = useState(0);
+  const [requireIdVerification, setRequireIdVerification] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toneExamples, setToneExamples] = useState("");
   const [dos, setDos] = useState("");
@@ -710,6 +809,11 @@ function EditPersonaDialog({
       setPriceDollars(centsToDollarsInput((persona as any).price_cents));
       setVeniceChatOptIn(!!(persona as any).venice_chat_opt_in);
       setContentThemeOverrides(((persona as any).content_theme_overrides as Record<string, boolean> | null) ?? {});
+      setUseClonedVoice(!!(persona as any).use_cloned_voice);
+      setVoiceStability(((persona as any).voice_stability as number | null) ?? 0.5);
+      setVoiceSimilarityBoost(((persona as any).voice_similarity_boost as number | null) ?? 0.75);
+      setVoiceStyle(((persona as any).voice_style as number | null) ?? 0);
+      setRequireIdVerification(!!(persona as any).require_id_verification);
       const tn = ((persona as any).training_notes ?? {}) as Record<string, string>;
       setToneExamples(tn.tone_examples ?? "");
       setDos(tn.dos ?? "");
@@ -727,6 +831,37 @@ function EditPersonaDialog({
       setTab("basics");
     }
   }, [persona]);
+
+  useEffect(() => {
+    if (!persona) return;
+    getFeedPolicy({ data: { personaId: persona.id } })
+      .then((r) => setFeedTier(r.defaultVisibility))
+      .catch(() => {});
+  }, [persona, getFeedPolicy]);
+
+  async function applyFeedTier(next: FeedVisibilityTier) {
+    if (!persona) return;
+    const prev = feedTier;
+    setFeedTier(next); // optimistic
+    setFeedTierBusy(true);
+    try {
+      await setFeedPolicy({ data: { personaId: persona.id, defaultVisibility: next } });
+      toast.success("Feed audience updated");
+    } catch (e: any) {
+      setFeedTier(prev);
+      toast.error(e.message ?? "Could not update feed audience");
+    } finally { setFeedTierBusy(false); }
+  }
+
+  const feedLoggedOutVisible = feedTier === "public";
+  const feedLoggedInVisible = feedTier === "public" || feedTier === "logged_in";
+
+  function onToggleFeedLoggedOut(v: boolean) {
+    applyFeedTier(nextFeedTierForToggle(feedTier, "loggedOut", v));
+  }
+  function onToggleFeedLoggedIn(v: boolean) {
+    applyFeedTier(nextFeedTierForToggle(feedTier, "loggedIn", v));
+  }
 
   async function togglePack(packId: string, attached: boolean, permission: string) {
     if (!persona) return;
@@ -780,6 +915,11 @@ function EditPersonaDialog({
         boundaryRules: persona.kind === "ai" ? { hardLimits } : undefined,
         veniceChatOptIn: persona.kind === "ai" ? veniceChatOptIn : undefined,
         contentThemeOverrides: persona.kind === "ai" ? contentThemeOverrides : undefined,
+        useClonedVoice: persona.kind === "ai" ? useClonedVoice : undefined,
+        voiceStability: persona.kind === "ai" && useClonedVoice ? voiceStability : undefined,
+        voiceSimilarityBoost: persona.kind === "ai" && useClonedVoice ? voiceSimilarityBoost : undefined,
+        voiceStyle: persona.kind === "ai" && useClonedVoice ? voiceStyle : undefined,
+        requireIdVerification: persona.kind === "ai" ? requireIdVerification : undefined,
         trainingNotes: {
           tone_examples: toneExamples,
           dos, donts,
@@ -909,13 +1049,13 @@ function EditPersonaDialog({
             </div>
           </div>
           <div>
-            <Label>Name</Label>
-            <Input className="mt-1.5" value={displayName} onChange={(e) => setName(e.target.value)} maxLength={60} />
+            <Label htmlFor="edit-persona-name">Name</Label>
+            <Input id="edit-persona-name" className="mt-1.5" value={displayName} onChange={(e) => setName(e.target.value)} maxLength={60} />
           </div>
           <div>
-            <Label>Visibility</Label>
+            <Label htmlFor="edit-persona-visibility">Visibility</Label>
             <Select value={visibility} onValueChange={(v) => changeVisibilityInline(v as Visibility)} disabled={visBusy}>
-              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="edit-persona-visibility" className="mt-1.5"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {(Object.keys(VISIBILITY_LABEL) as Visibility[]).map((v) => (
                   <SelectItem key={v} value={v}>{VISIBILITY_LABEL[v]}</SelectItem>
@@ -926,20 +1066,35 @@ function EditPersonaDialog({
               Applies instantly. Draft & Hidden are only visible to you. Public shows to everyone; Subscribers & VIP only to fans in that tier.
             </p>
           </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea className="mt-1.5" rows={2} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} />
+          <div className="rounded-lg border p-3 space-y-2">
+            <Label>Feed audience</Label>
+            <label className="flex items-center justify-between gap-2 text-xs">
+              <span>Visible to logged-out visitors</span>
+              <Switch checked={feedLoggedOutVisible} disabled={feedTierBusy} onCheckedChange={onToggleFeedLoggedOut} />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-xs">
+              <span>Visible to logged-in visitors (non-subscribers)</span>
+              <Switch checked={feedLoggedInVisible} disabled={feedTierBusy} onCheckedChange={onToggleFeedLoggedIn} />
+            </label>
+            <p className="text-[11px] text-muted-foreground">
+              Subscribers can always see everything. This sets the default for new feed posts — for per-post overrides and full control, see{" "}
+              <Link to="/studio/feed-visibility" className="underline">Feed visibility →</Link>
+            </p>
           </div>
           <div>
-            <Label>Disclosure label</Label>
-            <Input className="mt-1.5" value={disclosureLabel} onChange={(e) => setDisclosure(e.target.value)} maxLength={120} />
+            <Label htmlFor="edit-persona-description">Description</Label>
+            <Textarea id="edit-persona-description" className="mt-1.5" rows={2} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="edit-persona-disclosure">Disclosure label</Label>
+            <Input id="edit-persona-disclosure" className="mt-1.5" value={disclosureLabel} onChange={(e) => setDisclosure(e.target.value)} maxLength={120} />
             <p className="mt-1 text-xs text-muted-foreground">Shown to every fan before they interact.</p>
           </div>
           <div>
-            <Label>Price</Label>
+            <Label htmlFor="edit-persona-price">Price</Label>
             <div className="relative mt-1.5">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-              <Input className="pl-6" type="number" min="0" step="0.01" value={priceDollars}
+              <Input id="edit-persona-price" className="pl-6" type="number" min="0" step="0.01" value={priceDollars}
                 onChange={(e) => setPriceDollars(e.target.value)} placeholder="0.00" />
             </div>
             <p className="mt-1 text-xs text-muted-foreground">Shown to fans on this persona's card. Leave blank for "Included".</p>
@@ -947,17 +1102,17 @@ function EditPersonaDialog({
           {persona?.kind === "ai" && (
             <>
               <div>
-                <Label>System prompt</Label>
-                <Textarea className="mt-1.5" rows={5} maxLength={4000} value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} />
+                <Label htmlFor="edit-persona-system-prompt">System prompt</Label>
+                <Textarea id="edit-persona-system-prompt" className="mt-1.5" rows={5} maxLength={4000} value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} />
               </div>
               <div>
-                <Label>Personality / tone</Label>
-                <Input className="mt-1.5" maxLength={300} value={personality} onChange={(e) => setPersonality(e.target.value)}
+                <Label htmlFor="edit-persona-personality">Personality / tone</Label>
+                <Input id="edit-persona-personality" className="mt-1.5" maxLength={300} value={personality} onChange={(e) => setPersonality(e.target.value)}
                   placeholder="e.g. Playful, teasing, warm — never sarcastic." />
               </div>
               <div>
-                <Label>Boundary ceiling — one hard limit per line</Label>
-                <Textarea className="mt-1.5" rows={3} maxLength={6000} value={hardLimitsText}
+                <Label htmlFor="edit-persona-boundary">Boundary ceiling — one hard limit per line</Label>
+                <Textarea id="edit-persona-boundary" className="mt-1.5" rows={3} maxLength={6000} value={hardLimitsText}
                   onChange={(e) => setHardLimitsText(e.target.value)}
                   placeholder={"Never discuss meeting in person\nNever claim to be human"} />
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -965,9 +1120,9 @@ function EditPersonaDialog({
                 </p>
               </div>
               <div>
-                <Label>Explicitness level</Label>
+                <Label htmlFor="edit-persona-explicitness">Explicitness level</Label>
                 <Select value={explicitnessCeiling} onValueChange={(v) => setExplicitnessCeiling(v as any)}>
-                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="edit-persona-explicitness" className="mt-1.5"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="sfw">SFW</SelectItem>
                     <SelectItem value="suggestive">Suggestive</SelectItem>
@@ -989,14 +1144,23 @@ function EditPersonaDialog({
               {explicitnessCeiling === "suggestive" && (
                 <div className="flex items-center justify-between rounded-lg border p-3">
                   <div>
-                    <Label>Use Venice AI for chat</Label>
+                    <Label htmlFor="edit-persona-venice-opt-in">Use Venice AI for chat</Label>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Optional at this tier. Off uses the default AI Gateway.
                     </p>
                   </div>
-                  <Switch checked={veniceChatOptIn} onCheckedChange={setVeniceChatOptIn} />
+                  <Switch id="edit-persona-venice-opt-in" checked={veniceChatOptIn} onCheckedChange={setVeniceChatOptIn} />
                 </div>
               )}
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <Label htmlFor="edit-persona-require-id-verification">Require ID verification</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Fans must complete identity verification before chatting or viewing this persona's feed content — regardless of explicitness tier.
+                  </p>
+                </div>
+                <Switch id="edit-persona-require-id-verification" checked={requireIdVerification} onCheckedChange={setRequireIdVerification} />
+              </div>
               <div>
                 <Label>Content categories</Label>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -1014,6 +1178,33 @@ function EditPersonaDialog({
                   })}
                 </div>
               </div>
+              <div>
+                <Label>Voice replies</Label>
+                {elevenlabsVoiceId ? (
+                  <div className="mt-1.5 space-y-3 rounded-lg border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-sm">Use your cloned voice</div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Off falls back to a generic preset voice for this persona's spoken replies.
+                        </p>
+                      </div>
+                      <Switch checked={useClonedVoice} onCheckedChange={setUseClonedVoice} />
+                    </div>
+                    {useClonedVoice && (
+                      <div className="space-y-3 border-t pt-3">
+                        <VoiceSettingSlider label="Closeness to your voice" value={voiceSimilarityBoost} onChange={setVoiceSimilarityBoost} />
+                        <VoiceSettingSlider label="Stability" value={voiceStability} onChange={setVoiceStability} />
+                        <VoiceSettingSlider label="Style exaggeration" value={voiceStyle} onChange={setVoiceStyle} />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Record and clone your voice first from this persona's onboarding page ("Voice samples" step) to enable spoken replies that sound like you.
+                  </p>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -1024,30 +1215,30 @@ function EditPersonaDialog({
             These inputs shape how the persona sounds. They're merged into the AI system prompt at chat time and are only visible to you.
           </p>
           <div>
-            <Label>Tone & voice examples</Label>
-            <Textarea className="mt-1.5" rows={3} maxLength={4000} value={toneExamples} onChange={(e) => setToneExamples(e.target.value)}
+            <Label htmlFor="edit-persona-tone-examples">Tone & voice examples</Label>
+            <Textarea id="edit-persona-tone-examples" className="mt-1.5" rows={3} maxLength={4000} value={toneExamples} onChange={(e) => setToneExamples(e.target.value)}
               placeholder="Playful, teasing, uses emojis sparingly. Never sarcastic." />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <Label>Do's</Label>
-              <Textarea className="mt-1.5" rows={4} maxLength={4000} value={dos} onChange={(e) => setDos(e.target.value)}
+              <Label htmlFor="edit-persona-dos">Do's</Label>
+              <Textarea id="edit-persona-dos" className="mt-1.5" rows={4} maxLength={4000} value={dos} onChange={(e) => setDos(e.target.value)}
                 placeholder="- Address fans by name&#10;- Offer VIP upsells naturally" />
             </div>
             <div>
-              <Label>Don'ts</Label>
-              <Textarea className="mt-1.5" rows={4} maxLength={4000} value={donts} onChange={(e) => setDonts(e.target.value)}
+              <Label htmlFor="edit-persona-donts">Don'ts</Label>
+              <Textarea id="edit-persona-donts" className="mt-1.5" rows={4} maxLength={4000} value={donts} onChange={(e) => setDonts(e.target.value)}
                 placeholder="- Never claim to be human&#10;- No political topics" />
             </div>
           </div>
           <div>
-            <Label>Sample phrasings</Label>
-            <Textarea className="mt-1.5" rows={3} maxLength={4000} value={samplePhrasings} onChange={(e) => setSamplePhrasings(e.target.value)}
+            <Label htmlFor="edit-persona-sample-phrasings">Sample phrasings</Label>
+            <Textarea id="edit-persona-sample-phrasings" className="mt-1.5" rows={3} maxLength={4000} value={samplePhrasings} onChange={(e) => setSamplePhrasings(e.target.value)}
               placeholder={"“hey babe 💜 what are we getting into tonight?”"} />
           </div>
           <div>
-            <Label>Voice reference URL (optional)</Label>
-            <Input className="mt-1.5" value={voiceRefUrl} onChange={(e) => setVoiceRefUrl(e.target.value)}
+            <Label htmlFor="edit-persona-voice-ref-url">Voice reference URL (optional)</Label>
+            <Input id="edit-persona-voice-ref-url" className="mt-1.5" value={voiceRefUrl} onChange={(e) => setVoiceRefUrl(e.target.value)}
               placeholder="https://…/voice-sample.mp3" />
             <p className="mt-1 text-xs text-muted-foreground">Placeholder for future voice-clone training input.</p>
           </div>
@@ -1193,12 +1384,12 @@ function EditPersonaDialog({
             </p>
             <div className="grid gap-2 md:grid-cols-2">
               <div>
-                <Label className="text-[11px]">Avatar ID</Label>
-                <Input className="mt-1" value={heygenAvatarId} onChange={(e) => setHeygenAvatarId(e.target.value)} placeholder="e.g. Daisy_sitting_sofa_side_public" maxLength={120} />
+                <Label htmlFor="edit-persona-heygen-avatar-id" className="text-[11px]">Avatar ID</Label>
+                <Input id="edit-persona-heygen-avatar-id" className="mt-1" value={heygenAvatarId} onChange={(e) => setHeygenAvatarId(e.target.value)} placeholder="e.g. Daisy_sitting_sofa_side_public" maxLength={120} />
               </div>
               <div>
-                <Label className="text-[11px]">Voice ID (optional)</Label>
-                <Input className="mt-1" value={heygenVoiceId} onChange={(e) => setHeygenVoiceId(e.target.value)} placeholder="Leave blank to use our TTS voice selection" maxLength={120} />
+                <Label htmlFor="edit-persona-heygen-voice-id" className="text-[11px]">Voice ID (optional)</Label>
+                <Input id="edit-persona-heygen-voice-id" className="mt-1" value={heygenVoiceId} onChange={(e) => setHeygenVoiceId(e.target.value)} placeholder="Leave blank to use our TTS voice selection" maxLength={120} />
               </div>
             </div>
           </div>

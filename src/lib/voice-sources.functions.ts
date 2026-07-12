@@ -180,14 +180,25 @@ export const deleteVoiceSourceRecording = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const FORMAT_MIME: Record<string, string> = {
+  wav: "audio/wav",
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  webm: "audio/webm",
+  ogg: "audio/ogg",
+};
+
+// ElevenLabs' own console caps a single Instant Voice Clone submission —
+// stay comfortably under it rather than sending an unbounded batch.
+const MAX_CLONE_FILES = 25;
+
 /**
- * Handoff to voice cloning. There is no ElevenLabs (or any other) voice
- * cloning provider integrated anywhere in this codebase yet — this marks
- * validated recordings as submitted (submitted_for_clone_at) so the intake
- * side of the pipeline is complete and provable, without fabricating a call
- * to a vendor that isn't actually wired up. Swap the body of this function
- * for a real provider call once one is chosen; the consent/validation gate
- * above it does not need to change.
+ * Submits validated recordings to ElevenLabs for real Instant Voice Cloning.
+ * The resulting voice_id is stored on the CREATOR (one real voice per
+ * creator), not the persona — personas opt in to using it individually via
+ * use_cloned_voice. Recordings are only marked 'cloned' after ElevenLabs
+ * actually accepts them, so a failed call leaves them resubmittable rather
+ * than silently marking the intake done despite nothing being produced.
  */
 export const submitVoiceCloneJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -199,9 +210,12 @@ export const submitVoiceCloneJob = createServerFn({ method: "POST" })
     await assertVoiceSourceConsent(supabase, creator.id);
 
     if (!data.recordingIds.length) throw new Error("Select at least one validated recording.");
+    if (data.recordingIds.length > MAX_CLONE_FILES) {
+      throw new Error(`Select at most ${MAX_CLONE_FILES} recordings per submission.`);
+    }
     const { data: recordings, error } = await supabase
       .from("voice_source_recordings")
-      .select("id, status")
+      .select("id, status, file_ref, format")
       .eq("persona_id", data.personaId)
       .in("id", data.recordingIds);
     if (error) throw error;
@@ -213,19 +227,55 @@ export const submitVoiceCloneJob = createServerFn({ method: "POST" })
       throw new Error("Only validated recordings can be submitted for voice cloning.");
     }
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const files: { bytes: ArrayBuffer; filename: string; mimeType: string }[] = [];
+    for (const rec of recordings as any[]) {
+      const { data: blob, error: dlErr } = await supabaseAdmin.storage.from("voice-messages").download(rec.file_ref);
+      if (dlErr || !blob) throw new Error(`Could not read recording ${rec.id} from storage.`);
+      files.push({
+        bytes: await blob.arrayBuffer(),
+        filename: `${rec.id}.${rec.format}`,
+        mimeType: FORMAT_MIME[rec.format] ?? "application/octet-stream",
+      });
+    }
+
+    const { cloneVoice } = await import("./elevenlabs.server");
+    const result = await cloneVoice({
+      name: `${creator.handle} — Twinly voice`,
+      files,
+      description: "Twinly.life creator voice clone, submitted with explicit consent.",
+    });
+
+    const now = new Date().toISOString();
+    const { error: creatorUpdErr } = await supabase
+      .from("creators")
+      .update({
+        elevenlabs_voice_id: result.voiceId,
+        elevenlabs_voice_requires_verification: result.requiresVerification,
+        elevenlabs_voice_cloned_at: now,
+      })
+      .eq("id", creator.id);
+    if (creatorUpdErr) throw creatorUpdErr;
+
     const { error: updErr } = await supabase
       .from("voice_source_recordings")
-      .update({ submitted_for_clone_at: new Date().toISOString() })
+      .update({ submitted_for_clone_at: now, status: "cloned" })
       .in("id", data.recordingIds);
     if (updErr) throw updErr;
 
-    await logAudit(userId, "voice_source.submitted_for_clone", { type: "persona", id: data.personaId }, {
+    await logAudit(userId, "voice_source.cloned", { type: "persona", id: data.personaId }, {
       recordingCount: data.recordingIds.length,
+      voiceId: result.voiceId,
+      requiresVerification: result.requiresVerification,
     });
 
     return {
       ok: true,
       submittedCount: data.recordingIds.length,
-      note: "Recordings marked as submitted. No voice-clone provider is connected yet — this is the intake handoff point only.",
+      voiceId: result.voiceId,
+      requiresVerification: result.requiresVerification,
+      note: result.requiresVerification
+        ? "Voice cloned. ElevenLabs flagged this voice for additional verification before it can be used."
+        : "Voice cloned successfully — enable it per persona from the persona's Basics tab.",
     };
   });

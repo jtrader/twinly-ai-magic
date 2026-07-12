@@ -557,6 +557,7 @@ export type Database = {
           resolution_note: string | null
           resolved_at: string | null
           resolved_by: string | null
+          severity: string | null
           status: Database["public"]["Enums"]["conversation_flag_status"]
           updated_at: string
         }
@@ -574,6 +575,7 @@ export type Database = {
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
+          severity?: string | null
           status?: Database["public"]["Enums"]["conversation_flag_status"]
           updated_at?: string
         }
@@ -591,6 +593,7 @@ export type Database = {
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
+          severity?: string | null
           status?: Database["public"]["Enums"]["conversation_flag_status"]
           updated_at?: string
         }
@@ -933,6 +936,9 @@ export type Database = {
           cover_url: string | null
           created_at: string
           digital_twin_status: Database["public"]["Enums"]["twin_status"]
+          elevenlabs_voice_id: string | null
+          elevenlabs_voice_requires_verification: boolean | null
+          elevenlabs_voice_cloned_at: string | null
           generation_spend_cap_cents: number | null
           handle: string
           id: string
@@ -959,6 +965,9 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           digital_twin_status?: Database["public"]["Enums"]["twin_status"]
+          elevenlabs_voice_id?: string | null
+          elevenlabs_voice_requires_verification?: boolean | null
+          elevenlabs_voice_cloned_at?: string | null
           generation_spend_cap_cents?: number | null
           handle: string
           id?: string
@@ -985,6 +994,9 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           digital_twin_status?: Database["public"]["Enums"]["twin_status"]
+          elevenlabs_voice_id?: string | null
+          elevenlabs_voice_requires_verification?: boolean | null
+          elevenlabs_voice_cloned_at?: string | null
           generation_spend_cap_cents?: number | null
           handle?: string
           id?: string
@@ -1799,6 +1811,7 @@ export type Database = {
           memory_enabled: boolean
           persona_type: Database["public"]["Enums"]["persona_type"]
           price_cents: number
+          require_id_verification: boolean
           slug: string
           sort_order: number
           starts_at: string | null
@@ -1808,9 +1821,13 @@ export type Database = {
           tts_voice: string | null
           twin_link_mode: string
           updated_at: string
+          use_cloned_voice: boolean
           venice_chat_opt_in: boolean
           visibility: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled: boolean
+          voice_similarity_boost: number | null
+          voice_stability: number | null
+          voice_style: number | null
         }
         Insert: {
           avatar_url?: string | null
@@ -1834,6 +1851,7 @@ export type Database = {
           memory_enabled?: boolean
           persona_type?: Database["public"]["Enums"]["persona_type"]
           price_cents?: number
+          require_id_verification?: boolean
           slug: string
           sort_order?: number
           starts_at?: string | null
@@ -1843,9 +1861,13 @@ export type Database = {
           tts_voice?: string | null
           twin_link_mode?: string
           updated_at?: string
+          use_cloned_voice?: boolean
           venice_chat_opt_in?: boolean
           visibility?: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled?: boolean
+          voice_similarity_boost?: number | null
+          voice_stability?: number | null
+          voice_style?: number | null
         }
         Update: {
           avatar_url?: string | null
@@ -1869,6 +1891,7 @@ export type Database = {
           memory_enabled?: boolean
           persona_type?: Database["public"]["Enums"]["persona_type"]
           price_cents?: number
+          require_id_verification?: boolean
           slug?: string
           sort_order?: number
           starts_at?: string | null
@@ -1878,9 +1901,13 @@ export type Database = {
           tts_voice?: string | null
           twin_link_mode?: string
           updated_at?: string
+          use_cloned_voice?: boolean
           venice_chat_opt_in?: boolean
           visibility?: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled?: boolean
+          voice_similarity_boost?: number | null
+          voice_stability?: number | null
+          voice_style?: number | null
         }
         Relationships: [
           {
@@ -2966,6 +2993,8 @@ export type Database = {
         | "uncomfortable"
         | "wants_human"
         | "other"
+        | "auto_high_severity"
+        | "auto_prompt_leak"
       conversation_flag_status:
         | "open"
         | "acknowledged"
@@ -3034,7 +3063,7 @@ export type Database = {
         | "revoked"
       persona_invite_status: "pending" | "accepted" | "revoked"
       visibility: "draft" | "public" | "subscribers" | "vip" | "hidden" | "invite_only"
-      voice_source_status: "pending_validation" | "validated" | "rejected"
+      voice_source_status: "pending_validation" | "validated" | "rejected" | "cloned"
       voice_source_type: "uploaded" | "recorded_in_app"
     }
     CompositeTypes: {
@@ -3192,6 +3221,8 @@ export const Constants = {
         "uncomfortable",
         "wants_human",
         "other",
+        "auto_high_severity",
+        "auto_prompt_leak",
       ],
       conversation_flag_status: [
         "open",
@@ -3266,7 +3297,7 @@ export const Constants = {
       ],
       persona_invite_status: ["pending", "accepted", "revoked"],
       visibility: ["draft", "public", "subscribers", "vip", "hidden", "invite_only"],
-      voice_source_status: ["pending_validation", "validated", "rejected"],
+      voice_source_status: ["pending_validation", "validated", "rejected", "cloned"],
       voice_source_type: ["uploaded", "recorded_in_app"],
     },
   },
