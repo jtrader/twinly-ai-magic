@@ -12,6 +12,8 @@ import { TipButton } from "@/components/twinly/TipButton";
 import { ShieldCheck, Rss } from "lucide-react";
 import { PostComposer, PostFeed } from "@/components/twinly/PostFeed";
 import { getCreatorPosts } from "@/lib/posts.functions";
+import { listCreatorPollsPublic } from "@/lib/polls.functions";
+import { PollCard } from "@/components/twinly/PollCard";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/integrations/supabase/client";
 import { Crown, Sparkles, Star } from "lucide-react";
@@ -106,11 +108,22 @@ function CreatorProfile() {
   const loadPosts = useServerFn(getCreatorPosts);
   const refreshPosts = async () => {
     try {
-      const r = await loadPosts({ data: { handle: creator.handle } });
+      const r = await loadPosts({ data: { handle: creator.handle, viewerId: user?.id ?? null } });
       setPosts(r.items ?? []);
     } catch {}
   };
-  useEffect(() => { refreshPosts(); /* eslint-disable-line */ }, [creator.handle]);
+  useEffect(() => { refreshPosts(); /* eslint-disable-line */ }, [creator.handle, user?.id]);
+
+  // Standalone polls — not attached to any post — shown alongside the feed.
+  const [standalonePolls, setStandalonePolls] = useState<any[]>([]);
+  const loadStandalonePolls = useServerFn(listCreatorPollsPublic);
+  const refreshStandalonePolls = async () => {
+    try {
+      const r = await loadStandalonePolls({ data: { handle: creator.handle, viewerId: user?.id ?? null } });
+      setStandalonePolls(r.polls ?? []);
+    } catch {}
+  };
+  useEffect(() => { refreshStandalonePolls(); /* eslint-disable-line */ }, [creator.handle, user?.id]);
   return (
     <AppShell>
       <div className="mb-6 flex items-center justify-between gap-4">
@@ -211,6 +224,14 @@ function CreatorProfile() {
               : "No posts yet."}
             onChanged={refreshPosts}
           />
+          {standalonePolls.length > 0 && (
+            <div className="mt-4 space-y-3">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Polls</div>
+              {standalonePolls.map((p: any) => (
+                <PollCard key={p.id} poll={p} onVoted={refreshStandalonePolls} />
+              ))}
+            </div>
+          )}
         </section>
       ) : (
         <section key="experiences" className="animate-fade-in">

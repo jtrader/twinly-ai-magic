@@ -17,6 +17,7 @@ import {
 } from "@/lib/posts.functions";
 import { Heart, MessageCircle, Image as ImageIcon, X, Trash2, Package, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { PollCard } from "@/components/twinly/PollCard";
 
 type Post = {
   id: string;
@@ -29,6 +30,7 @@ type Post = {
   creator: { id: string; handle: string; stageName: string; avatarUrl: string | null; verified: boolean };
   linkedPack: { id: string; name: string; slug: string } | null;
   linkedPersona: { id: string; slug: string; displayName: string; kind: string } | null;
+  linkedPoll: any | null;
 };
 
 export function PostFeed({
@@ -160,6 +162,12 @@ function PostCard({
               <Package className="size-3" /> {post.linkedPack.name}
             </Link>
           )}
+        </div>
+      )}
+
+      {post.linkedPoll && (
+        <div className="mt-3">
+          <PollCard poll={post.linkedPoll} onVoted={onChanged} />
         </div>
       )}
 

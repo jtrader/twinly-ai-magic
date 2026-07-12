@@ -51,6 +51,22 @@ export const createCreatorProfile = createServerFn({ method: "POST" })
     await supabase.from("user_roles").insert({ user_id: userId, role: "creator" as const })
       .then(() => undefined, () => undefined);
 
+    // Real Me is always present per creator (persona-onboarding studio) —
+    // seeded here so it exists before the creator ever visits persona
+    // studio, matching what escalation/away-mode already assume is there.
+    // is_default_seed protects it from deletion (see deletePersona).
+    await supabase.from("personas").insert({
+      creator_id: creator.id,
+      slug: "real-me",
+      kind: "real_me" as const,
+      persona_type: "real_me" as const,
+      display_name: "Real Me",
+      disclosure_label: `${stageName} — Human creator/team`,
+      is_default_seed: true,
+      visibility: "draft" as const,
+      sort_order: 0,
+    }).then(() => undefined, () => undefined);
+
     await logAudit(userId, "creator.created", { type: "creator", id: creator.id }, { handle });
     return { creator, created: true };
   });

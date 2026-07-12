@@ -4,7 +4,7 @@ import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
-import { Sparkles, Library, ShieldCheck, MessageCircle, Wallet, BadgeCheck, Package, User, Wand2, BarChart3, Moon, Flag, UserCheck, DollarSign } from "lucide-react";
+import { Sparkles, Library, ShieldCheck, MessageCircle, Wallet, BadgeCheck, Package, User, Wand2, BarChart3, Moon, Flag, UserCheck, DollarSign, Eye, ClipboardList, ListChecks, UserCircle } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { countOpenCreatorFlags } from "@/lib/conversation-flags.functions";
 
@@ -88,7 +88,9 @@ function StudioHome() {
 
       <div className="grid gap-3 md:grid-cols-2">
         <Tile to="/creators/$handle" params={{ handle: creator.handle }} icon={<BadgeCheck className="size-5 text-brand-glow" />} title="Public profile" desc="See what fans see." />
+        <Tile to="/studio/real-me" icon={<UserCircle className="size-5 text-brand-glow" />} title="Real Me baseline" desc="The foundational questionnaire every persona is built from." />
         <Tile to="/studio/personas" icon={<Sparkles className="size-5 text-brand-glow" />} title="Persona studio" desc="Create, edit, publish, reorder personas." />
+        <Tile to="/studio/persona-onboarding" icon={<ClipboardList className="size-5 text-brand-glow" />} title="Persona onboarding" desc="Brand-safe questionnaire, generated tone guidelines & openers, preview, export." />
         <Tile to="/studio/content" icon={<Library className="size-5 text-brand-glow" />} title="Content vault" desc="Upload assets and attach per persona." />
         <Tile to="/studio/packs" icon={<Package className="size-5 text-brand-glow" />} title="Content packs" desc="Bundle assets into Nice, Naughty, Wicked, Seasonal & custom packs." />
         <Tile to="/studio/create" icon={<Wand2 className="size-5 text-brand-glow" />} title="Twinly Create" desc="Plan AI image, voice & video jobs — approval-gated placeholder workflow." />
@@ -99,6 +101,8 @@ function StudioHome() {
         <Tile to="/studio/escalations" icon={<UserCheck className="size-5 text-brand-glow" />} title="Real Me requests" desc="Accept or decline supporters asking to talk to you directly." />
         <Tile to="/studio/payouts" icon={<Wallet className="size-5 text-brand-glow" />} title="Payouts" desc="Payment history, subscribers, next payout." />
         <Tile to="/studio/pricing" icon={<DollarSign className="size-5 text-brand-glow" />} title="Subscription pricing" desc="Set your monthly Base / Plus / VIP tier prices." />
+        <Tile to="/studio/feed-visibility" icon={<Eye className="size-5 text-brand-glow" />} title="Feed visibility" desc="Set default audience per persona, curate individual posts, and preview by tier." />
+        <Tile to="/studio/polls" icon={<ListChecks className="size-5 text-brand-glow" />} title="Polls" desc="Single/multi-choice and tip-to-vote polls, feed-attached or standalone." />
         <Tile to="/studio/analytics" icon={<BarChart3 className="size-5 text-brand-glow" />} title="Analytics" desc="Generation volume, approval rate, chat engagement." />
         <Tile to="/studio/twin" icon={<User className="size-5 text-brand-glow" />} title="Digital twin profile" desc="Identity, voice, style, consent & use rules." />
         <Tile to="/studio/away" icon={<Moon className="size-5 text-brand-glow" />} title="Away mode" desc="Auto-reply for Real Me and route fans to your AI personas when you're offline." />

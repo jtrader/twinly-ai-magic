@@ -5,6 +5,7 @@ import { logAudit } from "./audit.server";
 type PersonaKind = "real_me" | "ai";
 type Visibility = "draft" | "public" | "subscribers" | "vip" | "hidden";
 type ExplicitnessLevel = "sfw" | "suggestive" | "explicit";
+type PersonaType = "real_me" | "nice" | "naughty" | "wicked" | "custom";
 
 const SLUG_RE = /^[a-z0-9-]{2,40}$/;
 const FAN_FACING_VISIBILITY: ReadonlySet<Visibility> = new Set(["public", "subscribers", "vip"]);
@@ -63,12 +64,20 @@ export const createPersona = createServerFn({ method: "POST" })
     toneRules?: { personality?: string };
     boundaryRules?: { hardLimits?: string[] };
     explicitnessCeiling?: ExplicitnessLevel;
+    personaType?: PersonaType;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const creator = await requireCreator(supabase, userId);
     const ceiling = data.explicitnessCeiling ?? "sfw";
+    // persona_type must agree with kind (DB CHECK enforces this too): only a
+    // real_me-kind persona may carry the real_me tag; everything else picks
+    // a named tier or defaults to "custom".
+    const personaType: PersonaType = data.kind === "real_me" ? "real_me" : (data.personaType ?? "custom");
+    if (personaType === "real_me" && data.kind !== "real_me") {
+      throw new Error("Only a Real Me persona can use the real_me tier.");
+    }
     await assertCeilingWithinPlatformMax(supabase, ceiling);
 
     const displayName = data.displayName.trim();
@@ -115,6 +124,7 @@ export const createPersona = createServerFn({ method: "POST" })
         tone_rules: sanitizeToneRules(data.toneRules),
         boundary_rules: sanitizeBoundaryRules(data.boundaryRules),
         explicitness_ceiling: ceiling,
+        persona_type: personaType,
         visibility: "draft" as Visibility,
         sort_order: nextOrder,
       })

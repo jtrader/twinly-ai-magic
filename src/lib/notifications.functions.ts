@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-type NotificationType = "new_content" | "persona_reply" | "escalation_requested" | "escalation_accepted" | "escalation_declined";
+type NotificationType = "new_content" | "persona_reply" | "escalation_requested" | "escalation_accepted" | "escalation_declined" | "poll_response" | "poll_closed";
 
 const PREF_FIELD: Partial<Record<NotificationType, "new_content" | "persona_reply" | "escalation_updates">> = {
   new_content: "new_content",

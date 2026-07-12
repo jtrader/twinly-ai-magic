@@ -210,17 +210,19 @@ async function handleCheckoutCompleted(session: any, env: StripeEnv) {
   if (kind === "tip") {
     const { userId, creatorId } = meta;
     if (!userId || !creatorId) return;
+    let transactionId: string | null = null;
     try {
       const { data: dup } = await (sb.from("transactions") as any)
         .select("id").eq("stripe_checkout_session_id", session.id).maybeSingle();
       if (dup) return;
-      await (sb.from("transactions") as any).insert({
+      const { data: tx } = await (sb.from("transactions") as any).insert({
         fan_id: userId, creator_id: creatorId,
         amount_cents: amount, kind: "tip", status: "succeeded",
         stripe_checkout_session_id: session.id,
         stripe_payment_intent_id: paymentIntentId ?? null,
         environment: env,
-      });
+      }).select("id").single();
+      transactionId = tx?.id ?? null;
       const { data: creator } = await (sb.from("creators") as any).select("user_id, stage_name, handle").eq("id", creatorId).maybeSingle();
       const creatorName = creator?.stage_name ?? creator?.handle ?? "Creator";
       await notify(userId, "tip_sent", `Tip sent to ${creatorName}`, `$${(amount / 100).toFixed(2)}. Thanks for supporting creators!`, `/creators/${creator?.handle ?? ""}`);
@@ -229,6 +231,26 @@ async function handleCheckoutCompleted(session: any, env: StripeEnv) {
         await notify(creator.user_id, "tip_received", `${fan?.display_name ?? "A fan"} tipped $${(amount / 100).toFixed(2)}`, undefined, "/studio");
       }
     } catch (e) { console.error("tip insert failed", e); }
+
+    // Tip-to-vote poll: record the vote now that payment has succeeded.
+    // Never lets a poll_response failure affect the payment webhook's 200 —
+    // the charge already went through regardless of what happens here.
+    if (meta.context === "poll" && meta.pollId && meta.optionId && transactionId) {
+      try {
+        await (sb.from("poll_responses") as any).insert({
+          poll_id: meta.pollId,
+          poll_option_id: meta.optionId,
+          supporter_id: userId,
+          tip_id: transactionId,
+          poll_type: "tip_to_vote",
+        });
+        const { data: poll } = await (sb.from("polls") as any).select("question, creator_id").eq("id", meta.pollId).maybeSingle();
+        const { data: creator } = poll ? await (sb.from("creators") as any).select("user_id").eq("id", poll.creator_id).maybeSingle() : { data: null };
+        if (creator?.user_id) {
+          await notify(creator.user_id, "poll_response", "New tip-to-vote response", poll?.question, "/studio/polls");
+        }
+      } catch (e) { console.error("poll_response insert failed (payment already succeeded)", e); }
+    }
     return;
   }
 }

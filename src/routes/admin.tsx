@@ -288,6 +288,11 @@ function AdminPage() {
             <Stat label="Age-gate pass rate" value="—" />
           </div>
         </div>
+        <div className="mt-4">
+          <Link to="/studio/feed-visibility">
+            <Button variant="outline" size="sm">Manage feed visibility (any creator) →</Button>
+          </Link>
+        </div>
         </>
       )}
 

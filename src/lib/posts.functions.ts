@@ -29,9 +29,10 @@ type FeedPost = {
   creator: { id: string; handle: string; stageName: string; avatarUrl: string | null; verified: boolean };
   linkedPack: { id: string; name: string; slug: string } | null;
   linkedPersona: { id: string; slug: string; displayName: string; kind: string } | null;
+  linkedPoll: any | null;
 };
 
-async function hydratePosts(rows: any[], viewerLikedIds: Set<string>): Promise<FeedPost[]> {
+async function hydratePosts(rows: any[], viewerLikedIds: Set<string>, pollMap: Map<string, any> = new Map()): Promise<FeedPost[]> {
   const pub = serverPublic();
   return Promise.all(rows.map(async (r: any) => ({
     id: r.id,
@@ -54,19 +55,104 @@ async function hydratePosts(rows: any[], viewerLikedIds: Set<string>): Promise<F
     linkedPersona: r.personas
       ? { id: r.personas.id, slug: r.personas.slug, displayName: r.personas.display_name, kind: r.personas.kind }
       : null,
+    linkedPoll: r.linked_poll_id ? pollMap.get(r.linked_poll_id) ?? null : null,
   })));
 }
 
 const POST_SELECT = `
-  id, body, image_url, like_count, comment_count, created_at, creator_id,
+  id, body, image_url, like_count, comment_count, created_at, creator_id, linked_poll_id,
   creators:creator_id ( id, handle, stage_name, verification_status, user_id ),
   content_packs:linked_pack_id ( id, name, slug ),
   personas:linked_persona_id ( id, slug, display_name, kind )
 `;
 
-// Public: get a creator's posts by handle. Auth optional (adds "liked").
+/**
+ * Feed-attached polls: fetches the poll+options for any posts carrying a
+ * linked_poll_id, gated by the poll's own visibility (independent of, and on
+ * top of, the post's own feed-visibility gate above) and hydrated with this
+ * viewer's vote state — reuses hydrateWithViewerState from
+ * polls.functions.ts rather than reimplementing the resolution/results logic.
+ */
+async function loadLinkedPolls(rows: any[], viewerId: string | null): Promise<Map<string, any>> {
+  const pollIds = [...new Set(rows.map((r: any) => r.linked_poll_id).filter(Boolean))];
+  if (!pollIds.length) return new Map();
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { canViewerSeeTier, isPayingSubscriber } = await import("./feed-visibility-access.server");
+  const { hydrateWithViewerState } = await import("./polls.functions");
+
+  const { data: polls } = await supabaseAdmin
+    .from("polls").select("*, poll_options(id, label, display_order, linked_tip_amount_usd)").in("id", pollIds);
+  if (!polls?.length) return new Map();
+
+  const isAuthed = !!viewerId;
+  const subCache = new Map<string, boolean>();
+  const visible: any[] = [];
+  for (const p of polls) {
+    let isPaying = false;
+    if (isAuthed && p.visibility === "subscribers_only") {
+      if (!subCache.has(p.creator_id)) subCache.set(p.creator_id, await isPayingSubscriber(supabaseAdmin, viewerId as string, p.creator_id));
+      isPaying = subCache.get(p.creator_id)!;
+    }
+    if (canViewerSeeTier(p.visibility, { isAuthed, isPayingSubscriber: isPaying })) visible.push(p);
+  }
+
+  const hydrated = await hydrateWithViewerState(supabaseAdmin, visible, viewerId);
+  return new Map(hydrated.map((p: any) => [p.id, p]));
+}
+
+/**
+ * Single source of truth for gating feed rows by the visibility model (see
+ * feed-visibility-access.server.ts): item override → persona default →
+ * platform default. Used by every feed-reading surface below — not
+ * reimplemented per surface. Overrides/policies/subscription status are
+ * looked up via supabaseAdmin since they're not meant to be publicly
+ * readable (RLS on those tables only grants the managing creator/agency/
+ * admin), independent of whether the post rows themselves came from the
+ * public anon client.
+ */
+async function filterByFeedVisibility(rows: any[], viewerId: string | null): Promise<any[]> {
+  if (!rows.length) return rows;
+  const { resolveFeedItemVisibility, canViewerSeeTier, isPayingSubscriber } = await import("./feed-visibility-access.server");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  const postIds = rows.map((r: any) => r.id);
+  const personaIds = [...new Set(rows.map((r: any) => r.personas?.id).filter(Boolean))];
+  const [{ data: overrides }, { data: policies }] = await Promise.all([
+    supabaseAdmin.from("feed_item_visibility_overrides").select("feed_post_id, visibility").in("feed_post_id", postIds),
+    personaIds.length
+      ? supabaseAdmin.from("feed_visibility_policies").select("persona_id, default_visibility").in("persona_id", personaIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const overrideMap = new Map((overrides ?? []).map((o: any) => [o.feed_post_id, o.visibility]));
+  const policyMap = new Map((policies ?? []).map((p: any) => [p.persona_id, p.default_visibility]));
+
+  const isAuthed = !!viewerId;
+  const subCache = new Map<string, boolean>();
+  const result: any[] = [];
+  for (const r of rows) {
+    const isOwner = isAuthed && viewerId === r.creators?.user_id;
+    if (isOwner) { result.push(r); continue; }
+
+    const resolved = resolveFeedItemVisibility({
+      overrideTier: overrideMap.get(r.id) ?? null,
+      personaDefaultTier: r.personas?.id ? policyMap.get(r.personas.id) ?? null : null,
+    });
+
+    let isPaying = false;
+    if (isAuthed && resolved === "subscribers_only") {
+      const key = `${viewerId}:${r.creator_id}`;
+      if (!subCache.has(key)) subCache.set(key, await isPayingSubscriber(supabaseAdmin, viewerId as string, r.creator_id));
+      isPaying = subCache.get(key)!;
+    }
+    if (canViewerSeeTier(resolved, { isAuthed, isPayingSubscriber: isPaying })) result.push(r);
+  }
+  return result;
+}
+
+// Public: get a creator's posts by handle. Auth optional (adds "liked" and
+// unlocks subscriber-only visibility for the viewer's own subscriptions).
 export const getCreatorPosts = createServerFn({ method: "GET" })
-  .validator((d: { handle: string; limit?: number }) => d)
+  .validator((d: { handle: string; limit?: number; viewerId?: string | null }) => d)
   .handler(async ({ data }) => {
     const pub = serverPublic();
     const { data: creator } = await pub
@@ -86,17 +172,20 @@ export const getCreatorPosts = createServerFn({ method: "GET" })
       .limit(limit);
     if (error) throw new Error(error.message);
 
+    const visible = await filterByFeedVisibility(rows ?? [], data.viewerId ?? null);
+
     // hydrate creator avatar via profiles_public
     const { data: prof } = await pub
       .from("profiles_public")
       .select("avatar_url")
       .eq("id", creator.user_id)
       .maybeSingle();
-    const enriched = (rows ?? []).map((r: any) => ({
+    const enriched = visible.map((r: any) => ({
       ...r,
       creators: { ...r.creators, profiles_public: { avatar_url: prof?.avatar_url ?? null } },
     }));
-    const items = await hydratePosts(enriched, new Set());
+    const pollMap = await loadLinkedPolls(visible, data.viewerId ?? null);
+    const items = await hydratePosts(enriched, new Set(), pollMap);
     return { items };
   });
 
@@ -125,7 +214,9 @@ export const getHomeFeed = createServerFn({ method: "GET" })
       .limit(limit);
     if (error) throw new Error(error.message);
 
-    const postIds = (rows ?? []).map((r: any) => r.id);
+    const visibleRows = await filterByFeedVisibility(rows ?? [], userId);
+
+    const postIds = visibleRows.map((r: any) => r.id);
     const { data: liked } = await supabase
       .from("post_likes")
       .select("post_id")
@@ -134,18 +225,19 @@ export const getHomeFeed = createServerFn({ method: "GET" })
     const likedSet = new Set((liked ?? []).map((r: any) => r.post_id));
 
     // Hydrate creator avatars
-    const userIds = Array.from(new Set((rows ?? []).map((r: any) => r.creators?.user_id).filter(Boolean)));
+    const userIds = Array.from(new Set(visibleRows.map((r: any) => r.creators?.user_id).filter(Boolean)));
     const { data: profs } = await pub
       .from("profiles_public")
       .select("id, avatar_url")
       .in("id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]);
     const avatarByUser = new Map((profs ?? []).map((p: any) => [p.id, p.avatar_url as string | null]));
-    const enriched = (rows ?? []).map((r: any) => ({
+    const enriched = visibleRows.map((r: any) => ({
       ...r,
       creators: { ...r.creators, profiles_public: { avatar_url: avatarByUser.get(r.creators?.user_id) ?? null } },
     }));
 
-    const items = await hydratePosts(enriched, likedSet);
+    const pollMap = await loadLinkedPolls(visibleRows, userId);
+    const items = await hydratePosts(enriched, likedSet, pollMap);
     return { items };
   });
 

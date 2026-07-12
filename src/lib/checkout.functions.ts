@@ -452,6 +452,78 @@ export const createTipCheckout = createServerFn({ method: "POST" })
     }
   });
 
+/**
+ * Tip-to-vote poll: the tip amount is locked to the option's own
+ * linked_tip_amount_usd (never user-chosen) — the price is already shown on
+ * the option before this is ever called, so there's no bait-and-switch.
+ * Reuses the same Tip checkout flow as createTipCheckout, just tagged with
+ * context/pollId/optionId metadata so the webhook can also record the vote
+ * once payment succeeds (see payments/webhook.ts).
+ */
+export const createPollVoteTipCheckout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { pollId: string; optionId: string; returnUrl: string; environment: StripeEnv }) => d)
+  .handler(async ({ data, context }): Promise<CheckoutResult> => {
+    try {
+      const { userId } = context;
+      const admin = await getSupabaseAdmin();
+
+      const { data: poll } = await admin.from("polls").select("id, creator_id, poll_type, status, closes_at, visibility").eq("id", data.pollId).maybeSingle();
+      if (!poll) return { error: "Poll not found" };
+      if (poll.poll_type !== "tip_to_vote") return { error: "This poll doesn't use tip-to-vote." };
+
+      const { closeIfPastDeadline } = await import("./polls.functions");
+      const status = await closeIfPastDeadline(admin, data.pollId);
+      if (status !== "active") return { error: "This poll isn't open for voting." };
+
+      const { canViewerSeeTier, isPayingSubscriber } = await import("./feed-visibility-access.server");
+      const isPaying = await isPayingSubscriber(admin, userId, poll.creator_id);
+      if (!canViewerSeeTier(poll.visibility as any, { isAuthed: true, isPayingSubscriber: isPaying })) {
+        return { error: "You don't have access to this poll." };
+      }
+
+      const { data: option } = await admin.from("poll_options").select("id, label, linked_tip_amount_usd").eq("id", data.optionId).eq("poll_id", data.pollId).maybeSingle();
+      if (!option || !option.linked_tip_amount_usd) return { error: "Invalid option" };
+      const amountCents = Math.round(Number(option.linked_tip_amount_usd) * 100);
+
+      const { data: creator } = await admin.from("creators").select("stage_name, handle").eq("id", poll.creator_id).maybeSingle();
+      if (!creator) return { error: "Creator not found" };
+
+      const { data: hasPlus } = await admin.rpc("has_twinly_plus", { _user_id: userId });
+      const finalAmount = hasPlus === true ? Math.max(100, Math.round(amountCents * 0.9)) : amountCents;
+
+      const { data: { user } } = await context.supabase.auth.getUser();
+      const stripe = createStripeClient(data.environment);
+      const customerId = await resolveOrCreateCustomer(stripe, { email: user?.email ?? undefined, userId });
+      const productName = `Vote: ${option.label} — ${(creator as any).stage_name ?? (creator as any).handle}`;
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        ui_mode: "embedded_page" as any,
+        return_url: data.returnUrl,
+        customer: customerId,
+        line_items: [{
+          quantity: 1,
+          price_data: { currency: "usd", unit_amount: finalAmount, product_data: { name: productName } } as any,
+        }],
+        automatic_tax: { enabled: true },
+        payment_intent_data: { description: productName },
+        metadata: {
+          userId,
+          creatorId: poll.creator_id,
+          kind: "tip",
+          context: "poll",
+          pollId: data.pollId,
+          optionId: data.optionId,
+          originalAmountCents: String(amountCents),
+          twinlyPlusDiscount: hasPlus === true ? "true" : "false",
+        },
+      });
+      return { clientSecret: session.client_secret ?? "" };
+    } catch (error) {
+      return { error: getStripeErrorMessage(error) };
+    }
+  });
+
 /** Change tier on an existing creator subscription, with proration.
  *  - Upgrade → Stripe charges the difference immediately.
  *  - Downgrade → route the user to the billing portal instead (avoids surprise refunds). */

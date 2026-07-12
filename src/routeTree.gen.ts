@@ -22,13 +22,17 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as StudioTwinRouteImport } from './routes/studio.twin'
+import { Route as StudioRealMeRouteImport } from './routes/studio.real-me'
 import { Route as StudioPricingRouteImport } from './routes/studio.pricing'
+import { Route as StudioPollsRouteImport } from './routes/studio.polls'
 import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
+import { Route as StudioPersonaOnboardingRouteImport } from './routes/studio.persona-onboarding'
 import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
 import { Route as StudioPacksRouteImport } from './routes/studio.packs'
 import { Route as StudioInboxRouteImport } from './routes/studio.inbox'
 import { Route as StudioGenerateRouteImport } from './routes/studio.generate'
 import { Route as StudioFlagsRouteImport } from './routes/studio.flags'
+import { Route as StudioFeedVisibilityRouteImport } from './routes/studio.feed-visibility'
 import { Route as StudioEscalationsRouteImport } from './routes/studio.escalations'
 import { Route as StudioCreateRouteImport } from './routes/studio.create'
 import { Route as StudioContentRouteImport } from './routes/studio.content'
@@ -56,6 +60,7 @@ import { Route as ApiPublicBootstrapDemoCreatorsRouteImport } from './routes/api
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicHooksHeygenRouteImport } from './routes/api/public/hooks/heygen'
 import { Route as ApiPublicCronHeygenPollRouteImport } from './routes/api/public/cron/heygen-poll'
+import { Route as ApiPublicCronClosePollsRouteImport } from './routes/api/public/cron/close-polls'
 
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
@@ -122,14 +127,29 @@ const StudioTwinRoute = StudioTwinRouteImport.update({
   path: '/studio/twin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioRealMeRoute = StudioRealMeRouteImport.update({
+  id: '/studio/real-me',
+  path: '/studio/real-me',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioPricingRoute = StudioPricingRouteImport.update({
   id: '/studio/pricing',
   path: '/studio/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioPollsRoute = StudioPollsRouteImport.update({
+  id: '/studio/polls',
+  path: '/studio/polls',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioPersonasRoute = StudioPersonasRouteImport.update({
   id: '/studio/personas',
   path: '/studio/personas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioPersonaOnboardingRoute = StudioPersonaOnboardingRouteImport.update({
+  id: '/studio/persona-onboarding',
+  path: '/studio/persona-onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioPayoutsRoute = StudioPayoutsRouteImport.update({
@@ -155,6 +175,11 @@ const StudioGenerateRoute = StudioGenerateRouteImport.update({
 const StudioFlagsRoute = StudioFlagsRouteImport.update({
   id: '/studio/flags',
   path: '/studio/flags',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioFeedVisibilityRoute = StudioFeedVisibilityRouteImport.update({
+  id: '/studio/feed-visibility',
+  path: '/studio/feed-visibility',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioEscalationsRoute = StudioEscalationsRouteImport.update({
@@ -295,6 +320,11 @@ const ApiPublicCronHeygenPollRoute = ApiPublicCronHeygenPollRouteImport.update({
   path: '/api/public/cron/heygen-poll',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicCronClosePollsRoute = ApiPublicCronClosePollsRouteImport.update({
+  id: '/api/public/cron/close-polls',
+  path: '/api/public/cron/close-polls',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -326,13 +356,17 @@ export interface FileRoutesByFullPath {
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/escalations': typeof StudioEscalationsRoute
+  '/studio/feed-visibility': typeof StudioFeedVisibilityRoute
   '/studio/flags': typeof StudioFlagsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
+  '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
+  '/studio/real-me': typeof StudioRealMeRoute
   '/studio/twin': typeof StudioTwinRoute
   '/account/': typeof AccountIndexRoute
   '/studio/': typeof StudioIndexRoute
@@ -341,6 +375,7 @@ export interface FileRoutesByFullPath {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/api/public/cron/close-polls': typeof ApiPublicCronClosePollsRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -374,13 +409,17 @@ export interface FileRoutesByTo {
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/escalations': typeof StudioEscalationsRoute
+  '/studio/feed-visibility': typeof StudioFeedVisibilityRoute
   '/studio/flags': typeof StudioFlagsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
+  '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
+  '/studio/real-me': typeof StudioRealMeRoute
   '/studio/twin': typeof StudioTwinRoute
   '/account': typeof AccountIndexRoute
   '/studio': typeof StudioIndexRoute
@@ -389,6 +428,7 @@ export interface FileRoutesByTo {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/api/public/cron/close-polls': typeof ApiPublicCronClosePollsRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -424,13 +464,17 @@ export interface FileRoutesById {
   '/studio/content': typeof StudioContentRoute
   '/studio/create': typeof StudioCreateRoute
   '/studio/escalations': typeof StudioEscalationsRoute
+  '/studio/feed-visibility': typeof StudioFeedVisibilityRoute
   '/studio/flags': typeof StudioFlagsRoute
   '/studio/generate': typeof StudioGenerateRoute
   '/studio/inbox': typeof StudioInboxRoute
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
+  '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
   '/studio/personas': typeof StudioPersonasRoute
+  '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
+  '/studio/real-me': typeof StudioRealMeRoute
   '/studio/twin': typeof StudioTwinRoute
   '/account/': typeof AccountIndexRoute
   '/studio/': typeof StudioIndexRoute
@@ -439,6 +483,7 @@ export interface FileRoutesById {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/api/public/cron/close-polls': typeof ApiPublicCronClosePollsRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -475,13 +520,17 @@ export interface FileRouteTypes {
     | '/studio/content'
     | '/studio/create'
     | '/studio/escalations'
+    | '/studio/feed-visibility'
     | '/studio/flags'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
     | '/studio/payouts'
+    | '/studio/persona-onboarding'
     | '/studio/personas'
+    | '/studio/polls'
     | '/studio/pricing'
+    | '/studio/real-me'
     | '/studio/twin'
     | '/account/'
     | '/studio/'
@@ -490,6 +539,7 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/api/public/cron/close-polls'
     | '/api/public/cron/heygen-poll'
     | '/api/public/hooks/heygen'
     | '/api/public/payments/webhook'
@@ -523,13 +573,17 @@ export interface FileRouteTypes {
     | '/studio/content'
     | '/studio/create'
     | '/studio/escalations'
+    | '/studio/feed-visibility'
     | '/studio/flags'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
     | '/studio/payouts'
+    | '/studio/persona-onboarding'
     | '/studio/personas'
+    | '/studio/polls'
     | '/studio/pricing'
+    | '/studio/real-me'
     | '/studio/twin'
     | '/account'
     | '/studio'
@@ -538,6 +592,7 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/api/public/cron/close-polls'
     | '/api/public/cron/heygen-poll'
     | '/api/public/hooks/heygen'
     | '/api/public/payments/webhook'
@@ -572,13 +627,17 @@ export interface FileRouteTypes {
     | '/studio/content'
     | '/studio/create'
     | '/studio/escalations'
+    | '/studio/feed-visibility'
     | '/studio/flags'
     | '/studio/generate'
     | '/studio/inbox'
     | '/studio/packs'
     | '/studio/payouts'
+    | '/studio/persona-onboarding'
     | '/studio/personas'
+    | '/studio/polls'
     | '/studio/pricing'
+    | '/studio/real-me'
     | '/studio/twin'
     | '/account/'
     | '/studio/'
@@ -587,6 +646,7 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/api/public/cron/close-polls'
     | '/api/public/cron/heygen-poll'
     | '/api/public/hooks/heygen'
     | '/api/public/payments/webhook'
@@ -616,18 +676,23 @@ export interface RootRouteChildren {
   StudioContentRoute: typeof StudioContentRoute
   StudioCreateRoute: typeof StudioCreateRoute
   StudioEscalationsRoute: typeof StudioEscalationsRoute
+  StudioFeedVisibilityRoute: typeof StudioFeedVisibilityRoute
   StudioFlagsRoute: typeof StudioFlagsRoute
   StudioGenerateRoute: typeof StudioGenerateRoute
   StudioInboxRoute: typeof StudioInboxRoute
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
   StudioPayoutsRoute: typeof StudioPayoutsRoute
+  StudioPersonaOnboardingRoute: typeof StudioPersonaOnboardingRoute
   StudioPersonasRoute: typeof StudioPersonasRoute
+  StudioPollsRoute: typeof StudioPollsRoute
   StudioPricingRoute: typeof StudioPricingRoute
+  StudioRealMeRoute: typeof StudioRealMeRoute
   StudioTwinRoute: typeof StudioTwinRoute
   StudioIndexRoute: typeof StudioIndexRoute
   ApiPublicBootstrapDemoCreatorsRoute: typeof ApiPublicBootstrapDemoCreatorsRoute
   ApiPublicBootstrapSupportAdminRoute: typeof ApiPublicBootstrapSupportAdminRoute
   ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
+  ApiPublicCronClosePollsRoute: typeof ApiPublicCronClosePollsRoute
   ApiPublicCronHeygenPollRoute: typeof ApiPublicCronHeygenPollRoute
   ApiPublicHooksHeygenRoute: typeof ApiPublicHooksHeygenRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
@@ -726,6 +791,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioTwinRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/real-me': {
+      id: '/studio/real-me'
+      path: '/studio/real-me'
+      fullPath: '/studio/real-me'
+      preLoaderRoute: typeof StudioRealMeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/pricing': {
       id: '/studio/pricing'
       path: '/studio/pricing'
@@ -733,11 +805,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudioPricingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/polls': {
+      id: '/studio/polls'
+      path: '/studio/polls'
+      fullPath: '/studio/polls'
+      preLoaderRoute: typeof StudioPollsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio/personas': {
       id: '/studio/personas'
       path: '/studio/personas'
       fullPath: '/studio/personas'
       preLoaderRoute: typeof StudioPersonasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/persona-onboarding': {
+      id: '/studio/persona-onboarding'
+      path: '/studio/persona-onboarding'
+      fullPath: '/studio/persona-onboarding'
+      preLoaderRoute: typeof StudioPersonaOnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/studio/payouts': {
@@ -773,6 +859,13 @@ declare module '@tanstack/react-router' {
       path: '/studio/flags'
       fullPath: '/studio/flags'
       preLoaderRoute: typeof StudioFlagsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/feed-visibility': {
+      id: '/studio/feed-visibility'
+      path: '/studio/feed-visibility'
+      fullPath: '/studio/feed-visibility'
+      preLoaderRoute: typeof StudioFeedVisibilityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/studio/escalations': {
@@ -964,6 +1057,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronHeygenPollRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/close-polls': {
+      id: '/api/public/cron/close-polls'
+      path: '/api/public/cron/close-polls'
+      fullPath: '/api/public/cron/close-polls'
+      preLoaderRoute: typeof ApiPublicCronClosePollsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1054,18 +1154,23 @@ const rootRouteChildren: RootRouteChildren = {
   StudioContentRoute: StudioContentRoute,
   StudioCreateRoute: StudioCreateRoute,
   StudioEscalationsRoute: StudioEscalationsRoute,
+  StudioFeedVisibilityRoute: StudioFeedVisibilityRoute,
   StudioFlagsRoute: StudioFlagsRoute,
   StudioGenerateRoute: StudioGenerateRoute,
   StudioInboxRoute: StudioInboxRoute,
   StudioPacksRoute: StudioPacksRouteWithChildren,
   StudioPayoutsRoute: StudioPayoutsRoute,
+  StudioPersonaOnboardingRoute: StudioPersonaOnboardingRoute,
   StudioPersonasRoute: StudioPersonasRoute,
+  StudioPollsRoute: StudioPollsRoute,
   StudioPricingRoute: StudioPricingRoute,
+  StudioRealMeRoute: StudioRealMeRoute,
   StudioTwinRoute: StudioTwinRoute,
   StudioIndexRoute: StudioIndexRoute,
   ApiPublicBootstrapDemoCreatorsRoute: ApiPublicBootstrapDemoCreatorsRoute,
   ApiPublicBootstrapSupportAdminRoute: ApiPublicBootstrapSupportAdminRoute,
   ChatHandlePersonaRoute: ChatHandlePersonaRoute,
+  ApiPublicCronClosePollsRoute: ApiPublicCronClosePollsRoute,
   ApiPublicCronHeygenPollRoute: ApiPublicCronHeygenPollRoute,
   ApiPublicHooksHeygenRoute: ApiPublicHooksHeygenRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
