@@ -13,6 +13,8 @@ import { listMyBlocks, unblockUserId } from "@/lib/blocks.functions";
 import { getMyNotificationPreferences, updateMyNotificationPreferences } from "@/lib/notifications.functions";
 import { getMyProfile } from "@/lib/profile.functions";
 import { useAvatarUrl } from "@/lib/useAvatarUrl";
+import { getMyIdentityVerificationStatus, createIdentityVerificationSession } from "@/lib/identity-verification.functions";
+import { getStripe, getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 
 export const Route = createFileRoute("/account/")({ component: AccountPage });
 
@@ -26,6 +28,7 @@ function AccountPage() {
       <h1 className="font-display text-3xl font-bold">Account</h1>
       <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
       {user && <ProfileSection />}
+      {user && <IdentityVerificationSection />}
       <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
         <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Roles</div>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -148,6 +151,81 @@ function ProfileSection() {
             ))}
           </ul>
         </div>
+      )}
+    </div>
+  );
+}
+
+function IdentityVerificationSection() {
+  const load = useServerFn(getMyIdentityVerificationStatus);
+  const createSession = useServerFn(createIdentityVerificationSession);
+  const [status, setStatus] = useState<Awaited<ReturnType<typeof getMyIdentityVerificationStatus>> | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await load();
+      setStatus(res);
+    } catch {
+      /* not configured or not reachable — section quietly stays hidden below */
+    }
+  }, [load]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  async function startVerification() {
+    if (!isPaymentsConfigured()) {
+      toast.error("Identity verification isn't configured yet.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { clientSecret } = await createSession({
+        data: { environment: getStripeEnvironment(), returnUrl: window.location.href },
+      });
+      if (!clientSecret) throw new Error("Could not start verification session");
+      const stripe = await getStripe();
+      if (!stripe) throw new Error("Stripe failed to load");
+      const result = await stripe.verifyIdentity(clientSecret);
+      if (result.error) {
+        toast.error(result.error.message ?? "Verification was not completed");
+      } else {
+        toast.success("Verification submitted — this can take a few minutes to process.");
+      }
+      refresh();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not start verification");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!status) return null;
+  const verified = !!status.idVerifiedAt;
+  const pending = status.latestSession?.status === "pending" && !verified;
+
+  return (
+    <div className="mt-6 rounded-2xl border border-border bg-surface p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Identity verification</div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Required to chat with or unlock explicit-tier AI personas. Handled entirely by Stripe — Twinly never sees or stores your ID document.
+          </p>
+        </div>
+        <span className={
+          "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest " +
+          (verified ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+            : pending ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
+            : "border-border bg-background text-muted-foreground")
+        }>
+          {verified ? "Verified" : pending ? "Pending" : "Not verified"}
+        </span>
+      </div>
+      {!verified && (
+        <Button size="sm" className="mt-3" onClick={startVerification} disabled={busy}>
+          {busy ? "Starting…" : pending ? "Retry verification" : "Verify your identity"}
+        </Button>
       )}
     </div>
   );

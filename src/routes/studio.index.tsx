@@ -69,6 +69,18 @@ function StudioHome() {
         </div>
       </div>
 
+      {creator.digital_twin_status === "none" && (
+        <Link to="/studio/twin-onboarding" className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-brand/30 bg-brand/10 p-5 hover:border-brand/50">
+          <div>
+            <div className="font-display text-lg font-semibold text-brand-glow">Set up your AI Twin baseline</div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              A quick guided setup — reference photos and consent — that every persona you create afterward can draw from.
+            </p>
+          </div>
+          <Button>Get started</Button>
+        </Link>
+      )}
+
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Personas" value={counts.personas} />
         <Stat label="Vault assets" value={counts.assets} />
@@ -114,7 +126,7 @@ function StudioHome() {
 
 function StatusBadge({ label, value }: { label: string; value: string }) {
   const tone =
-    value === "verified" || value === "active" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+    value === "verified" || value === "active" || value === "approved" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
     : value === "pending" ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
     : value === "rejected" || value === "revoked" ? "border-rose-400/30 bg-rose-400/10 text-rose-300"
     : "border-border bg-surface text-muted-foreground";

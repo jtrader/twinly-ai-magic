@@ -3,6 +3,54 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { logAudit } from "./audit.server";
 
 type TwinKind = "identity_ref" | "voice_ref" | "style_ref";
+export type TwinStatus = "none" | "pending" | "approved" | "revoked";
+
+/**
+ * Pure — derives the creator-level Digital Twin status from ref-review and
+ * consent state. 'revoked' is a terminal state set only by revokeTwinConsent
+ * (re-consenting after a revocation is a separate, not-yet-built flow, so it
+ * is never recomputed away here). Otherwise: 'approved' requires both an
+ * approved identity_ref (likeness material a persona can actually use) and
+ * active consent (signed, not revoked, likeness_ok); anything submitted but
+ * short of that sits at 'pending'; nothing submitted is 'none'.
+ */
+export function computeTwinStatus(input: {
+  current: TwinStatus;
+  pendingRefCount: number;
+  approvedIdentityRefCount: number;
+  consentActive: boolean;
+}): TwinStatus {
+  if (input.current === "revoked") return "revoked";
+  if (input.approvedIdentityRefCount > 0 && input.consentActive) return "approved";
+  if (input.pendingRefCount > 0 || input.approvedIdentityRefCount > 0) return "pending";
+  return "none";
+}
+
+/** Recomputes and persists the creator's Digital Twin status after any event that could change it. */
+async function recomputeDigitalTwinStatus(supabase: any, creatorId: string): Promise<void> {
+  const { data: creator } = await supabase
+    .from("creators").select("digital_twin_status").eq("id", creatorId).maybeSingle();
+  const current = (creator?.digital_twin_status ?? "none") as TwinStatus;
+  if (current === "revoked") return;
+
+  const [{ count: pendingRefCount }, { count: approvedIdentityRefCount }, { data: consent }] = await Promise.all([
+    supabase.from("twin_reference_assets").select("id", { count: "exact", head: true })
+      .eq("creator_id", creatorId).eq("review_status", "pending").is("deleted_at", null),
+    supabase.from("twin_reference_assets").select("id", { count: "exact", head: true })
+      .eq("creator_id", creatorId).eq("kind", "identity_ref").eq("review_status", "approved").is("deleted_at", null),
+    supabase.from("digital_twin_consent").select("signed_at, revoked_at, likeness_ok").eq("creator_id", creatorId).maybeSingle(),
+  ]);
+  const consentActive = !!consent?.signed_at && !consent?.revoked_at && !!consent?.likeness_ok;
+  const next = computeTwinStatus({
+    current,
+    pendingRefCount: pendingRefCount ?? 0,
+    approvedIdentityRefCount: approvedIdentityRefCount ?? 0,
+    consentActive,
+  });
+  if (next !== current) {
+    await supabase.from("creators").update({ digital_twin_status: next }).eq("id", creatorId);
+  }
+}
 
 async function requireCreator(supabase: any, userId: string) {
   const { data, error } = await supabase
@@ -177,6 +225,7 @@ export const submitTwinReferencesForReview = createServerFn({ method: "POST" })
     if (data.ids && data.ids.length) q = q.in("id", data.ids);
     const { error, data: rows } = await q.select("id");
     if (error) throw error;
+    await recomputeDigitalTwinStatus(supabase, creator.id);
     await logAudit(userId, "twin.review_submitted", { type: "creator", id: creator.id }, { count: rows?.length ?? 0 });
     return { submitted: rows?.length ?? 0 };
   });
@@ -213,15 +262,17 @@ export const adminSetTwinRefReview = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+    const { data: updated, error } = await supabaseAdmin
       .from("twin_reference_assets")
       .update({
         review_status: data.status,
         review_note: data.note ?? null,
         reviewed_at: new Date().toISOString(),
         reviewed_by: context.userId,
-      }).eq("id", data.id);
+      }).eq("id", data.id)
+      .select("creator_id").single();
     if (error) throw error;
+    await recomputeDigitalTwinStatus(supabaseAdmin, updated.creator_id);
     await logAudit(context.userId, "admin.twin_ref_review", { type: "twin_reference", id: data.id }, { status: data.status });
     return { ok: true };
   });
@@ -273,6 +324,7 @@ export const upsertTwinConsent = createServerFn({ method: "POST" })
       .from("digital_twin_consent")
       .upsert(patch, { onConflict: "creator_id" });
     if (error) throw error;
+    await recomputeDigitalTwinStatus(supabase, creator.id);
     await logAudit(userId, "twin.consent_updated", { type: "creator", id: creator.id }, {
       keys: Object.keys(patch).filter((k) => k !== "creator_id" && k !== "updated_at"),
     });

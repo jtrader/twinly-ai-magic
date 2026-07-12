@@ -79,12 +79,17 @@ export const listMyPersonas = createServerFn({ method: "GET" })
       .from("creators").select("id, handle, stage_name, onboarding_completed_at, verification_status")
       .eq("user_id", userId).maybeSingle();
     if (!creator) return { creator: null, personas: [] };
+    // Real (legal) name, distinct from the public stage_name — used only for
+    // the persona-naming privacy-separation warning in the studio UI, never
+    // sent anywhere else.
+    const { data: profile } = await supabase
+      .from("profiles").select("full_name").eq("id", userId).maybeSingle();
     const { data: personas } = await supabase
       .from("personas")
       .select("id, slug, display_name, kind, description, disclosure_label, visibility, sort_order, twin_link_mode, linked_twin_ref_ids, training_notes, system_prompt, is_explicit, explicitness_ceiling, tone_rules, boundary_rules, price_cents, is_default_seed")
       .eq("creator_id", creator.id)
       .order("sort_order", { ascending: true });
-    return { creator, personas: personas ?? [] };
+    return { creator: { ...creator, fullName: (profile as any)?.full_name ?? null }, personas: personas ?? [] };
   });
 
 export const updatePersonaBasics = createServerFn({ method: "POST" })

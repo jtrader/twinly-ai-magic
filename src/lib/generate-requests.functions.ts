@@ -58,9 +58,9 @@ export async function assertTwinPolicy(
     .eq("id", creatorId)
     .single();
   if (cErr) throw cErr;
-  if (creator.digital_twin_status !== "ready") {
+  if (creator.digital_twin_status !== "approved") {
     throw new Error(
-      "Your Digital Twin Profile must be marked ready before generating synthetic content.",
+      "Your Digital Twin Profile must be approved (an approved identity reference plus active consent) before generating synthetic content.",
     );
   }
 
@@ -412,10 +412,10 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
     const allowed = await checkRateLimit(supabase, "generation_publish", 15, 3600);
     if (!allowed) throw new Error("Too many generations published recently. Please try again later.");
 
-    const isVeniceImageSpend = req.output_type === "image" || req.output_type === "promo_banner";
+    const isVeniceSpend = req.output_type === "image" || req.output_type === "promo_banner" || req.output_type === "video";
     let spendCapCents: number | null = null;
     let spentBeforeCents = 0;
-    if (isVeniceImageSpend) {
+    if (isVeniceSpend) {
       const { data: creatorCap } = await supabase
         .from("creators")
         .select("generation_spend_cap_cents")
@@ -460,10 +460,110 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
     };
 
     const isVeniceImage = req.output_type === "image" || req.output_type === "promo_banner";
+    const isVeniceVideo = req.output_type === "video";
     let rows: any[];
     let spendWarning: string | null = null;
 
-    if (isVeniceImage) {
+    if (isVeniceVideo) {
+      const { queueVeniceVideo } = await import("./venice.server");
+
+      // Ground the render in the creator's own approved identity reference
+      // images when available (falls back to plain text-to-video otherwise
+      // — reference imagery isn't required, just preferred for likeness
+      // consistency). Signed for 10 minutes, which only needs to cover the
+      // queue submission itself, not the render.
+      const { data: refAssets } = await supabase
+        .from("twin_reference_assets")
+        .select("storage_path")
+        .eq("creator_id", creator.id)
+        .eq("kind", "identity_ref")
+        .eq("review_status", "approved")
+        .is("deleted_at", null)
+        .order("sort_order", { ascending: true })
+        .limit(3);
+      let referenceImageUrls: string[] | undefined;
+      if (refAssets?.length) {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const signed = await Promise.all(
+          refAssets.map((r: any) => supabaseAdmin.storage.from("content-assets").createSignedUrl(r.storage_path, 600)),
+        );
+        referenceImageUrls = signed.map((s) => s.data?.signedUrl).filter((u): u is string => !!u);
+        if (!referenceImageUrls.length) referenceImageUrls = undefined;
+      }
+
+      // No duration control on generation_requests yet — a fixed, modest
+      // default keeps cost predictable until a duration selector is added
+      // to the create-request UI.
+      const DEFAULT_VIDEO_DURATION_SECONDS = 5;
+      // Static per-second estimate (Seedance pricing isn't published the
+      // way Kling's is) — override via env once /video/quote is wired for
+      // authoritative pricing, same pattern as DEFAULT_COST_PER_IMAGE_CENTS.
+      const perVideoCostCents = Math.round(
+        Number(process.env.VENICE_COST_PER_VIDEO_SECOND_CENTS || 15) * DEFAULT_VIDEO_DURATION_SECONDS,
+      );
+
+      const count = Math.max(1, Math.min(4, Math.floor(req.quantity)));
+      const queued: { queueId: string; model: string }[] = [];
+      const failures: string[] = [];
+      for (let i = 0; i < count; i++) {
+        try {
+          const result = await queueVeniceVideo({
+            prompt: req.prompt_notes,
+            durationSeconds: DEFAULT_VIDEO_DURATION_SECONDS,
+            referenceImageUrls,
+          });
+          queued.push(result);
+        } catch (e: any) {
+          failures.push(e?.message ?? "Venice video submission failed");
+        }
+      }
+
+      if (queued.length === 0) {
+        const msg = failures[0] ?? "Venice video generation failed";
+        await supabase
+          .from("generation_requests")
+          .update({ status: "failed", reviewer_note: msg.slice(0, 500) })
+          .eq("id", data.id);
+        await logAudit(
+          userId,
+          "generate.publish_failed",
+          { type: "generation_request", id: data.id },
+          { provider: "venice_video", error: msg },
+        );
+        throw new Error(msg);
+      }
+
+      if (spendCapCents) {
+        const afterCents = spentBeforeCents + perVideoCostCents * queued.length;
+        if (afterCents >= spendCapCents * 0.8) {
+          spendWarning = `You've used $${(afterCents / 100).toFixed(2)} of $${(spendCapCents / 100).toFixed(2)} monthly generation cap.`;
+        }
+      }
+      if (failures.length) {
+        spendWarning = [spendWarning, `${failures.length} of ${count} video submission(s) failed and were skipped.`]
+          .filter(Boolean).join(" ");
+      }
+
+      rows = queued.map((q, i) => ({
+        creator_id: creator.id,
+        title: `AI video · ${i + 1}`,
+        asset_type: "video",
+        is_synthetic: true,
+        ai_generated_label: true,
+        ai_disclosure_required: true,
+        approval_status: "pending",
+        source_type: "ai_generated",
+        internal_label: "approved_synthetic",
+        visibility: "private",
+        category: "ai_video_rendering",
+        provider: "venice_video",
+        provider_status: "processing",
+        provider_job_id: q.queueId,
+        provider_model: q.model,
+        render_started_at: new Date().toISOString(),
+        cost_cents: perVideoCostCents,
+      }));
+    } else if (isVeniceImage) {
       const { generateVeniceImages } = await import("./venice.server");
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

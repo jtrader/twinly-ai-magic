@@ -15,7 +15,7 @@ const UNLOCKED_STATUSES = ["stub", "succeeded"] as const;
 
 type Access =
   | { state: "open" }
-  | { state: "locked"; reason: "sign_in" | "age_gate" | "subscribe" | "vip" | "ppv" | "restricted"; priceCents?: number };
+  | { state: "locked"; reason: "sign_in" | "age_gate" | "id_verification" | "subscribe" | "vip" | "ppv" | "restricted"; priceCents?: number };
 
 function assetAccess(opts: {
   permission: "included" | "ppv" | "restricted";
@@ -24,6 +24,7 @@ function assetAccess(opts: {
   priceCents: number;
   isAuthed: boolean;
   isAdult: boolean;
+  idVerified: boolean;
   subTier: string | null;
   isOwner: boolean;
   purchased: boolean;
@@ -31,8 +32,16 @@ function assetAccess(opts: {
   if (opts.isOwner) return { state: "open" };
   if (opts.permission === "restricted") return { state: "locked", reason: "restricted" };
   if (opts.isExplicit && !opts.isAdult) return { state: "locked", reason: "age_gate" };
+  // Explicit content gets an additional, un-spoofable bar beyond self-attested
+  // age: real ID verification (see identity-verification.functions.ts). This
+  // sits after the age_gate check so a not-yet-age-attested viewer sees the
+  // simpler prompt first, not both at once.
+  if (opts.isExplicit && !opts.idVerified) return { state: "locked", reason: "id_verification" };
 
-  const needsSub = opts.personaVisibility !== "public";
+  // invite_only doesn't additionally require a subscription tier — the
+  // whole-persona invite check (getPersonaFeed) already gated the caller in;
+  // per-asset restricted/ppv/age-gate rules below still apply on top of that.
+  const needsSub = opts.personaVisibility === "subscribers" || opts.personaVisibility === "vip";
   const needsVip = opts.personaVisibility === "vip";
 
   if (needsSub && !opts.isAuthed) return { state: "locked", reason: "sign_in" };
@@ -74,7 +83,13 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
       .eq("slug", data.personaSlug)
       .maybeSingle();
     if (!persona) return null;
-    if (!["public", "subscribers", "vip"].includes(persona.visibility as string)) return null;
+    if (persona.visibility === "invite_only") {
+      const { checkPersonaInviteAccess } = await import("./persona-invites.functions");
+      const invited = isOwnerPreCheck ? true : await checkPersonaInviteAccess(supabaseAdmin, persona.id, data.userId ?? null);
+      if (!invited) return null;
+    } else if (!["public", "subscribers", "vip"].includes(persona.visibility as string)) {
+      return null;
+    }
 
     // Assets attached to this persona directly, plus everything the creator
     // has marked shared across all their personas (a "Global" folder).
@@ -112,11 +127,12 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
     const isOwner = !!(data.userId && data.userId === creator.user_id);
     let isAuthed = !!data.userId;
     let isAdult = false;
+    let idVerified = false;
     let subTier: string | null = null;
 
     if (data.userId) {
       const [{ data: prof }, { data: sub }] = await Promise.all([
-        supabaseAdmin.from("profiles").select("age_verified_at").eq("id", data.userId).maybeSingle(),
+        supabaseAdmin.from("profiles").select("age_verified_at, id_verified_at").eq("id", data.userId).maybeSingle(),
         supabaseAdmin
           .from("subscriptions")
           .select("tier, status, current_period_end")
@@ -126,6 +142,7 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
           .maybeSingle(),
       ]);
       isAdult = !!prof?.age_verified_at;
+      idVerified = !!(prof as any)?.id_verified_at;
       const stillValid = sub?.current_period_end ? new Date(sub.current_period_end).getTime() > Date.now() : true;
       if (sub && stillValid) subTier = sub.tier as string;
     }
@@ -151,6 +168,7 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
           priceCents: a.price_cents ?? 0,
           isAuthed,
           isAdult,
+          idVerified,
           subTier,
           isOwner,
           purchased: purchasedAssetIds.has(a.id),
@@ -193,7 +211,7 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
         isExplicit: !!persona.is_explicit,
         priceCents: persona.price_cents ?? 0,
       },
-      viewer: { isAuthed, isAdult, subTier, isOwner },
+      viewer: { isAuthed, isAdult, idVerified, subTier, isOwner },
       items,
     };
   });

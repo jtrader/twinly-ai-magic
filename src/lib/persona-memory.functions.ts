@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { redactObviousPii } from "./prompt-classification.server";
 
 /** How many new messages accumulate before the summary is refreshed — cost
  * control: we summarize periodically instead of replaying full history into
@@ -11,7 +12,7 @@ export function shouldUpdateMemory(messageCount: number, lastCountAtSummary: num
 /** Formats the memory summary as a system-prompt line, or null if there's
  * nothing worth injecting. Pure so it's unit-testable without a DB. */
 export function buildMemoryPromptLine(summary: string | null | undefined): string | null {
-  const trimmed = (summary ?? "").trim();
+  const trimmed = redactObviousPii((summary ?? "").trim());
   if (!trimmed) return null;
   return `What you remember about this supporter (from past conversations): ${trimmed}`;
 }
@@ -54,7 +55,8 @@ export async function updateMemoryIfDue(personaId: string, fanId: string, conver
 
     const system = [
       "You maintain a short, factual memory of what a supporter has told an AI persona across a conversation.",
-      "Update the prior summary with new facts from the transcript below — preferences, name, recurring topics.",
+      "Update the prior summary with new facts from the transcript below — preferences, interests, recurring topics.",
+      "Do NOT record the supporter's real name, exact location, contact details (email/phone/social handles), or any other identifying information, even if they share it — capture only their preferences and interests.",
       "Third person, under 400 characters, factual only. If nothing new and notable, return the prior summary unchanged.",
       "Reply with only the updated summary text, nothing else.",
     ].join(" ");
@@ -70,7 +72,11 @@ export async function updateMemoryIfDue(personaId: string, fanId: string, conver
     });
     if (!res.ok) return;
     const json: any = await res.json();
-    const newSummary = (json?.choices?.[0]?.message?.content ?? "").trim().slice(0, 600);
+    // The instruction above is the primary control; this is defense-in-depth
+    // for the specific PII patterns a regex can actually catch reliably
+    // (free-text real-name detection can't be done safely with a regex, so
+    // that part rests on the instruction alone).
+    const newSummary = redactObviousPii((json?.choices?.[0]?.message?.content ?? "").trim()).slice(0, 600);
     if (!newSummary) return;
 
     await supabaseAdmin.from("persona_memory").upsert({

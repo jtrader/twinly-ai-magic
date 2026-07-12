@@ -1,0 +1,49 @@
+# Required check for the prompt-extraction/injection hardening suite.
+#
+# IMPORTANT — what this workflow does and does not do:
+# It makes GitHub report a pass/fail status on PRs that touch
+# prompt-construction-adjacent code. It does NOT, by itself, block a merge
+# or a deploy — this repo has no branch-protection config and deploys
+# through a platform (Lovable Cloud) outside this repo's control. To make
+# this an actual hard gate:
+#   1. In GitHub repo settings -> Branches -> branch protection rule for the
+#      default branch, add "prompt-hardening-suite" as a required status
+#      check.
+#   2. Confirm with whoever manages the Lovable Cloud deployment that its
+#      deploy trigger respects that required check (or wire an equivalent
+#      gate on their side) — this file cannot verify or enforce that part.
+#
+# Any exception to a failing check must go through a named approver with a
+# logged reason (e.g. a documented PR review override), never a silent skip
+# or an allowlisted "known failing" test.
+name: Prompt hardening gate
+
+on:
+  pull_request:
+    paths:
+      - "src/lib/chat.functions.ts"
+      - "src/lib/persona-memory.functions.ts"
+      - "src/lib/moderation.server.ts"
+      - "src/lib/prompt-classification.server.ts"
+      - "src/lib/persona-name-privacy.ts"
+      - "src/lib/persona-studio.functions.ts"
+      - "src/lib/real-me-questionnaire-schema.ts"
+      - "src/lib/twinly-content.server.ts"
+      - "src/lib/venice.server.ts"
+
+jobs:
+  prompt-hardening-suite:
+    name: prompt-hardening-suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Run prompt-hardening and extraction/injection test suite
+        run: >
+          npx vitest run
+          src/lib/__tests__/prompt-hardening.test.ts
+          src/lib/__tests__/content-theme.test.ts
+          src/lib/__tests__/venice-chat-engine.test.ts

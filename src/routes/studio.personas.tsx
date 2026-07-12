@@ -35,6 +35,10 @@ import { getTwinProfile } from "@/lib/twin.functions";
 import {
   listSavedMessages, createSavedMessage, updateSavedMessage, deleteSavedMessage,
 } from "@/lib/saved-messages.functions";
+import {
+  createPersonaInvite, listPersonaInvites, revokePersonaInvite,
+} from "@/lib/persona-invites.functions";
+import { matchesRealName } from "@/lib/persona-name-privacy";
 
 export const Route = createFileRoute("/studio/personas")({ component: PersonaStudioPage });
 
@@ -62,7 +66,24 @@ const VISIBILITY_LABEL: Record<Visibility, string> = {
   subscribers: "Subscribers",
   vip: "VIP",
   hidden: "Hidden",
+  invite_only: "Invite only",
 };
+
+// Per-persona content-category allow/disallow (see content_theme_overrides
+// migration). Generalized from this platform's own category primitives, not
+// pulled from the external Twinly Content service's real categories — that
+// service was never actually connected in this environment.
+const CONTENT_THEME_LABELS: Record<string, string> = {
+  romantic_affection: "Romantic / affection",
+  flirtation_teasing: "Flirtation / teasing",
+  roleplay_fantasy: "Roleplay / fantasy",
+  power_exchange: "Power exchange (D/s)",
+  fetish_general: "Fetish / kink (general)",
+  group_dynamics: "Group dynamics",
+  exhibitionism_voyeurism: "Exhibitionism / voyeurism",
+  sensory_focus: "Sensory focus (ASMR etc.)",
+};
+const CONTENT_THEME_KEYS = Object.keys(CONTENT_THEME_LABELS);
 
 function centsToDollarsInput(cents: number | null | undefined): string {
   return cents ? (cents / 100).toFixed(2) : "";
@@ -104,7 +125,7 @@ function PersonaStudioPage() {
   const { user, loading } = useSession();
   const navigate = useNavigate();
   const [personas, setPersonas] = useState<Persona[]>([]);
-  const [creator, setCreator] = useState<{ handle: string; verification_status?: string } | null>(null);
+  const [creator, setCreator] = useState<{ handle: string; verification_status?: string; fullName?: string | null } | null>(null);
   const [ready, setReady] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Persona | null>(null);
@@ -124,7 +145,7 @@ function PersonaStudioPage() {
       navigate({ to: "/onboarding" });
       return;
     }
-    setCreator({ handle: res.creator.handle, verification_status: (res.creator as any).verification_status });
+    setCreator({ handle: res.creator.handle, verification_status: (res.creator as any).verification_status, fullName: (res.creator as any).fullName ?? null });
     setPersonas(res.personas);
     setReady(true);
   }, [load, navigate]);
@@ -296,6 +317,7 @@ function PersonaStudioPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={() => { setCreateOpen(false); refresh(); }}
+        realFullName={creator?.fullName ?? null}
       />
       <EditPersonaDialog
         persona={editing}
@@ -325,8 +347,8 @@ function PersonaStudioPage() {
 }
 
 function CreatePersonaDialog({
-  open, onOpenChange, onCreated,
-}: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void }) {
+  open, onOpenChange, onCreated, realFullName,
+}: { open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void; realFullName?: string | null }) {
   const create = useServerFn(createPersona);
   const [displayName, setName] = useState("");
   const [kind, setKind] = useState<"real_me" | "ai">("ai");
@@ -336,12 +358,15 @@ function CreatePersonaDialog({
   const [personality, setPersonality] = useState("");
   const [hardLimitsText, setHardLimitsText] = useState("");
   const [priceDollars, setPriceDollars] = useState("");
+  const [veniceChatOptIn, setVeniceChatOptIn] = useState(false);
+  const [contentThemeOverrides, setContentThemeOverrides] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (open) {
       setName(""); setKind("ai"); setDescription(""); setSystemPrompt(""); setExplicitnessCeiling("sfw");
-      setPersonality(""); setHardLimitsText(""); setPriceDollars("");
+      setPersonality(""); setHardLimitsText(""); setPriceDollars(""); setVeniceChatOptIn(false);
+      setContentThemeOverrides({});
     }
   }, [open]);
 
@@ -356,8 +381,10 @@ function CreatePersonaDialog({
           isExplicit: explicitnessCeiling !== "sfw",
           explicitnessCeiling: kind === "ai" ? explicitnessCeiling : undefined,
           priceCents: dollarsInputToCents(priceDollars),
+          contentThemeOverrides: kind === "ai" ? contentThemeOverrides : undefined,
           toneRules: kind === "ai" ? { personality } : undefined,
           boundaryRules: kind === "ai" ? { hardLimits } : undefined,
+          veniceChatOptIn: kind === "ai" ? veniceChatOptIn : undefined,
         },
       });
       toast.success("Persona created — it's in draft.");
@@ -378,6 +405,11 @@ function CreatePersonaDialog({
           <div>
             <Label>Name</Label>
             <Input className="mt-1.5" value={displayName} onChange={(e) => setName(e.target.value)} maxLength={60} />
+            {matchesRealName(displayName, realFullName) && (
+              <p className="mt-1.5 text-xs text-amber-500">
+                This name may reduce your privacy separation between Real Me and this persona.
+              </p>
+            )}
           </div>
           <div>
             <Label>Kind</Label>
@@ -443,6 +475,42 @@ function CreatePersonaDialog({
                   Enforced on every reply, independent of what a fan says. Above "SFW" requires fan 18+ acknowledgement. Can't exceed the platform-wide maximum.
                 </p>
               </div>
+              {explicitnessCeiling === "explicit" && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">Venice AI (mandatory)</Badge>
+                  <p className="text-xs text-muted-foreground">
+                    Explicit-tier chat always runs on Venice AI — the default AI Gateway is moderated and can't produce this tier of content.
+                  </p>
+                </div>
+              )}
+              {explicitnessCeiling === "suggestive" && (
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <Label>Use Venice AI for chat</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Optional at this tier. Off uses the default AI Gateway.
+                    </p>
+                  </div>
+                  <Switch checked={veniceChatOptIn} onCheckedChange={setVeniceChatOptIn} />
+                </div>
+              )}
+              <div>
+                <Label>Content categories</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Off means this persona won't draw on that theme from the reference content library. Doesn't override your boundary ceiling above — this only narrows within it.
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {CONTENT_THEME_KEYS.map((key) => {
+                    const allowed = contentThemeOverrides[key] !== false;
+                    return (
+                      <label key={key} className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-background/40 px-2.5 py-1.5 text-xs">
+                        <span>{CONTENT_THEME_LABELS[key]}</span>
+                        <Switch checked={allowed} onCheckedChange={(v) => setContentThemeOverrides((s) => ({ ...s, [key]: v }))} />
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -479,13 +547,15 @@ function EditPersonaDialog({
   const [personality, setPersonality] = useState("");
   const [hardLimitsText, setHardLimitsText] = useState("");
   const [priceDollars, setPriceDollars] = useState("");
+  const [veniceChatOptIn, setVeniceChatOptIn] = useState(false);
+  const [contentThemeOverrides, setContentThemeOverrides] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [toneExamples, setToneExamples] = useState("");
   const [dos, setDos] = useState("");
   const [donts, setDonts] = useState("");
   const [samplePhrasings, setSamplePhrasings] = useState("");
   const [voiceRefUrl, setVoiceRefUrl] = useState("");
-  const [tab, setTab] = useState<"basics" | "training" | "packs" | "twin" | "saved">("basics");
+  const [tab, setTab] = useState<"basics" | "training" | "packs" | "twin" | "invites" | "saved">("basics");
   const [savedItems, setSavedItems] = useState<any[] | null>(null);
   const [savedLoading, setSavedLoading] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -507,6 +577,51 @@ function EditPersonaDialog({
   useEffect(() => {
     if (persona && tab === "saved" && savedItems === null) refreshSaved();
   }, [persona, tab, savedItems, refreshSaved]);
+
+  // Invite-only access management
+  const createInvite = useServerFn(createPersonaInvite);
+  const listInvites = useServerFn(listPersonaInvites);
+  const revokeInvite = useServerFn(revokePersonaInvite);
+  const [invites, setInvites] = useState<any[] | null>(null);
+  const [invitesLoading, setInvitesLoading] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
+
+  const refreshInvites = useCallback(async () => {
+    if (!persona) return;
+    setInvitesLoading(true);
+    try {
+      const res = await listInvites({ data: { personaId: persona.id } });
+      setInvites(res.invites ?? []);
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not load invites");
+    } finally { setInvitesLoading(false); }
+  }, [persona, listInvites]);
+
+  useEffect(() => {
+    if (persona && tab === "invites" && invites === null) refreshInvites();
+  }, [persona, tab, invites, refreshInvites]);
+
+  async function generateInvite() {
+    if (!persona) return;
+    setInviteBusy(true);
+    try {
+      await createInvite({ data: { personaId: persona.id } });
+      setInvites(null);
+      refreshInvites();
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not create invite");
+    } finally { setInviteBusy(false); }
+  }
+
+  async function handleRevokeInvite(inviteId: string) {
+    setInviteBusy(true);
+    try {
+      await revokeInvite({ data: { inviteId } });
+      setInvites((s) => s?.map((i) => i.id === inviteId ? { ...i, status: "revoked" } : i) ?? null);
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not revoke invite");
+    } finally { setInviteBusy(false); }
+  }
 
   async function addSaved() {
     if (!persona || !newLabel.trim()) return;
@@ -593,6 +708,8 @@ function EditPersonaDialog({
       setPersonality((persona as any).tone_rules?.personality ?? "");
       setHardLimitsText((((persona as any).boundary_rules?.hard_limits ?? []) as string[]).join("\n"));
       setPriceDollars(centsToDollarsInput((persona as any).price_cents));
+      setVeniceChatOptIn(!!(persona as any).venice_chat_opt_in);
+      setContentThemeOverrides(((persona as any).content_theme_overrides as Record<string, boolean> | null) ?? {});
       const tn = ((persona as any).training_notes ?? {}) as Record<string, string>;
       setToneExamples(tn.tone_examples ?? "");
       setDos(tn.dos ?? "");
@@ -661,6 +778,8 @@ function EditPersonaDialog({
         explicitnessCeiling: persona.kind === "ai" ? explicitnessCeiling : undefined,
         toneRules: persona.kind === "ai" ? { personality } : undefined,
         boundaryRules: persona.kind === "ai" ? { hardLimits } : undefined,
+        veniceChatOptIn: persona.kind === "ai" ? veniceChatOptIn : undefined,
+        contentThemeOverrides: persona.kind === "ai" ? contentThemeOverrides : undefined,
         trainingNotes: {
           tone_examples: toneExamples,
           dos, donts,
@@ -745,13 +864,13 @@ function EditPersonaDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="mb-3 flex gap-1 border-b border-border">
-          {(["basics", "training", "packs", "twin", "saved"] as const).map((t) => (
+          {(["basics", "training", "packs", "twin", "invites", "saved"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={"px-3 py-1.5 text-xs font-semibold uppercase tracking-widest " + (tab === t ? "border-b-2 border-brand text-foreground" : "text-muted-foreground")}
-            >{t === "basics" ? "Basics" : t === "training" ? "Training" : t === "packs" ? "Packs" : t === "twin" ? "Twin" : "Saved"}</button>
+            >{t === "basics" ? "Basics" : t === "training" ? "Training" : t === "packs" ? "Packs" : t === "twin" ? "Twin" : t === "invites" ? "Invites" : "Saved"}</button>
           ))}
         </div>
         {tab === "basics" && (
@@ -858,6 +977,42 @@ function EditPersonaDialog({
                 <p className="mt-1 text-xs text-muted-foreground">
                   Enforced on every reply, independent of what a fan says. Above "SFW" requires fan 18+ acknowledgement. Can't exceed the platform-wide maximum.
                 </p>
+              </div>
+              {explicitnessCeiling === "explicit" && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">Venice AI (mandatory)</Badge>
+                  <p className="text-xs text-muted-foreground">
+                    Explicit-tier chat always runs on Venice AI — the default AI Gateway is moderated and can't produce this tier of content.
+                  </p>
+                </div>
+              )}
+              {explicitnessCeiling === "suggestive" && (
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <Label>Use Venice AI for chat</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Optional at this tier. Off uses the default AI Gateway.
+                    </p>
+                  </div>
+                  <Switch checked={veniceChatOptIn} onCheckedChange={setVeniceChatOptIn} />
+                </div>
+              )}
+              <div>
+                <Label>Content categories</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Off means this persona won't draw on that theme from the reference content library. Doesn't override your boundary ceiling above — this only narrows within it.
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {CONTENT_THEME_KEYS.map((key) => {
+                    const allowed = contentThemeOverrides[key] !== false;
+                    return (
+                      <label key={key} className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-background/40 px-2.5 py-1.5 text-xs">
+                        <span>{CONTENT_THEME_LABELS[key]}</span>
+                        <Switch checked={allowed} onCheckedChange={(v) => setContentThemeOverrides((s) => ({ ...s, [key]: v }))} />
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             </>
           )}
@@ -1047,6 +1202,59 @@ function EditPersonaDialog({
               </div>
             </div>
           </div>
+        </div>
+        )}
+        {tab === "invites" && (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Share this persona privately with specific people you trust, without listing it publicly. Only takes effect once this persona's{" "}
+            <button type="button" className="text-brand-glow underline" onClick={() => setTab("basics")}>visibility</button> is set to "Invite only".
+          </p>
+          {visibility !== "invite_only" && (
+            <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
+              Set visibility to "Invite only" in the Basics tab to make invite links functional.
+            </div>
+          )}
+          <Button size="sm" onClick={generateInvite} disabled={inviteBusy}>
+            {inviteBusy ? "Creating…" : "Generate invite link"}
+          </Button>
+          {invitesLoading || invites === null ? (
+            <div className="text-sm text-muted-foreground">Loading invites…</div>
+          ) : invites.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              No invites yet. Generate one above and send the link to someone you trust.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {invites.map((inv) => {
+                const url = typeof window !== "undefined" ? `${window.location.origin}/invite/${inv.token}` : `/invite/${inv.token}`;
+                const tone = inv.status === "accepted" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                  : inv.status === "revoked" ? "border-rose-400/30 bg-rose-400/10 text-rose-300"
+                  : "border-border bg-surface text-muted-foreground";
+                return (
+                  <div key={inv.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface p-2.5 text-xs">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest ${tone}`}>{inv.status}</span>
+                        <span className="text-muted-foreground">{new Date(inv.created_at).toLocaleDateString()}</span>
+                      </div>
+                      {inv.status === "pending" && (
+                        <button
+                          type="button"
+                          className="mt-1 block truncate text-left text-brand-glow underline"
+                          onClick={() => { navigator.clipboard.writeText(url); toast.success("Invite link copied"); }}
+                          title={url}
+                        >{url}</button>
+                      )}
+                    </div>
+                    {inv.status !== "revoked" && (
+                      <Button size="sm" variant="ghost" disabled={inviteBusy} onClick={() => handleRevokeInvite(inv.id)}>Revoke</Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         )}
         {tab === "saved" && (

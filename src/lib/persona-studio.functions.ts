@@ -3,12 +3,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { logAudit } from "./audit.server";
 
 type PersonaKind = "real_me" | "ai";
-type Visibility = "draft" | "public" | "subscribers" | "vip" | "hidden";
+type Visibility = "draft" | "public" | "subscribers" | "vip" | "hidden" | "invite_only";
 type ExplicitnessLevel = "sfw" | "suggestive" | "explicit";
 type PersonaType = "real_me" | "nice" | "naughty" | "wicked" | "custom";
 
 const SLUG_RE = /^[a-z0-9-]{2,40}$/;
-const FAN_FACING_VISIBILITY: ReadonlySet<Visibility> = new Set(["public", "subscribers", "vip"]);
+const FAN_FACING_VISIBILITY: ReadonlySet<Visibility> = new Set(["public", "subscribers", "vip", "invite_only"]);
 const CEILING_RANK: Record<ExplicitnessLevel, number> = { sfw: 0, suggestive: 1, explicit: 2 };
 
 /** A creator's persona ceiling may never exceed the platform-wide maximum — set only via admin settings, never via chat. */
@@ -65,6 +65,8 @@ export const createPersona = createServerFn({ method: "POST" })
     boundaryRules?: { hardLimits?: string[] };
     explicitnessCeiling?: ExplicitnessLevel;
     personaType?: PersonaType;
+    veniceChatOptIn?: boolean;
+    contentThemeOverrides?: Record<string, boolean>;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -109,6 +111,22 @@ export const createPersona = createServerFn({ method: "POST" })
       .order("sort_order", { ascending: false }).limit(1).maybeSingle();
     const nextOrder = (last?.sort_order ?? -1) + 1;
 
+    const sanitizedTone = sanitizeToneRules(data.toneRules);
+    const sanitizedBoundary = sanitizeBoundaryRules(data.boundaryRules);
+    {
+      const { checkPersonaConfigForHardeningRegressions } = await import("./prompt-classification.server");
+      const check = checkPersonaConfigForHardeningRegressions({
+        systemPrompt: data.systemPrompt,
+        personality: sanitizedTone.personality,
+        hardLimits: sanitizedBoundary.hard_limits,
+      });
+      if (!check.ok) {
+        throw new Error(
+          `This persona can't be created: its configuration would ${check.reason}, which conflicts with required safety instructions. Please rephrase and try again.`,
+        );
+      }
+    }
+
     const { data: created, error } = await supabase
       .from("personas")
       .insert({
@@ -121,10 +139,15 @@ export const createPersona = createServerFn({ method: "POST" })
         system_prompt: data.systemPrompt?.trim() || null,
         is_explicit: !!data.isExplicit,
         price_cents: Math.max(0, Math.floor(data.priceCents ?? 0)),
-        tone_rules: sanitizeToneRules(data.toneRules),
-        boundary_rules: sanitizeBoundaryRules(data.boundaryRules),
+        tone_rules: sanitizedTone,
+        boundary_rules: sanitizedBoundary,
         explicitness_ceiling: ceiling,
         persona_type: personaType,
+        // Only meaningful at ceiling='suggestive' (resolveChatEngine ignores
+        // this flag at 'explicit', where Venice is mandatory, and at 'sfw',
+        // where Venice is never used for chat).
+        venice_chat_opt_in: !!data.veniceChatOptIn,
+        content_theme_overrides: data.contentThemeOverrides ?? {},
         visibility: "draft" as Visibility,
         sort_order: nextOrder,
       })
@@ -161,6 +184,8 @@ export const updatePersona = createServerFn({ method: "POST" })
     heygenAvatarId?: string | null;
     heygenVoiceId?: string | null;
     avatarUrl?: string | null;
+    veniceChatOptIn?: boolean;
+    contentThemeOverrides?: Record<string, boolean>;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -184,6 +209,8 @@ export const updatePersona = createServerFn({ method: "POST" })
       heygen_avatar_id?: string | null;
       heygen_voice_id?: string | null;
       avatar_url?: string | null;
+      venice_chat_opt_in?: boolean;
+      content_theme_overrides?: Record<string, boolean>;
     } = {};
     if (data.displayName !== undefined) {
       const v = data.displayName.trim();
@@ -233,6 +260,43 @@ export const updatePersona = createServerFn({ method: "POST" })
     if (data.avatarUrl !== undefined) {
       const v = (data.avatarUrl ?? "").trim();
       patch.avatar_url = v ? v.slice(0, 500) : null;
+    }
+    if (data.veniceChatOptIn !== undefined) patch.venice_chat_opt_in = !!data.veniceChatOptIn;
+    if (data.contentThemeOverrides !== undefined) patch.content_theme_overrides = data.contentThemeOverrides;
+
+    // Per-persona save-time regression gate: re-check the freshly-merged
+    // config against known hardening-regression patterns whenever any of
+    // the prompt-construction-relevant fields change. Runs against the
+    // FINAL merged state (existing + this patch), not just the delta, so
+    // editing only tone_rules still catches a regression introduced by an
+    // earlier, still-active system_prompt/training_notes/boundary_rules.
+    if (
+      patch.system_prompt !== undefined ||
+      patch.tone_rules !== undefined ||
+      patch.training_notes !== undefined ||
+      patch.boundary_rules !== undefined
+    ) {
+      const { data: current } = await supabase
+        .from("personas")
+        .select("system_prompt, tone_rules, training_notes, boundary_rules")
+        .eq("id", data.personaId)
+        .maybeSingle();
+      const merged = {
+        systemPrompt: patch.system_prompt !== undefined ? patch.system_prompt : (current as any)?.system_prompt,
+        personality: patch.tone_rules !== undefined ? patch.tone_rules.personality : (current as any)?.tone_rules?.personality,
+        trainingNotes: patch.training_notes !== undefined ? patch.training_notes : (current as any)?.training_notes,
+        hardLimits: patch.boundary_rules !== undefined ? patch.boundary_rules.hard_limits : (current as any)?.boundary_rules?.hard_limits,
+      };
+      const { checkPersonaConfigForHardeningRegressions } = await import("./prompt-classification.server");
+      const check = checkPersonaConfigForHardeningRegressions(merged);
+      await logAudit(userId, "persona.config_hardening_check", { type: "persona", id: data.personaId }, {
+        passed: check.ok, reason: check.ok ? null : check.reason,
+      });
+      if (!check.ok) {
+        throw new Error(
+          `This change can't be saved: your persona's configuration would ${check.reason}, which conflicts with required safety instructions. Please rephrase and try again.`,
+        );
+      }
     }
 
     if (Object.keys(patch).length === 0) return { ok: true };

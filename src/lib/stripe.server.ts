@@ -57,12 +57,9 @@ export function getStripeErrorMessage(error: unknown): string {
   return "Stripe request failed";
 }
 
-export async function verifyWebhook(req: Request, env: StripeEnv): Promise<{ type: string; data: { object: any } }> {
+async function verifyStripeSignature(req: Request, secret: string): Promise<{ type: string; data: { object: any } }> {
   const signature = req.headers.get("stripe-signature");
   const body = await req.text();
-  const secret = env === "sandbox"
-    ? getEnv("PAYMENTS_SANDBOX_WEBHOOK_SECRET")
-    : getEnv("PAYMENTS_LIVE_WEBHOOK_SECRET");
 
   if (!signature || !body) throw new Error("Missing signature or body");
 
@@ -91,4 +88,19 @@ export async function verifyWebhook(req: Request, env: StripeEnv): Promise<{ typ
   if (!v1Signatures.includes(expected)) throw new Error("Invalid webhook signature");
 
   return JSON.parse(body);
+}
+
+export async function verifyWebhook(req: Request, env: StripeEnv): Promise<{ type: string; data: { object: any } }> {
+  const secret = env === "sandbox"
+    ? getEnv("PAYMENTS_SANDBOX_WEBHOOK_SECRET")
+    : getEnv("PAYMENTS_LIVE_WEBHOOK_SECRET");
+  return verifyStripeSignature(req, secret);
+}
+
+/** Separate signing secret from payments — Stripe recommends a distinct webhook endpoint per event category. */
+export async function verifyIdentityWebhook(req: Request, env: StripeEnv): Promise<{ type: string; data: { object: any } }> {
+  const secret = env === "sandbox"
+    ? getEnv("IDENTITY_SANDBOX_WEBHOOK_SECRET")
+    : getEnv("IDENTITY_LIVE_WEBHOOK_SECRET");
+  return verifyStripeSignature(req, secret);
 }

@@ -232,6 +232,7 @@ export type Database = {
           provider: string | null
           provider_error: string | null
           provider_job_id: string | null
+          provider_model: string | null
           provider_status: string | null
           render_completed_at: string | null
           render_started_at: string | null
@@ -264,6 +265,7 @@ export type Database = {
           provider?: string | null
           provider_error?: string | null
           provider_job_id?: string | null
+          provider_model?: string | null
           provider_status?: string | null
           render_completed_at?: string | null
           render_started_at?: string | null
@@ -296,6 +298,7 @@ export type Database = {
           provider?: string | null
           provider_error?: string | null
           provider_job_id?: string | null
+          provider_model?: string | null
           provider_status?: string | null
           render_completed_at?: string | null
           render_started_at?: string | null
@@ -1777,6 +1780,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           boundary_rules: Json
+          content_theme_overrides: Json
           cover_url: string | null
           created_at: string
           creator_id: string
@@ -1804,12 +1808,14 @@ export type Database = {
           tts_voice: string | null
           twin_link_mode: string
           updated_at: string
+          venice_chat_opt_in: boolean
           visibility: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled: boolean
         }
         Insert: {
           avatar_url?: string | null
           boundary_rules?: Json
+          content_theme_overrides?: Json
           cover_url?: string | null
           created_at?: string
           creator_id: string
@@ -1837,12 +1843,14 @@ export type Database = {
           tts_voice?: string | null
           twin_link_mode?: string
           updated_at?: string
+          venice_chat_opt_in?: boolean
           visibility?: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled?: boolean
         }
         Update: {
           avatar_url?: string | null
           boundary_rules?: Json
+          content_theme_overrides?: Json
           cover_url?: string | null
           created_at?: string
           creator_id?: string
@@ -1870,6 +1878,7 @@ export type Database = {
           tts_voice?: string | null
           twin_link_mode?: string
           updated_at?: string
+          venice_chat_opt_in?: boolean
           visibility?: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled?: boolean
         }
@@ -1889,6 +1898,108 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      persona_invites: {
+        Row: {
+          id: string
+          persona_id: string
+          creator_id: string
+          token: string
+          invited_fan_id: string | null
+          status: Database["public"]["Enums"]["persona_invite_status"]
+          note: string | null
+          created_at: string
+          accepted_at: string | null
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          persona_id: string
+          creator_id: string
+          token: string
+          invited_fan_id?: string | null
+          status?: Database["public"]["Enums"]["persona_invite_status"]
+          note?: string | null
+          created_at?: string
+          accepted_at?: string | null
+          revoked_at?: string | null
+        }
+        Update: {
+          id?: string
+          persona_id?: string
+          creator_id?: string
+          token?: string
+          invited_fan_id?: string | null
+          status?: Database["public"]["Enums"]["persona_invite_status"]
+          note?: string | null
+          created_at?: string
+          accepted_at?: string | null
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "persona_invites_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "persona_invites_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_data_handling_records: {
+        Row: {
+          id: string
+          provider_name: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          zero_data_retention: boolean | null
+          used_for_training: boolean | null
+          covers_creator_data: boolean | null
+          covers_supporter_data: boolean | null
+          contract_reference: string | null
+          notes: string | null
+          next_review_due: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          provider_name: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          zero_data_retention?: boolean | null
+          used_for_training?: boolean | null
+          covers_creator_data?: boolean | null
+          covers_supporter_data?: boolean | null
+          contract_reference?: string | null
+          notes?: string | null
+          next_review_due?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          provider_name?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          zero_data_retention?: boolean | null
+          used_for_training?: boolean | null
+          covers_creator_data?: boolean | null
+          covers_supporter_data?: boolean | null
+          contract_reference?: string | null
+          notes?: string | null
+          next_review_due?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       platform_settings: {
         Row: {
@@ -2191,6 +2302,7 @@ export type Database = {
           full_name: string | null
           handle: string | null
           id: string
+          id_verified_at: string | null
           profile_completed_at: string | null
           strike_count: number
           updated_at: string
@@ -2208,6 +2320,7 @@ export type Database = {
           full_name?: string | null
           handle?: string | null
           id: string
+          id_verified_at?: string | null
           profile_completed_at?: string | null
           strike_count?: number
           updated_at?: string
@@ -2225,9 +2338,46 @@ export type Database = {
           full_name?: string | null
           handle?: string | null
           id?: string
+          id_verified_at?: string | null
           profile_completed_at?: string | null
           strike_count?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      identity_verifications: {
+        Row: {
+          id: string
+          user_id: string
+          provider: string
+          provider_session_id: string
+          status: string
+          environment: string
+          created_at: string
+          updated_at: string
+          verified_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          provider?: string
+          provider_session_id: string
+          status?: string
+          environment: string
+          created_at?: string
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          provider?: string
+          provider_session_id?: string
+          status?: string
+          environment?: string
+          created_at?: string
+          updated_at?: string
+          verified_at?: string | null
         }
         Relationships: []
       }
@@ -2800,6 +2950,15 @@ export type Database = {
       asset_source_type: "real_upload" | "ai_generated" | "edited" | "synthetic"
       asset_type: "image" | "video" | "audio" | "text"
       asset_visibility: "private" | "subscribers" | "vip" | "ppv" | "public"
+      content_theme:
+        | "romantic_affection"
+        | "flirtation_teasing"
+        | "roleplay_fantasy"
+        | "power_exchange"
+        | "fetish_general"
+        | "group_dynamics"
+        | "exhibitionism_voyeurism"
+        | "sensory_focus"
       consent_status: "n_a" | "on_file" | "missing"
       conversation_flag_reason:
         | "off_tone"
@@ -2873,7 +3032,8 @@ export type Database = {
         | "verified"
         | "rejected"
         | "revoked"
-      visibility: "draft" | "public" | "subscribers" | "vip" | "hidden"
+      persona_invite_status: "pending" | "accepted" | "revoked"
+      visibility: "draft" | "public" | "subscribers" | "vip" | "hidden" | "invite_only"
       voice_source_status: "pending_validation" | "validated" | "rejected"
       voice_source_type: "uploaded" | "recorded_in_app"
     }
@@ -3015,6 +3175,16 @@ export const Constants = {
       asset_source_type: ["real_upload", "ai_generated", "edited", "synthetic"],
       asset_type: ["image", "video", "audio", "text"],
       asset_visibility: ["private", "subscribers", "vip", "ppv", "public"],
+      content_theme: [
+        "romantic_affection",
+        "flirtation_teasing",
+        "roleplay_fantasy",
+        "power_exchange",
+        "fetish_general",
+        "group_dynamics",
+        "exhibitionism_voyeurism",
+        "sensory_focus",
+      ],
       consent_status: ["n_a", "on_file", "missing"],
       conversation_flag_reason: [
         "off_tone",
@@ -3094,7 +3264,8 @@ export const Constants = {
         "rejected",
         "revoked",
       ],
-      visibility: ["draft", "public", "subscribers", "vip", "hidden"],
+      persona_invite_status: ["pending", "accepted", "revoked"],
+      visibility: ["draft", "public", "subscribers", "vip", "hidden", "invite_only"],
       voice_source_status: ["pending_validation", "validated", "rejected"],
       voice_source_type: ["uploaded", "recorded_in_app"],
     },

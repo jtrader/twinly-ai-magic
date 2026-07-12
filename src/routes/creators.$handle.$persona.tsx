@@ -136,6 +136,12 @@ function PersonaFeedPage() {
           This persona contains 18+ content. Confirm your age from your account to unlock media.
         </div>
       )}
+      {persona.isExplicit && viewer.isAdult && !(viewer as any).idVerified && (
+        <div className="mb-6 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-200">
+          This persona's most explicit content requires identity verification.{" "}
+          <Link to="/account" className="underline">Verify your identity →</Link>
+        </div>
+      )}
       {persona.visibility !== "public" && !viewer.subTier && (
         <div className="mb-6 rounded-xl border border-brand/30 bg-brand/10 p-3 text-xs text-brand-glow">
           {viewer.isAuthed ? "Subscribe to unlock this persona's feed." : "Sign in and subscribe to unlock this persona's feed."}
@@ -156,6 +162,7 @@ function PersonaFeedPage() {
               item={it}
               onNeedAuth={() => navigate({ to: "/auth" })}
               onNeedAge={() => navigate({ to: "/account" })}
+              onNeedIdVerification={() => navigate({ to: "/account" })}
               onUnlocked={refresh}
             />
           ))}
@@ -181,10 +188,11 @@ function typeIcon(t: string) {
   return FileText;
 }
 
-function FeedTile({ item, onNeedAuth, onNeedAge, onUnlocked }: {
+function FeedTile({ item, onNeedAuth, onNeedAge, onNeedIdVerification, onUnlocked }: {
   item: FeedData["items"][number];
   onNeedAuth: () => void;
   onNeedAge: () => void;
+  onNeedIdVerification: () => void;
   onUnlocked: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(item.externalUrl);
@@ -216,6 +224,7 @@ function FeedTile({ item, onNeedAuth, onNeedAge, onUnlocked }: {
   const lockLabel = !open && item.access.state === "locked" ? (
     item.access.reason === "sign_in" ? "Sign in to view"
     : item.access.reason === "age_gate" ? "18+ · verify age"
+    : item.access.reason === "id_verification" ? "Verify your identity"
     : item.access.reason === "vip" ? "VIP only"
     : item.access.reason === "subscribe" ? "Subscribers only"
     : item.access.reason === "ppv" ? `Unlock $${(priceCents / 100).toFixed(2)}`
@@ -226,6 +235,7 @@ function FeedTile({ item, onNeedAuth, onNeedAge, onUnlocked }: {
     if (item.access.state !== "locked") return;
     if (item.access.reason === "sign_in") onNeedAuth();
     else if (item.access.reason === "age_gate") onNeedAge();
+    else if (item.access.reason === "id_verification") onNeedIdVerification();
     else if (item.access.reason === "ppv") setPaywallOpen(true);
     else toast.info("Subscribe on the creator profile to unlock.");
   }

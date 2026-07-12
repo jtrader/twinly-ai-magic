@@ -21,18 +21,35 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { Moon } from "lucide-react";
 
+function friendlyChatError(message: string | undefined): string {
+  if (message === "AGE_GATE_REQUIRED") return "Confirm your age from your account to continue.";
+  if (message === "ID_VERIFICATION_REQUIRED") return "This persona requires identity verification — verify from your account to continue.";
+  return message ?? "Failed to send";
+}
+
 const loadPersonaChat = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((d: { handle: string; persona: string }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: creator } = await supabaseAdmin.from("creators").select("id, handle, stage_name").eq("handle", data.handle).maybeSingle();
+    const { data: creator } = await supabaseAdmin.from("creators").select("id, user_id, handle, stage_name").eq("handle", data.handle).maybeSingle();
     if (!creator) return null;
     const { data: persona } = await supabaseAdmin.from("personas")
-      .select("id, slug, display_name, description, kind, disclosure_label")
+      .select("id, slug, display_name, description, kind, disclosure_label, visibility")
       .eq("creator_id", creator.id).eq("slug", data.persona).maybeSingle();
     if (!persona) return null;
+
+    const isOwner = creator.user_id === userId;
+    if (!isOwner) {
+      if (persona.visibility === "invite_only") {
+        const { checkPersonaInviteAccess } = await import("@/lib/persona-invites.functions");
+        if (!(await checkPersonaInviteAccess(supabaseAdmin, persona.id, userId))) return null;
+      } else if (!["public", "subscribers", "vip"].includes(persona.visibility as string)) {
+        // draft/hidden: only the owning creator may open this chat directly.
+        return null;
+      }
+    }
     const { data: aiPersonas } = await supabaseAdmin.from("personas")
       .select("slug, display_name, kind, disclosure_label")
       .eq("creator_id", creator.id)
@@ -121,7 +138,7 @@ function ChatPage() {
         toast.message("Message delivered to creator", { description: "A team member is handling this conversation directly now." });
       }
     } catch (err: any) {
-      toast.error(err.message ?? "Failed to send");
+      toast.error(friendlyChatError(err.message));
     } finally { setSending(false); }
   }
 
@@ -158,7 +175,7 @@ function ChatPage() {
         }]);
       }
     } catch (err: any) {
-      toast.error(err.message ?? "Failed to send voice note");
+      toast.error(friendlyChatError(err.message));
     } finally { setSending(false); }
   }
 

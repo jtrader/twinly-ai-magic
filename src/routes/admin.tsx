@@ -13,6 +13,7 @@ import { adminListPendingPacks, adminSetPackApproval } from "@/lib/admin.functio
 import { adminListPendingTwinRefs, adminSetTwinRefReview, adminGetTwinRefSignedUrl } from "@/lib/twin.functions";
 import { adminListDemoCreators, adminSeedDemoCreators, adminImpersonateCreator, adminListAllCreators, adminListAllAgencies, adminImpersonateUser } from "@/lib/demo.functions";
 import { setImpersonationContext } from "@/components/twinly/ImpersonationBanner";
+import { adminListProviderDataHandlingRecords, adminUpsertProviderDataHandlingRecord, isReviewOverdue } from "@/lib/provider-data-handling.functions";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -30,7 +31,7 @@ function AdminPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
-  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo" | "creators" | "agencies" | "settings">("overview");
+  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo" | "creators" | "agencies" | "settings" | "providers">("overview");
   const [stats, setStats] = useState<any>(null);
   const [creators, setCreators] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
@@ -75,6 +76,9 @@ function AdminPage() {
   const verifyLedger = useServerFn(adminVerifyConsentLedger);
   const [ledgerCreatorId, setLedgerCreatorId] = useState("");
   const [ledgerResult, setLedgerResult] = useState<{ checked: number; broken: number; brokenIds: string[] } | null>(null);
+  const listProviderRecords = useServerFn(adminListProviderDataHandlingRecords);
+  const upsertProviderRecord = useServerFn(adminUpsertProviderDataHandlingRecord);
+  const [providerRecords, setProviderRecords] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user || !roles.includes("admin")) return;
@@ -99,6 +103,7 @@ function AdminPage() {
         if (tab === "creators") setAllCreators(await listAllCreatorsFn({}));
         if (tab === "agencies") setAllAgencies(await listAllAgenciesFn({}));
         if (tab === "settings") setPlatformSettings((await getSettings({})).settings);
+        if (tab === "providers") setProviderRecords((await listProviderRecords({})).records);
       } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
     })();
   }, [tab, user, roles.join(",")]);
@@ -169,6 +174,28 @@ function AdminPage() {
       setLedgerResult(res);
       if (res.broken > 0) toast.error(`${res.broken} of ${res.checked} consent records failed integrity check`);
       else toast.success(`All ${res.checked} consent records verified`);
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(null); }
+  }
+
+  async function markProviderReviewed(record: any) {
+    setBusy(record.provider_name);
+    try {
+      await upsertProviderRecord({
+        data: {
+          providerName: record.provider_name,
+          zeroDataRetention: record.zero_data_retention,
+          usedForTraining: record.used_for_training,
+          coversCreatorData: record.covers_creator_data,
+          coversSupporterData: record.covers_supporter_data,
+          contractReference: record.contract_reference,
+          notes: record.notes,
+          nextReviewDue: new Date(Date.now() + 1000 * 60 * 60 * 24 * 182).toISOString().slice(0, 10),
+          markReviewedNow: true,
+        },
+      });
+      setProviderRecords((await listProviderRecords({})).records);
+      toast.success(`${record.provider_name} marked reviewed`);
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
     finally { setBusy(null); }
   }
@@ -260,7 +287,7 @@ function AdminPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-2">
-        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo","creators","agencies","settings"] as const).map((t) => (
+        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo","creators","agencies","settings","providers"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -683,6 +710,45 @@ function AdminPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {tab === "providers" && (
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            One row per LLM/generation provider in use. A new provider integration is blocked from activating until it has a row here —
+            existing providers stay live even while unreviewed, since taking down chat over an unfinished governance review is the wrong
+            tradeoff. See <code>docs/PROVIDER_DATA_HANDLING.md</code> for the underlying research behind each row.
+          </p>
+          {providerRecords.map((r) => {
+            const overdue = isReviewOverdue(r);
+            return (
+              <div key={r.provider_name} className="rounded-2xl border border-border bg-surface p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-display text-lg font-bold">{r.provider_name}</div>
+                  <div className="flex items-center gap-2">
+                    <Pill value={overdue ? "pending" : "verified"} />
+                    <span className="text-xs text-muted-foreground">
+                      {r.reviewed_at ? `Reviewed ${new Date(r.reviewed_at).toLocaleDateString()}` : "Never reviewed"} · next due {new Date(r.next_review_due).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                  <div><span className="text-muted-foreground">Zero retention:</span> {r.zero_data_retention === null ? "—" : r.zero_data_retention ? "Yes" : "No"}</div>
+                  <div><span className="text-muted-foreground">Used for training:</span> {r.used_for_training === null ? "—" : r.used_for_training ? "Yes" : "No"}</div>
+                  <div><span className="text-muted-foreground">Covers creator data:</span> {r.covers_creator_data === null ? "—" : r.covers_creator_data ? "Yes" : "No"}</div>
+                  <div><span className="text-muted-foreground">Covers supporter data:</span> {r.covers_supporter_data === null ? "—" : r.covers_supporter_data ? "Yes" : "No"}</div>
+                </div>
+                {r.notes && <p className="mt-2 text-xs text-muted-foreground">{r.notes}</p>}
+                <Button size="sm" className="mt-3" disabled={busy === r.provider_name} onClick={() => markProviderReviewed(r)}>
+                  {busy === r.provider_name ? "Saving…" : "Mark reviewed (confirms terms as of today, next review in ~6 months)"}
+                </Button>
+              </div>
+            );
+          })}
+          {providerRecords.length === 0 && (
+            <p className="text-sm text-muted-foreground">No provider records yet.</p>
+          )}
         </div>
       )}
     </AppShell>

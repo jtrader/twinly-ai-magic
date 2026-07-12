@@ -50,6 +50,46 @@ export async function checkCeilingConformance(
   return { conforms: true };
 }
 
+/**
+ * Output-filtering layer (defense-in-depth beyond the standing hardening
+ * suffix's instructions not to repeat the system prompt): scans a generated
+ * reply for a verbatim chunk matching the constructed system prompt, which
+ * would indicate the model leaked its own instructions anyway. Pure/sync so
+ * it's directly unit-testable without a DB or network call. Whitespace is
+ * normalized before comparing so reformatting alone can't dodge detection.
+ */
+export function detectPromptLeakage(replyText: string, systemPrompt: string, minMatchLength = 40): boolean {
+  const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+  const reply = normalize(replyText);
+  const prompt = normalize(systemPrompt);
+  if (reply.length < minMatchLength || prompt.length < minMatchLength) return false;
+  for (let i = 0; i + minMatchLength <= prompt.length; i += minMatchLength) {
+    if (reply.includes(prompt.slice(i, i + minMatchLength))) return true;
+  }
+  return false;
+}
+
+/** Wrapper: records a moderation event when a leak is detected, mirroring the ceiling-conformance/screenMessage pattern. */
+export async function checkPromptLeakage(
+  replyText: string,
+  systemPrompt: string,
+  ids: { reporterId: string; targetId: string },
+): Promise<{ leaked: boolean }> {
+  const leaked = detectPromptLeakage(replyText, systemPrompt);
+  if (leaked) {
+    await recordModerationEvent({
+      reporterId: ids.reporterId,
+      targetType: "message_outbound_ai",
+      targetId: ids.targetId,
+      category: "prompt_leak_attempt",
+      severity: "high",
+      notes: "AI reply contained a verbatim chunk matching its own system prompt.",
+      autoFlagged: true,
+    });
+  }
+  return { leaked };
+}
+
 export const REPEAT_OFFENDER_THRESHOLD = 3;
 
 /**

@@ -9,20 +9,49 @@ import { AuthPromptDialog } from "@/components/twinly/AuthPromptDialog";
 import { useSession } from "@/lib/session";
 import { getStripe, getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 import { getCreatorPricing, type Tier } from "@/lib/creator-pricing.functions";
-import { createCreatorSubscriptionCheckout, createBillingPortal, changeSubscriptionTier } from "@/lib/checkout.functions";
+import {
+  createCreatorSubscriptionCheckout,
+  createBillingPortal,
+  changeSubscriptionTier,
+} from "@/lib/checkout.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { SupporterJourneyDialog } from "@/components/twinly/SupporterJourneyDialog";
 
-const TIER_META: Record<Tier, { label: string; blurb: string; icon: typeof Star; accent: string }> = {
-  base: { label: "Base", blurb: "Support the creator + posts", icon: Star, accent: "text-sky-300" },
-  plus: { label: "Plus", blurb: "Everything in Base + extras", icon: Sparkles, accent: "text-brand-glow" },
-  vip: { label: "VIP", blurb: "Full access, priority replies", icon: Crown, accent: "text-amber-300" },
-};
+const TIER_META: Record<Tier, { label: string; blurb: string; icon: typeof Star; accent: string }> =
+  {
+    base: {
+      label: "Base",
+      blurb: "Support the creator + posts",
+      icon: Star,
+      accent: "text-sky-300",
+    },
+    plus: {
+      label: "Plus",
+      blurb: "Everything in Base + extras",
+      icon: Sparkles,
+      accent: "text-brand-glow",
+    },
+    vip: {
+      label: "VIP",
+      blurb: "Full access, priority replies",
+      icon: Crown,
+      accent: "text-amber-300",
+    },
+  };
 
 type Price = { tier: Tier; amountCents: number; currency: string };
 type ActiveSub = { id: string; tier: Tier };
 const TIER_RANK: Record<Tier, number> = { base: 1, plus: 2, vip: 3 };
 
-export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId: string; creatorName: string }) {
+export function CreatorSubscribeButtons({
+  creatorId,
+  creatorName,
+  creatorAvatarUrl,
+}: {
+  creatorId: string;
+  creatorName: string;
+  creatorAvatarUrl?: string | null;
+}) {
   const { user } = useSession();
   const [prices, setPrices] = useState<Price[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +61,7 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [busyTier, setBusyTier] = useState<Tier | null>(null);
   const [portalBusy, setPortalBusy] = useState(false);
+  const [journeyTier, setJourneyTier] = useState<Tier | null>(null);
 
   const loadPricing = useServerFn(getCreatorPricing);
   const startCheckout = useServerFn(createCreatorSubscriptionCheckout);
@@ -46,7 +76,10 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
   }, [loadPricing, creatorId]);
 
   useEffect(() => {
-    if (!user) { setActiveTiers(new Set()); return; }
+    if (!user) {
+      setActiveTiers(new Set());
+      return;
+    }
     (async () => {
       const { data } = await supabase
         .from("subscriptions")
@@ -59,7 +92,10 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
       for (const row of (data ?? []) as any[]) {
         const end = row.current_period_end ? new Date(row.current_period_end) : null;
         const stillValid = !end || end > now;
-        if ((row.status === "active" || (row.status === "canceled" && stillValid)) && ["base","plus","vip"].includes(row.tier)) {
+        if (
+          (row.status === "active" || (row.status === "canceled" && stillValid)) &&
+          ["base", "plus", "vip"].includes(row.tier)
+        ) {
           s.add(row.tier as Tier);
           if (row.status === "active") live = { id: row.id, tier: row.tier as Tier };
         }
@@ -69,14 +105,21 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
     })();
   }, [user, creatorId, checkoutOpen]);
 
-  async function handleSubscribe(tier: Tier) {
-    if (!isPaymentsConfigured()) { toast.error("Payments not configured yet."); return; }
+  async function handleSubscribe(tier: Tier, journeyComplete = false) {
+    if (!isPaymentsConfigured()) {
+      toast.error("Payments not configured yet.");
+      return;
+    }
     // If already subscribed to a lower tier, this is an upgrade — apply proration.
     if (activeSub && TIER_RANK[tier] > TIER_RANK[activeSub.tier]) {
       setBusyTier(tier);
       try {
         const res = await changeTier({
-          data: { subscriptionId: activeSub.id, newTier: tier, environment: getStripeEnvironment() },
+          data: {
+            subscriptionId: activeSub.id,
+            newTier: tier,
+            environment: getStripeEnvironment(),
+          },
         });
         if ("error" in res) throw new Error(res.error);
         toast.success(`Upgraded to ${tier.toUpperCase()} — prorated charge applied.`);
@@ -84,12 +127,18 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
         setCheckoutOpen((v) => v); // triggers effect via dependency
       } catch (e: any) {
         toast.error(e?.message ?? "Could not upgrade");
-      } finally { setBusyTier(null); }
+      } finally {
+        setBusyTier(null);
+      }
       return;
     }
     if (activeSub && TIER_RANK[tier] < TIER_RANK[activeSub.tier]) {
       toast.info("For downgrades, open the billing portal — the change takes effect next renewal.");
       handleManage();
+      return;
+    }
+    if (!activeSub && !journeyComplete) {
+      setJourneyTier(tier);
       return;
     }
     setBusyTier(tier);
@@ -133,7 +182,9 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
   return (
     <section className="mt-4">
       <div className="mb-2 flex items-baseline justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Subscribe to {creatorName}</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Subscribe to {creatorName}
+        </h3>
         {user && activeTiers.size > 0 && (
           <Button size="sm" variant="ghost" disabled={portalBusy} onClick={handleManage}>
             {portalBusy ? "…" : "Manage billing"}
@@ -147,24 +198,24 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
             const meta = TIER_META[p.tier];
             const Icon = meta.icon;
             const subscribed = activeTiers.has(p.tier);
-          const isCurrent = activeSub?.tier === p.tier;
-          const isUpgrade = !!activeSub && TIER_RANK[p.tier] > TIER_RANK[activeSub.tier];
-          const isDowngrade = !!activeSub && TIER_RANK[p.tier] < TIER_RANK[activeSub.tier];
-          const label = isCurrent
-            ? "Current plan"
-            : isUpgrade
-              ? `Upgrade · $${(p.amountCents / 100).toFixed(2)}/mo`
-              : isDowngrade
-                ? `Downgrade · $${(p.amountCents / 100).toFixed(2)}/mo`
-                : subscribed
-                  ? "Subscribed"
-                  : `$${(p.amountCents / 100).toFixed(2)}/mo`;
+            const isCurrent = activeSub?.tier === p.tier;
+            const isUpgrade = !!activeSub && TIER_RANK[p.tier] > TIER_RANK[activeSub.tier];
+            const isDowngrade = !!activeSub && TIER_RANK[p.tier] < TIER_RANK[activeSub.tier];
+            const label = isCurrent
+              ? "Current plan"
+              : isUpgrade
+                ? `Upgrade · $${(p.amountCents / 100).toFixed(2)}/mo`
+                : isDowngrade
+                  ? `Downgrade · $${(p.amountCents / 100).toFixed(2)}/mo`
+                  : subscribed
+                    ? "Subscribed"
+                    : `$${(p.amountCents / 100).toFixed(2)}/mo`;
             const button = (
               <Button
                 key={p.tier}
-              variant={isCurrent ? "secondary" : "outline"}
+                variant={isCurrent ? "secondary" : "outline"}
                 className="flex h-auto w-full flex-col items-start gap-1 rounded-xl border-border bg-surface p-3 text-left hover:bg-surface-elevated"
-              disabled={busyTier === p.tier || isCurrent}
+                disabled={busyTier === p.tier || isCurrent}
                 onClick={() => user && handleSubscribe(p.tier)}
               >
                 <div className="flex w-full items-center justify-between">
@@ -175,7 +226,11 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
                   {busyTier === p.tier && <Loader2 className="size-3.5 animate-spin" />}
                 </div>
                 <span className="text-xs text-muted-foreground">{meta.blurb}</span>
-                <span className={`mt-1 text-sm font-semibold ${subscribed ? "text-brand-glow" : ""}`}>{label}</span>
+                <span
+                  className={`mt-1 text-sm font-semibold ${subscribed ? "text-brand-glow" : ""}`}
+                >
+                  {label}
+                </span>
               </Button>
             );
             if (!user) {
@@ -193,7 +248,13 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
           })}
       </div>
 
-      <Dialog open={checkoutOpen} onOpenChange={(v) => { setCheckoutOpen(v); if (!v) setClientSecret(null); }}>
+      <Dialog
+        open={checkoutOpen}
+        onOpenChange={(v) => {
+          setCheckoutOpen(v);
+          if (!v) setClientSecret(null);
+        }}
+      >
         <DialogContent className="max-w-2xl p-0">
           <DialogHeader className="px-6 pt-6">
             <DialogTitle>Complete your subscription</DialogTitle>
@@ -207,6 +268,23 @@ export function CreatorSubscribeButtons({ creatorId, creatorName }: { creatorId:
           </div>
         </DialogContent>
       </Dialog>
+      {journeyTier && (
+        <SupporterJourneyDialog
+          open={!!journeyTier}
+          onOpenChange={(open) => {
+            if (!open) setJourneyTier(null);
+          }}
+          creatorId={creatorId}
+          creatorName={creatorName}
+          creatorAvatarUrl={creatorAvatarUrl}
+          tier={journeyTier}
+          onComplete={() => {
+            const tier = journeyTier;
+            setJourneyTier(null);
+            void handleSubscribe(tier, true);
+          }}
+        />
+      )}
     </section>
   );
 }

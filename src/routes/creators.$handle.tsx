@@ -157,7 +157,7 @@ function CreatorProfile() {
             <BlockButton targetType="creator" targetId={creator.id} variant="outline" />
           </div>
           {!isOwner && (
-            <CreatorSubscribeButtons creatorId={creator.id} creatorName={creator.stage_name} />
+            <CreatorSubscribeButtons creatorId={creator.id} creatorName={creator.stage_name} creatorAvatarUrl={avatarUrl} />
           )}
         </div>
         {avatarUrl && (
