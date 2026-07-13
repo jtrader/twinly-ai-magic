@@ -76,7 +76,7 @@ export const listMyPersonas = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { data: creator } = await supabase
-      .from("creators").select("id, handle, stage_name, onboarding_completed_at, verification_status, elevenlabs_voice_id, digital_twin_status")
+      .from("creators").select("id, handle, stage_name, onboarding_completed_at, verification_status, elevenlabs_voice_id, digital_twin_status, venice_character_slug")
       .eq("user_id", userId).maybeSingle();
     if (!creator) return { creator: null, personas: [] };
     // Real (legal) name, distinct from the public stage_name — used only for
@@ -91,11 +91,16 @@ export const listMyPersonas = createServerFn({ method: "GET" })
       .from("real_me_profiles").select("id").eq("creator_id", creator.id).maybeSingle();
     const { data: personas } = await supabase
       .from("personas")
-      .select("id, slug, display_name, kind, description, disclosure_label, visibility, sort_order, twin_link_mode, linked_twin_ref_ids, training_notes, system_prompt, is_explicit, explicitness_ceiling, tone_rules, boundary_rules, price_cents, is_default_seed, use_cloned_voice, voice_stability, voice_similarity_boost, voice_style, require_id_verification, venice_character_slug")
+      .select("id, slug, display_name, kind, description, disclosure_label, visibility, sort_order, twin_link_mode, linked_twin_ref_ids, training_notes, system_prompt, is_explicit, explicitness_ceiling, tone_rules, boundary_rules, price_cents, is_default_seed, use_cloned_voice, voice_stability, voice_similarity_boost, voice_style, require_id_verification, venice_character_slug, heygen_avatar_id, heygen_voice_id, elevenlabs_voice_id")
       .eq("creator_id", creator.id)
       .order("sort_order", { ascending: true });
     return {
-      creator: { ...creator, fullName: (profile as any)?.full_name ?? null, hasRealMeProfile: !!realMe },
+      creator: {
+        ...creator,
+        fullName: (profile as any)?.full_name ?? null,
+        hasRealMeProfile: !!realMe,
+        venice_character_slug: (creator as any).venice_character_slug ?? null,
+      },
       personas: personas ?? [],
     };
   });

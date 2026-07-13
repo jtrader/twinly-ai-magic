@@ -80,7 +80,7 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
     const { data: persona } = await supabaseAdmin
       .from("personas")
       .select(
-        "id, kind, display_name, disclosure_label, system_prompt, tone_rules, boundary_rules, training_notes, voice_reply_enabled, tts_voice, memory_enabled, explicitness_ceiling, venice_chat_opt_in, visibility, content_theme_overrides, use_cloned_voice, voice_stability, voice_similarity_boost, voice_style, require_id_verification, venice_character_slug",
+        "id, kind, display_name, disclosure_label, system_prompt, tone_rules, boundary_rules, training_notes, voice_reply_enabled, tts_voice, memory_enabled, explicitness_ceiling, venice_chat_opt_in, visibility, content_theme_overrides, use_cloned_voice, voice_stability, voice_similarity_boost, voice_style, require_id_verification, venice_character_slug, elevenlabs_voice_id",
       )
       .eq("creator_id", creator.id)
       .eq("slug", data.personaSlug)
@@ -295,13 +295,18 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
         // a persona's voice unpredictably switch identity mid-conversation.
         if ((persona as any).voice_reply_enabled) {
           try {
-            const useCloned = (persona as any).use_cloned_voice && creator.elevenlabs_voice_id;
+            const personaVoiceId = ((persona as any).elevenlabs_voice_id as string | null) || null;
+            // A per-persona ElevenLabs voice_id always overrides — it's an
+            // explicit pin for this persona. Otherwise fall back to the
+            // creator's cloned voice when the persona opted into it.
+            const clonedVoiceId = personaVoiceId || ((persona as any).use_cloned_voice ? creator.elevenlabs_voice_id : null);
+            const useCloned = !!clonedVoiceId;
             const { bytes } = useCloned
               ? await (async () => {
                   const { synthesizeSpeechElevenLabs } = await import("./elevenlabs.server");
                   return synthesizeSpeechElevenLabs({
                     text: assistantText,
-                    voiceId: creator.elevenlabs_voice_id as string,
+                    voiceId: clonedVoiceId as string,
                     stability: (persona as any).voice_stability,
                     similarityBoost: (persona as any).voice_similarity_boost,
                     style: (persona as any).voice_style,

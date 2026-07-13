@@ -32,7 +32,7 @@ import {
   type PersonaIntroVideoStatus,
 } from "@/lib/persona-intro-video.functions";
 import {
-  CONTENT_THEME_KEYS, CONTENT_THEME_LABELS, VISIBILITY_LABEL, VeniceCharacterField, VoiceSettingSlider,
+  CONTENT_THEME_KEYS, CONTENT_THEME_LABELS, VISIBILITY_LABEL, ExternalModelIdsPanel, VoiceSettingSlider,
   centsToDollarsInput, dollarsInputToCents, resizeImageToBlob,
   type Persona, type Visibility,
 } from "@/components/twinly/persona-form-shared";
@@ -59,7 +59,7 @@ function EditPersonaPage() {
   const setVis = useServerFn(setPersonaVisibility);
 
   const [persona, setPersona] = useState<Persona | null>(null);
-  const [creator, setCreator] = useState<{ id: string; elevenlabsVoiceId: string | null; digitalTwinStatus?: string } | null>(null);
+  const [creator, setCreator] = useState<{ id: string; elevenlabsVoiceId: string | null; digitalTwinStatus?: string; baselineVeniceSlug: string | null } | null>(null);
   const [ready, setReady] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -71,6 +71,7 @@ function EditPersonaPage() {
       id: r.creator.id,
       elevenlabsVoiceId: (r.creator as any).elevenlabs_voice_id ?? null,
       digitalTwinStatus: (r.creator as any).digital_twin_status,
+      baselineVeniceSlug: (r.creator as any).venice_character_slug ?? null,
     });
     setPersona(p);
     setReady(true);
@@ -100,7 +101,7 @@ function PersonaEditForm({
   persona, creator, update, setVis, refresh,
 }: {
   persona: Persona;
-  creator: { id: string; elevenlabsVoiceId: string | null; digitalTwinStatus?: string };
+  creator: { id: string; elevenlabsVoiceId: string | null; digitalTwinStatus?: string; baselineVeniceSlug: string | null };
   update: ReturnType<typeof useServerFn<typeof updatePersona>>;
   setVis: ReturnType<typeof useServerFn<typeof setPersonaVisibility>>;
   refresh: () => Promise<void>;
@@ -238,6 +239,7 @@ function PersonaEditForm({
   const [linkedRefIds, setLinkedRefIds] = useState<string[]>(((persona as any).linked_twin_ref_ids as string[] | null) ?? []);
   const [heygenAvatarId, setHeygenAvatarId] = useState(((persona as any).heygen_avatar_id as string | null) ?? "");
   const [heygenVoiceId, setHeygenVoiceId] = useState(((persona as any).heygen_voice_id as string | null) ?? "");
+  const [elevenlabsVoiceIdOverride, setElevenlabsVoiceIdOverride] = useState(((persona as any).elevenlabs_voice_id as string | null) ?? "");
   const [twinRefs, setTwinRefs] = useState<any[] | null>(null);
   const loadTwin = useServerFn(getTwinProfile);
   useEffect(() => {
@@ -376,6 +378,7 @@ function PersonaEditForm({
         voiceStyle: persona.kind === "ai" && useClonedVoice ? voiceStyle : undefined,
         requireIdVerification: persona.kind === "ai" ? requireIdVerification : undefined,
         veniceCharacterSlug: persona.kind === "ai" ? veniceCharacterSlug : undefined,
+        elevenlabsVoiceId: persona.kind === "ai" ? elevenlabsVoiceIdOverride : undefined,
         trainingNotes: { tone_examples: toneExamples, dos, donts, sample_phrasings: samplePhrasings, voice_ref_url: voiceRefUrl },
         twinLinkMode, linkedTwinRefIds: twinLinkMode === "selected" ? linkedRefIds : [],
         heygenAvatarId, heygenVoiceId, avatarUrl,
@@ -622,7 +625,14 @@ function PersonaEditForm({
 
             {persona.kind === "ai" && (
               <>
-                <VeniceCharacterField idPrefix="edit-persona" value={veniceCharacterSlug} onChange={setVeniceCharacterSlug} />
+                <ExternalModelIdsPanel
+                  idPrefix="edit-persona"
+                  venice={veniceCharacterSlug} onVenice={setVeniceCharacterSlug}
+                  heygenAvatar={heygenAvatarId} onHeygenAvatar={setHeygenAvatarId}
+                  heygenVoice={heygenVoiceId} onHeygenVoice={setHeygenVoiceId}
+                  elevenlabsVoice={elevenlabsVoiceIdOverride} onElevenlabsVoice={setElevenlabsVoiceIdOverride}
+                  baselineVeniceSlug={creator.baselineVeniceSlug}
+                />
                 <div>
                   <Label htmlFor="edit-persona-system-prompt">System prompt</Label>
                   <Textarea id="edit-persona-system-prompt" className="mt-1.5" rows={5} maxLength={4000} value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} />
@@ -885,22 +895,9 @@ function PersonaEditForm({
                 </div>
               )
             )}
-            <div className="rounded-lg border border-border bg-surface p-3 text-xs">
-              <h3 className="mb-1 text-sm font-semibold">HeyGen render IDs (talking-head)</h3>
-              <p className="mb-2 text-muted-foreground">
-                Paste the avatar and (optional) voice IDs from your HeyGen account. Used when this persona queues a talking-head clip. Leave blank to fall back to workspace defaults.
-              </p>
-              <div className="grid gap-2 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="edit-persona-heygen-avatar-id" className="text-[11px]">Avatar ID</Label>
-                  <Input id="edit-persona-heygen-avatar-id" className="mt-1" value={heygenAvatarId} onChange={(e) => setHeygenAvatarId(e.target.value)} placeholder="e.g. Daisy_sitting_sofa_side_public" maxLength={120} />
-                </div>
-                <div>
-                  <Label htmlFor="edit-persona-heygen-voice-id" className="text-[11px]">Voice ID (optional)</Label>
-                  <Input id="edit-persona-heygen-voice-id" className="mt-1" value={heygenVoiceId} onChange={(e) => setHeygenVoiceId(e.target.value)} placeholder="Leave blank to use our TTS voice selection" maxLength={120} />
-                </div>
-              </div>
-            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Looking for HeyGen avatar/voice IDs? They're in the persona <button type="button" className="text-brand-glow underline" onClick={() => setTab("basics")}>Basics</button> tab under <span className="font-medium">External model IDs</span>.
+            </p>
           </section>
         )}
 

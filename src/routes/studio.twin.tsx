@@ -24,6 +24,8 @@ import {
   upsertTwinConsent, revokeTwinConsent, upsertStyleNotes, getTwinRefSignedUrl,
   restoreTwinReference, hardDeleteTwinReference, submitTwinReferencesForReview,
 } from "@/lib/twin.functions";
+import { getBaselineVeniceCharacter, setBaselineVeniceCharacter } from "@/lib/venice-character.functions";
+import { VeniceCharacterField } from "@/components/twinly/persona-form-shared";
 
 export const Route = createFileRoute("/studio/twin")({
   component: TwinProfilePage,
@@ -112,6 +114,7 @@ function TwinProfilePage() {
       </div>
 
       <nav className="mb-6 flex flex-wrap gap-2 text-xs">
+        <a href="#baseline-character" className="rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-brand-glow hover:border-brand/70">Character ID</a>
         <a href="#identity"  className="rounded-full border border-border bg-surface px-3 py-1 hover:border-brand/50">Identity</a>
         <a href="#voice"     className="rounded-full border border-border bg-surface px-3 py-1 hover:border-brand/50">Voice</a>
         <a href="#style"     className="rounded-full border border-border bg-surface px-3 py-1 hover:border-brand/50">Style</a>
@@ -122,6 +125,7 @@ function TwinProfilePage() {
 
       <div className="grid gap-6">
         <SummaryCard data={data} />
+        <BaselineCharacterSection />
         <ReferencesSection
           id="identity" title="Identity references" icon={<User className="size-4" />}
           hint="Upload 5+ clear photos: face front, 3/4 profile, side, body, expressions. Used to anchor likeness."
@@ -712,6 +716,87 @@ function ForbiddenUsesSection({ data, onChanged }: { data: any; onChanged: () =>
 
       <div className="mt-3 flex justify-end">
         <Button size="sm" onClick={save} disabled={saving}>{saving && <Loader2 className="mr-2 size-3.5 animate-spin" />}Save forbidden uses</Button>
+      </div>
+    </section>
+  );
+}
+
+function BaselineCharacterSection() {
+  const load = useServerFn(getBaselineVeniceCharacter);
+  const save = useServerFn(setBaselineVeniceCharacter);
+  const [slug, setSlug] = useState("");
+  const [initial, setInitial] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await load();
+        if (!alive) return;
+        setSlug(r.slug ?? "");
+        setInitial(r.slug);
+      } catch { /* ignore */ }
+      finally { if (alive) setLoaded(true); }
+    })();
+    return () => { alive = false; };
+  }, [load]);
+
+  const dirty = (slug.trim() || null) !== (initial?.trim() || null);
+
+  async function onSave() {
+    setBusy(true);
+    try {
+      const r = await save({ data: { slug: slug.trim() || null } });
+      setInitial(r.slug);
+      toast.success(r.slug ? "Baseline Character ID saved" : "Baseline Character ID cleared");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not save");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <section
+      id="baseline-character"
+      aria-labelledby="baseline-character-heading"
+      className="rounded-2xl border border-brand/30 bg-brand/5 p-5"
+    >
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 text-brand-glow" />
+            <h2 id="baseline-character-heading" className="font-display text-lg font-semibold">
+              Baseline Venice Character ID
+            </h2>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Import a Venice Character once here and every new AI persona picks it up as the default —
+            no need to paste it into each persona. Personas can still override it individually.
+          </p>
+        </div>
+      </header>
+
+      <div className="mt-4">
+        {loaded ? (
+          <VeniceCharacterField idPrefix="baseline" value={slug} onChange={setSlug} />
+        ) : (
+          <div className="text-xs text-muted-foreground">Loading…</div>
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center justify-end gap-2">
+        {initial && !slug.trim() && (
+          <span className="mr-auto text-[11px] text-amber-300">
+            Saving will clear the current baseline (<span className="font-mono">{initial}</span>).
+          </span>
+        )}
+        <Button size="sm" variant="outline" disabled={!dirty || busy} onClick={() => setSlug(initial ?? "")}>
+          Reset
+        </Button>
+        <Button size="sm" disabled={!dirty || busy} onClick={onSave} className="min-h-9">
+          {busy ? "Saving…" : "Save baseline"}
+        </Button>
       </div>
     </section>
   );

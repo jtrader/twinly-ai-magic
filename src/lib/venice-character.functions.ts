@@ -37,3 +37,35 @@ export const lookupVeniceCharacter = createServerFn({ method: "POST" })
       },
     };
   });
+
+/**
+ * Read the creator-level "baseline" Venice Character ID — imported once
+ * from the Twin/Baseline model page and inherited as the default by new
+ * personas, so creators don't have to paste it into every persona.
+ */
+export const getBaselineVeniceCharacter = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data } = await supabase
+      .from("creators")
+      .select("venice_character_slug")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return { slug: ((data as any)?.venice_character_slug as string | null) ?? null };
+  });
+
+export const setBaselineVeniceCharacter = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { slug: string | null }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const v = (data.slug ?? "").trim();
+    const value = v ? v.slice(0, 120) : null;
+    const { error } = await supabase
+      .from("creators")
+      .update({ venice_character_slug: value } as any)
+      .eq("user_id", userId);
+    if (error) throw error;
+    return { ok: true, slug: value };
+  });
