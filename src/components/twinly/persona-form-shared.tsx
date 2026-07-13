@@ -245,14 +245,37 @@ export function VeniceCharacterField({
           onChange={(e) => { onChange(e.target.value); setResult(null); setManualVerified(false); onPreview?.(null); }}
           placeholder="e.g. alan-watts"
           maxLength={120}
-          aria-describedby={helpId}
+          aria-describedby={`${helpId} ${idPrefix}-venice-status`}
+          aria-invalid={showNotFound || showLookupErr || undefined}
           spellCheck={false}
           autoCapitalize="none"
           autoCorrect="off"
+          enterKeyHint="search"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && trimmed && !busy) {
+              e.preventDefault();
+              check();
+            }
+          }}
         />
-        <Button type="button" variant="outline" size="sm" disabled={busy || !trimmed} onClick={() => check()}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={busy || !trimmed}
+          onClick={() => check()}
+          aria-label={busy ? "Checking Venice Character" : "Preview Venice Character"}
+          aria-busy={busy || undefined}
+        >
           {busy ? "Checking…" : "Preview"}
         </Button>
+      </div>
+      <div id={`${idPrefix}-venice-status`} className="sr-only" aria-live="polite">
+        {busy ? "Checking Venice…"
+          : showFound && result && "found" in result && result.found ? `Match: ${result.character.name}${result.character.adult ? ", 18 plus" : ""}`
+          : showNotFound ? "No Venice Character found with that ID."
+          : showLookupErr ? "Venice lookup failed. You can retry or paste the character JSON."
+          : ""}
       </div>
       {busy && !result && (
         <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">Checking Venice…</p>
