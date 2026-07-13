@@ -139,9 +139,9 @@ describe("RLS: polls visibility", () => {
       return;
     }
     for (const row of data ?? []) {
-      expect(
-        (row as { polls: { visibility: string } }).polls.visibility,
-      ).toBe("public");
+      const parent = (row as unknown as { polls: { visibility: string } | { visibility: string }[] }).polls;
+      const vis = Array.isArray(parent) ? parent[0]?.visibility : parent?.visibility;
+      expect(vis).toBe("public");
     }
   });
 
