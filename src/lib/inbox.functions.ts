@@ -126,6 +126,11 @@ export const sendCreatorReply = createServerFn({ method: "POST" })
     if (convoErr) throw convoErr;
     if (!convo) throw new Error("Conversation not found");
 
+    const { data: canManage } = await supabase.rpc("can_manage_creator", {
+      _creator_id: (convo as any).creator_id,
+    });
+    if (!canManage) throw new Error("Not authorized to reply to this conversation.");
+
     const { data: blocked } = await supabase.rpc("is_blocked", { _a: userId, _b: (convo as any).fan_id });
     if (blocked) throw new Error("Messaging is blocked between you and this fan.");
 
