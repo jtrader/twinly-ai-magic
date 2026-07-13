@@ -11,6 +11,15 @@ import {
   listRealMeVersionHistory,
   saveRealMeAnswer,
 } from "@/lib/real-me.functions";
+import { generateRealMeProfile } from "@/lib/real-me-generate.functions";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   REAL_ME_QUESTIONNAIRE,
   computeOverallCompletionPercentage,
@@ -27,7 +36,17 @@ import {
   SingleSelectInput,
   YesNoInput,
 } from "@/components/twinly/RealMeInputs";
-import { ArrowLeft, CheckCircle2, Circle, History } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, History, Sparkles, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { SeedInput } from "@/lib/real-me-generate.functions";
 
 export const Route = createFileRoute("/studio/real-me")({
   component: RealMePage,
@@ -51,12 +70,14 @@ function RealMePage() {
   const navigate = useNavigate();
   const getProfile = useServerFn(getRealMeProfile);
   const saveAnswer = useServerFn(saveRealMeAnswer);
+  const generateProfile = useServerFn(generateRealMeProfile);
 
   const [ready, setReady] = useState(false);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Answers>({});
   const [activeSectionId, setActiveSectionId] = useState(REAL_ME_QUESTIONNAIRE[0].id);
   const [showHistory, setShowHistory] = useState(false);
+  const [showGenerate, setShowGenerate] = useState(false);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
@@ -117,6 +138,9 @@ function RealMePage() {
         <Button size="sm" variant="outline" onClick={() => setShowHistory((s) => !s)}>
           <History className="mr-1.5 size-4" /> Version history
         </Button>
+        <Button size="sm" onClick={() => setShowGenerate(true)}>
+          <Sparkles className="mr-1.5 size-4" /> Generate random profile
+        </Button>
       </div>
       <p className="mb-3 text-sm text-muted-foreground">
         The foundational profile every persona is built from. Answers autosave as you go — jump between sections in any order.
@@ -163,6 +187,17 @@ function RealMePage() {
           </div>
         </div>
       )}
+
+      <GenerateProfileDialog
+        open={showGenerate}
+        onOpenChange={setShowGenerate}
+        onGenerate={async (seed) => {
+          const result = await generateProfile({ data: seed });
+          setVersionId(result.version.id);
+          setAnswers((result.answers ?? {}) as Answers);
+          toast.success("Generated a fresh AI profile draft — review and edit below.");
+        }}
+      />
     </AppShell>
   );
 }
@@ -214,5 +249,140 @@ function VersionHistoryPanel() {
         </div>
       ))}
     </div>
+  );
+}
+
+const GENDER_OPTIONS = ["Female", "Male", "Non-binary", "Prefer not to say"];
+const AGE_OPTIONS = ["18-24", "25-34", "35-44", "45-54", "55+"];
+const LIFESTYLE_OPTIONS = [
+  "Urban", "Suburban", "Rural", "Fitness-focused", "Homebody", "Travels often",
+  "Nightlife", "Outdoorsy", "Creative/artsy", "Tech/startup", "Parenting",
+  "Student life", "Foodie", "Wellness-focused",
+];
+const TRAIT_OPTIONS = [
+  "Warm", "Dry-witted", "Adventurous", "Calm", "Intense", "Playful", "Thoughtful",
+  "Blunt", "Romantic", "Guarded", "Confident", "Curious", "Empathetic", "Sarcastic",
+  "Ambitious", "Nurturing", "Rebellious", "Optimistic",
+];
+
+function GenerateProfileDialog({
+  open,
+  onOpenChange,
+  onGenerate,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onGenerate: (seed: SeedInput) => Promise<void>;
+}) {
+  const [gender, setGender] = useState<string>("");
+  const [age, setAge] = useState<string>("");
+  const [lifestyle, setLifestyle] = useState<string[]>([]);
+  const [traits, setTraits] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  function toggle(list: string[], value: string, setter: (v: string[]) => void, limit: number) {
+    if (list.includes(value)) setter(list.filter((v) => v !== value));
+    else if (list.length < limit) setter([...list, value]);
+  }
+
+  const canSubmit = gender && age && lifestyle.length > 0 && traits.length > 0 && !busy;
+
+  async function submit() {
+    if (!canSubmit) return;
+    setBusy(true);
+    try {
+      await onGenerate({ gender, ageBracket: age, lifestyle, traits });
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to generate profile");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !busy && onOpenChange(v)}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="size-4 text-brand" /> Generate random AI profile
+          </DialogTitle>
+          <DialogDescription>
+            Answer a few quick seeds and AI will fill out your Real Me baseline as a new version. You can edit anything afterwards.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 py-2">
+          <div className="grid gap-2">
+            <Label>Gender</Label>
+            <Select value={gender} onValueChange={setGender}>
+              <SelectTrigger><SelectValue placeholder="Pick one" /></SelectTrigger>
+              <SelectContent>
+                {GENDER_OPTIONS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Age bracket</Label>
+            <Select value={age} onValueChange={setAge}>
+              <SelectTrigger><SelectValue placeholder="Pick one" /></SelectTrigger>
+              <SelectContent>
+                {AGE_OPTIONS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Lifestyle <span className="text-xs text-muted-foreground">(pick up to 4)</span></Label>
+            <div className="flex flex-wrap gap-2">
+              {LIFESTYLE_OPTIONS.map((opt) => {
+                const active = lifestyle.includes(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => toggle(lifestyle, opt, setLifestyle, 4)}
+                    className={"rounded-full border px-3 py-1 text-xs transition " + (active
+                      ? "border-brand bg-brand/10 text-brand"
+                      : "border-border bg-surface hover:border-brand/40")}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Character traits <span className="text-xs text-muted-foreground">(pick up to 5)</span></Label>
+            <div className="flex flex-wrap gap-2">
+              {TRAIT_OPTIONS.map((opt) => {
+                const active = traits.includes(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => toggle(traits, opt, setTraits, 5)}
+                    className={"rounded-full border px-3 py-1 text-xs transition " + (active
+                      ? "border-brand bg-brand/10 text-brand"
+                      : "border-border bg-surface hover:border-brand/40")}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={!canSubmit}>
+            {busy ? <><Loader2 className="mr-1.5 size-4 animate-spin" /> Generating…</> : <><Sparkles className="mr-1.5 size-4" /> Generate</>}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
