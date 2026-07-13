@@ -984,7 +984,7 @@ function BulkPhotoStager({
 }
 
 function StatusPill({ status }: { status: PendingStatus }) {
-  const map: Record<PendingStatus, { label: string; className: string; icon?: JSX.Element }> = {
+  const map: Record<PendingStatus, { label: string; className: string; icon?: React.ReactNode }> = {
     pending:        { label: "Ready", className: "border-border text-muted-foreground" },
     uploading:      { label: "Uploading", className: "border-brand/40 text-brand-glow", icon: <Loader2 className="size-3 animate-spin" /> },
     done:           { label: "Done", className: "border-emerald-400/40 text-emerald-300", icon: <CheckCircle2 className="size-3" /> },
