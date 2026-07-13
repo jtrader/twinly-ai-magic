@@ -205,11 +205,19 @@ function RealMePage() {
   if (loading || !ready) {
     return <AppShell><div className="py-16 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
   }
-  if (!versionId) return null;
+  if (!versionId) {
+    return (
+      <AppShell>
+        <div className="py-16 text-center text-sm text-muted-foreground">
+          Couldn't load your Real Me baseline. <button className="underline" onClick={() => window.location.reload()}>Retry</button>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <Link to="/studio" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </Link>
@@ -217,12 +225,24 @@ function RealMePage() {
           <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Creator studio</div>
           <h1 className="font-display text-2xl font-bold">Real Me baseline</h1>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setShowHistory((s) => !s)} disabled={!!draft}>
-          <History className="mr-1.5 size-4" /> Version history
-        </Button>
-        <Button size="sm" onClick={() => setShowGenerate(true)} disabled={!!draft}>
-          <Sparkles className="mr-1.5 size-4" /> Generate random profile
-        </Button>
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          <Button size="sm" variant="outline" onClick={() => setShowHistory((s) => !s)} disabled={!!draft}>
+            <History className="mr-1.5 size-4" />
+            <span className="hidden sm:inline">Version history</span>
+            <span className="sm:hidden">History</span>
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setShowGenerate(true)}
+            disabled={!!draft}
+            className="relative bg-gradient-to-r from-brand to-fuchsia-500 text-white shadow-md hover:opacity-90"
+          >
+            <Sparkles className="mr-1.5 size-4" />
+            <span className="hidden sm:inline">Generate random profile</span>
+            <span className="sm:hidden">Generate</span>
+            <span className="ml-2 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">AI</span>
+          </Button>
+        </div>
       </div>
       {draft ? (
         <DraftReviewBanner
