@@ -40,6 +40,7 @@ import {
   YesNoInput,
 } from "@/components/twinly/RealMeInputs";
 import { ArrowLeft, CheckCircle2, Circle, History, Sparkles, Loader2, RefreshCw, X, Save } from "lucide-react";
+import { Download, RotateCcw, FileJson, FileText, Rows, LayoutGrid } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -48,6 +49,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportRealMeJson, exportRealMePdf } from "@/lib/real-me-export";
 import type { SeedInput } from "@/lib/real-me-generate.functions";
 
 export const Route = createFileRoute("/studio/real-me")({
@@ -81,10 +99,16 @@ function RealMePage() {
   const [activeSectionId, setActiveSectionId] = useState(REAL_ME_QUESTIONNAIRE[0].id);
   const [showHistory, setShowHistory] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
-  // When set, we're reviewing an AI-generated draft that has NOT been saved yet.
-  // Autosave is suppressed and Save/Regenerate/Discard controls take over.
-  const [draft, setDraft] = useState<{ answers: Answers; seed: SeedInput } | null>(null);
+  // When set, we're reviewing an unsaved draft (from AI generation OR from
+  // restoring an older version). Autosave is suppressed and Save/Discard
+  // controls take over.
+  const [draft, setDraft] = useState<{
+    answers: Answers;
+    seed: SeedInput | null;
+    restoredFrom?: { id: string; versionNumber: number };
+  } | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
@@ -136,7 +160,13 @@ function RealMePage() {
     if (!draft) return;
     setSavingDraft(true);
     try {
-      const result = await saveGenerated({ data: { answers: draft.answers as any, seed: draft.seed } });
+      const result = await saveGenerated({
+        data: {
+          answers: draft.answers as any,
+          seed: draft.seed,
+          restoredFromVersionId: draft.restoredFrom?.id ?? null,
+        },
+      });
       setVersionId(result.version.id);
       setAnswers((result.answers ?? {}) as Answers);
       setDraft(null);
@@ -150,7 +180,26 @@ function RealMePage() {
 
   function discardDraft() {
     setDraft(null);
+    setConfirmDiscard(false);
     toast.message("Discarded AI draft — original answers restored.");
+  }
+
+  function handleExportDraft(kind: "json" | "pdf") {
+    if (!draft) return;
+    const label = draft.restoredFrom
+      ? `Restored draft (v${draft.restoredFrom.versionNumber})`
+      : "AI-generated draft";
+    const payload = {
+      label,
+      answers: draft.answers,
+      seed: draft.seed ?? (draft.restoredFrom ? { restoredFromVersionId: draft.restoredFrom.id } : null),
+    };
+    try {
+      if (kind === "json") exportRealMeJson(payload);
+      else exportRealMePdf(payload);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Export failed.");
+    }
   }
 
   if (loading || !ready) {
@@ -178,10 +227,12 @@ function RealMePage() {
       {draft ? (
         <DraftReviewBanner
           seed={draft.seed}
+          restoredFrom={draft.restoredFrom}
           saving={savingDraft}
           onSave={commitDraft}
-          onDiscard={discardDraft}
-          onRegenerate={() => setShowGenerate(true)}
+          onDiscard={() => setConfirmDiscard(true)}
+          onRegenerate={draft.seed ? () => setShowGenerate(true) : undefined}
+          onExport={handleExportDraft}
         />
       ) : (
         <p className="mb-3 text-sm text-muted-foreground">
@@ -200,7 +251,19 @@ function RealMePage() {
       </div>
 
       {showHistory ? (
-        <VersionHistoryPanel />
+        <VersionHistoryPanel
+          disabled={!!draft}
+          onRestore={(v) => {
+            setDraft({
+              answers: (v.responses ?? {}) as Answers,
+              seed: null,
+              restoredFrom: { id: v.id, versionNumber: v.version_number },
+            });
+            setShowHistory(false);
+            setActiveSectionId(REAL_ME_QUESTIONNAIRE[0].id);
+            toast.success(`Loaded Version ${v.version_number} as an editable draft.`);
+          }}
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
           <nav className="flex gap-1.5 overflow-x-auto pb-2 md:flex-col md:overflow-visible md:pb-0">
@@ -244,6 +307,22 @@ function RealMePage() {
           toast.success("Draft loaded — review, edit, then Save as a new version.");
         }}
       />
+
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your edits to this {draft?.restoredFrom ? "restored" : "AI-generated"} draft will be
+              lost. This can't be undone. Your last saved version is unaffected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction onClick={discardDraft}>Discard draft</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }
@@ -271,7 +350,13 @@ function QuestionField({ question, value, onChange }: { question: QuestionDefini
   );
 }
 
-function VersionHistoryPanel() {
+function VersionHistoryPanel({
+  disabled,
+  onRestore,
+}: {
+  disabled?: boolean;
+  onRestore: (v: any) => void;
+}) {
   const list = useServerFn(listRealMeVersionHistory);
   const [versions, setVersions] = useState<any[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -307,6 +392,52 @@ function VersionHistoryPanel() {
               <div><span className="font-medium text-foreground">Traits:</span> {(v.generation_seed.traits ?? []).join(", ") || "—"}</div>
             </div>
           ) : null}
+          <div className="mt-2 flex flex-wrap justify-end gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost">
+                  <Download className="mr-1.5 size-4" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() =>
+                    exportRealMeJson({
+                      label: `Real Me v${v.version_number}`,
+                      answers: (v.responses ?? {}) as Answers,
+                      seed: v.generation_seed ?? null,
+                      completion: v.completion_percentage,
+                      versionNumber: v.version_number,
+                      createdAt: v.created_at,
+                    })
+                  }
+                >
+                  <FileJson className="mr-2 size-4" /> Download JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    try {
+                      exportRealMePdf({
+                        label: `Real Me v${v.version_number}`,
+                        answers: (v.responses ?? {}) as Answers,
+                        seed: v.generation_seed ?? null,
+                        completion: v.completion_percentage,
+                        versionNumber: v.version_number,
+                        createdAt: v.created_at,
+                      });
+                    } catch (e: any) {
+                      toast.error(e?.message ?? "Export failed.");
+                    }
+                  }}
+                >
+                  <FileText className="mr-2 size-4" /> Print / Save as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" variant="outline" onClick={() => onRestore(v)} disabled={disabled}>
+              <RotateCcw className="mr-1.5 size-4" /> Restore as draft
+            </Button>
+          </div>
         </div>
       ))}
     </div>
@@ -330,41 +461,68 @@ type Variant = { id: string; style: string; answers: Record<string, unknown>; co
 
 function DraftReviewBanner({
   seed,
+  restoredFrom,
   saving,
   onSave,
   onDiscard,
   onRegenerate,
+  onExport,
 }: {
-  seed: SeedInput;
+  seed: SeedInput | null;
+  restoredFrom?: { id: string; versionNumber: number };
   saving: boolean;
   onSave: () => void;
   onDiscard: () => void;
-  onRegenerate: () => void;
+  onRegenerate?: () => void;
+  onExport: (kind: "json" | "pdf") => void;
 }) {
+  const isRestore = !!restoredFrom;
   return (
     <div className="mb-4 rounded-xl border border-brand/40 bg-brand/5 p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-brand">
-            <Sparkles className="size-4" /> Reviewing AI-generated draft
+            {isRestore ? <RotateCcw className="size-4" /> : <Sparkles className="size-4" />}
+            {isRestore
+              ? `Reviewing restored draft (from Version ${restoredFrom!.versionNumber})`
+              : "Reviewing AI-generated draft"}
           </div>
           <p className="text-xs text-muted-foreground">
             Edit anything below, then Save to create a new version. Nothing is stored until you save.
           </p>
-          <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
-            <Badge variant="outline">{seed.gender}</Badge>
-            <Badge variant="outline">{seed.ageBracket}</Badge>
-            {seed.lifestyle.map((l) => <Badge key={"l-" + l} variant="outline">{l}</Badge>)}
-            {seed.traits.map((t) => <Badge key={"t-" + t} variant="outline">{t}</Badge>)}
-          </div>
+          {seed ? (
+            <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
+              <Badge variant="outline">{seed.gender}</Badge>
+              <Badge variant="outline">{seed.ageBracket}</Badge>
+              {seed.lifestyle.map((l) => <Badge key={"l-" + l} variant="outline">{l}</Badge>)}
+              {seed.traits.map((t) => <Badge key={"t-" + t} variant="outline">{t}</Badge>)}
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost" disabled={saving}>
+                <Download className="mr-1.5 size-4" /> Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onExport("json")}>
+                <FileJson className="mr-2 size-4" /> Download JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport("pdf")}>
+                <FileText className="mr-2 size-4" /> Print / Save as PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" variant="ghost" onClick={onDiscard} disabled={saving}>
             <X className="mr-1.5 size-4" /> Discard
           </Button>
-          <Button size="sm" variant="outline" onClick={onRegenerate} disabled={saving}>
-            <RefreshCw className="mr-1.5 size-4" /> Regenerate
-          </Button>
+          {onRegenerate ? (
+            <Button size="sm" variant="outline" onClick={onRegenerate} disabled={saving}>
+              <RefreshCw className="mr-1.5 size-4" /> Regenerate
+            </Button>
+          ) : null}
           <Button size="sm" onClick={onSave} disabled={saving}>
             {saving ? <><Loader2 className="mr-1.5 size-4 animate-spin" /> Saving…</> : <><Save className="mr-1.5 size-4" /> Save as new version</>}
           </Button>
@@ -395,6 +553,7 @@ function GenerateProfileDialog({
   const [variants, setVariants] = useState<Variant[]>([]);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [attempt, setAttempt] = useState(0);
+  const [pickView, setPickView] = useState<"cards" | "compare">("cards");
 
   // Rehydrate previous seeds when dialog re-opens (e.g. Regenerate from draft banner)
   useEffect(() => {
@@ -408,6 +567,7 @@ function GenerateProfileDialog({
     setStep("seeds");
     setVariants([]);
     setErrorMsg("");
+    setPickView("cards");
   }, [open, initialSeed]);
 
   function toggle(list: string[], value: string, setter: (v: string[]) => void, limit: number) {
@@ -528,10 +688,37 @@ function GenerateProfileDialog({
         )}
 
         {step === "pick" && (
-          <div className="grid gap-3 py-2 md:grid-cols-3">
-            {variants.map((v, i) => (
-              <VariantCard key={v.id} index={i + 1} variant={v} onPick={() => pickVariant(v)} />
-            ))}
+          <div className="py-2">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-xs text-muted-foreground">
+                {variants.length} variant{variants.length === 1 ? "" : "s"} · pick one to edit
+              </div>
+              <div className="inline-flex rounded-lg border border-border p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setPickView("cards")}
+                  className={"flex items-center gap-1 rounded-md px-2 py-1 " + (pickView === "cards" ? "bg-surface-elevated text-foreground" : "text-muted-foreground hover:text-foreground")}
+                >
+                  <LayoutGrid className="size-3.5" /> Cards
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPickView("compare")}
+                  className={"flex items-center gap-1 rounded-md px-2 py-1 " + (pickView === "compare" ? "bg-surface-elevated text-foreground" : "text-muted-foreground hover:text-foreground")}
+                >
+                  <Rows className="size-3.5" /> Compare
+                </button>
+              </div>
+            </div>
+            {pickView === "cards" ? (
+              <div className="grid gap-3 md:grid-cols-3">
+                {variants.map((v, i) => (
+                  <VariantCard key={v.id} index={i + 1} variant={v} onPick={() => pickVariant(v)} />
+                ))}
+              </div>
+            ) : (
+              <VariantCompareTable variants={variants} onPick={pickVariant} />
+            )}
           </div>
         )}
 
@@ -592,5 +779,73 @@ function VariantCard({ index, variant, onPick }: { index: number; variant: Varia
       )}
       <div className="mt-3 text-[11px] font-semibold text-brand">Pick and edit →</div>
     </button>
+  );
+}
+
+/** Key questions surfaced in the side-by-side comparison view. */
+const COMPARE_QUESTION_IDS: string[] = [
+  "1.1", // Name
+  "1.2", // Pronouns
+  "1.3", // Region
+  "2.1", // Character traits
+  "2.2", // Warmth/spark
+  "3.1", // Interests
+  "4.1", // Outlook
+  "5.1", // Communication style
+  "6.1", // Humor
+];
+
+function VariantCompareTable({ variants, onPick }: { variants: Variant[]; onPick: (v: Variant) => void }) {
+  const byId = new Map<string, QuestionDefinition>();
+  for (const s of REAL_ME_QUESTIONNAIRE) for (const q of s.questions) byId.set(q.id, q);
+  const rows = COMPARE_QUESTION_IDS.map((id) => byId.get(id)).filter((q): q is QuestionDefinition => !!q);
+
+  function fmt(v: unknown) {
+    if (v === null || v === undefined || v === "") return <span className="text-muted-foreground/60">—</span>;
+    if (Array.isArray(v)) return v.join(", ");
+    if (typeof v === "boolean") return v ? "Yes" : "No";
+    return String(v);
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border">
+      <table className="w-full min-w-[560px] border-collapse text-xs">
+        <thead className="bg-surface-elevated/60 text-[10px] uppercase tracking-widest text-muted-foreground">
+          <tr>
+            <th className="sticky left-0 z-10 bg-surface-elevated/60 px-3 py-2 text-left font-semibold">Field</th>
+            {variants.map((v, i) => (
+              <th key={v.id} className="border-l border-border px-3 py-2 text-left font-semibold">
+                <div className="flex items-center justify-between gap-2">
+                  <span>Variant {i + 1}</span>
+                  <Badge variant="outline" className="text-[10px]">{v.completion}%</Badge>
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((q) => (
+            <tr key={q.id} className="border-t border-border align-top">
+              <td className="sticky left-0 z-10 bg-surface px-3 py-2 font-medium text-muted-foreground">{q.promptText}</td>
+              {variants.map((v) => (
+                <td key={v.id + q.id} className="border-l border-border px-3 py-2">
+                  {fmt(v.answers[q.id])}
+                </td>
+              ))}
+            </tr>
+          ))}
+          <tr className="border-t border-border bg-surface-elevated/40">
+            <td className="sticky left-0 z-10 bg-surface-elevated/40 px-3 py-2" />
+            {variants.map((v) => (
+              <td key={"pick-" + v.id} className="border-l border-border px-3 py-2">
+                <Button size="sm" className="w-full" onClick={() => onPick(v)}>
+                  Pick this variant
+                </Button>
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </div>
   );
 }

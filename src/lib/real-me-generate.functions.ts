@@ -230,7 +230,11 @@ export const generateRealMeVariants = createServerFn({ method: "POST" })
 /** Persist an edited AI-generated draft as a NEW Real Me version, tagged with the seed. */
 export const saveGeneratedRealMe = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { answers: SavedAnswers; seed: SeedInput }) => d)
+  .validator((d: {
+    answers: SavedAnswers;
+    seed?: SeedInput | null;
+    restoredFromVersionId?: string | null;
+  }) => d)
   .handler(async ({ data, context }) => {
     const creator = await requireCreator(context.supabase, context.userId);
 
@@ -253,14 +257,22 @@ export const saveGeneratedRealMe = createServerFn({ method: "POST" })
       .from("real_me_profile_versions").select("version_number")
       .eq("real_me_profile_id", profileId).order("version_number", { ascending: false }).limit(1).maybeSingle();
 
-    const seedPayload = {
-      gender: data.seed.gender,
-      ageBracket: data.seed.ageBracket,
-      lifestyle: data.seed.lifestyle,
-      traits: data.seed.traits,
-      source: "ai_generated" as const,
-      generatedAt: new Date().toISOString(),
-    };
+    const seedPayload = data.seed
+      ? {
+          gender: data.seed.gender,
+          ageBracket: data.seed.ageBracket,
+          lifestyle: data.seed.lifestyle,
+          traits: data.seed.traits,
+          source: "ai_generated" as const,
+          generatedAt: new Date().toISOString(),
+        }
+      : data.restoredFromVersionId
+        ? {
+            source: "restored_from_version" as const,
+            restoredFromVersionId: data.restoredFromVersionId,
+            restoredAt: new Date().toISOString(),
+          }
+        : null;
 
     const { data: newVersion, error: vErr } = await context.supabase
       .from("real_me_profile_versions")
