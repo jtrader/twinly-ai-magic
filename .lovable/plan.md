@@ -1,84 +1,64 @@
-# Persona form: dialog → dedicated pages + Venice field rename
+## Live preview + resilient error handling for the onboarding Character ID step
 
-## Why
+Enhance the Step 2 "Character ID (optional)" panel in `src/routes/studio.twin-onboarding.tsx` so a pasted Venice slug produces a prominent live preview, surfaces real errors clearly, offers a one-tap retry, and — if Venice keeps failing — falls back to a JSON paste box the creator can fill by hand.
 
-`src/routes/studio.personas.tsx` is 1,744 lines. The create and edit forms live inside two shadcn `Dialog`s (`CreatePersonaDialog`, `EditPersonaDialog`), each with 6+ tabs, uploads, video generation, invites, and a `VeniceCharacterField`. That causes real accessibility and UX problems:
+### 1. Split "not found" from "lookup failed" in the server fn
 
-- Focus is trapped inside a single scrolling modal for a very long form.
-- Long content forces awkward inner scroll while the page background scrolls too.
-- Mobile: dialog eats the viewport and the sticky footer covers inputs.
-- Deep sections (Twin/Invites/Saved) are not linkable — no URL, no back button, no browser history.
-- Screen-reader users hear one enormous `<dialog>` with heading levels reset inside.
+`src/lib/venice-character.functions.ts` currently either returns `{found: true|false}` or throws — the field then can't tell the two failure modes apart. Update the handler to catch upstream/network errors and return a third shape:
 
-Moving to dedicated pages fixes all of the above and lets us use proper `<main>`, semantic headings, and a scrollable page instead of a modal.
-
-Separately: the Venice quick-start field is labeled ambiguously and the helper text doesn't tell creators where in Venice to actually find the slug.
-
-## Scope
-
-1. New route: `/studio/personas/new` — replaces `CreatePersonaDialog`.
-2. New route: `/studio/personas/$personaId/edit` — replaces `EditPersonaDialog` (keeps the existing tab set: Basics, Training, Packs, Twin, Invites, Saved).
-3. Update `/studio/personas` list page: replace "New persona" dialog trigger with a `<Link to="/studio/personas/new">` button, and each row's "Edit" opens the new edit route via `<Link>`.
-4. Rename the Venice field to **"Venice Character ID"** and rewrite its helper text with concrete steps to find the slug on venice.ai.
-5. Delete `CreatePersonaDialog` and `EditPersonaDialog` once their contents are moved.
-
-Delete confirmation (`AlertDialog`) stays on the list page — it's short and modal is the right pattern there.
-
-## Page structure (both new routes)
-
-Wrap in the existing `AppShell` and render a real `<main>` with breadcrumb + page title, then the form. Use the existing `DashboardNav` breadcrumbs for `Studio › Personas › New` / `… › Edit <name>`.
-
-```text
-AppShell
- └─ <main>
-     ├─ Breadcrumb: Studio › Personas › New | Edit "<name>"
-     ├─ h1: New persona | Edit <name>
-     ├─ Tabs (edit only): Basics · Training · Packs · Twin · Invites · Saved
-     └─ Form sections (semantic <section> with h2 per section)
-        Sticky bottom bar: Cancel (Link back to /studio/personas) · Save
+```ts
+type LookupVeniceCharacterResult =
+  | { found: true; character: {...} }
+  | { found: false }
+  | { error: true; message: string };   // NEW — Venice API unreachable / non-200
 ```
 
-On save: navigate back to `/studio/personas` (create) or stay on the edit page and toast success (edit), matching current dialog behaviour.
+No throws for transport errors; validation errors (empty slug) still throw. Existing call sites keep working because they already narrow on `found`.
 
-## Accessibility fixes rolled in during the move
+### 2. `VeniceCharacterField` — richer preview + retry + failure counter
 
-- Replace the dialog wrapper with `<main>` + `<h1>`; every current in-dialog `h4`/`h5` becomes `h2`/`h3` in document order.
-- One `<main>` per route (rule from a11y skill).
-- Sticky footer becomes `role="region" aria-label="Form actions"` with `min-h-14` and buttons at ≥ 44×44.
-- All icon-only buttons in the form (avatar remove, invite copy, saved-message actions) get `aria-label`s where missing.
-- Long textareas keep visible labels (already present) — no `aria-label`-only inputs.
-- Replace any `h-screen` in the new routes with `h-dvh` where a full-height area is used.
-- Preserve keyboard tab order by keeping fields in their current visual order.
+`src/components/twinly/persona-form-shared.tsx`:
 
-Out of scope: rewriting individual field components or business logic. This is a container swap plus one label/helper rename.
+- **Preview card** (when `result.found === true`): keep the current row but bump image to `size-16`, add rounded card with border, show name (`text-sm font-semibold`), author, adult badge (`18+` pill), and 3-line description. Reuse the same component everywhere it's already rendered — the persona-editor call sites already look correct with a slightly bigger preview.
+- **"Not found"**: keep the red line, add a small "Double-check the ID on venice.ai" hint and a **Retry** button that re-runs `check()`.
+- **"Lookup failed"** (the new `error` branch): amber card with the message, a **Retry** button, and — this is the trigger — increment an internal `failCount` state.
+- **`failCount >= 2`**: reveal a new "Paste character JSON instead" `<details>` block (see step 3). Once revealed it stays visible for the rest of the session even if a later retry succeeds, so the creator isn't locked into a flaky loop.
+- Add a new optional prop `onManualPreview?: (preview: {name; photoUrl; ...}) => void` so callers (onboarding) can capture the parsed JSON preview if they want to show it above the field.
 
-## Venice Character ID rename
+### 3. Manual JSON fallback
 
-In `VeniceCharacterField`:
+Inside the same field, behind the `<details>` disclosure:
 
-- **Label**: `Venice Character ID (optional)`
-- **Helper text** (replaces current copy):
-  > Give this persona an established look and voice from a Character you've already published on Venice. To find the ID:
-  > 1. Sign in at venice.ai and open your Character.
-  > 2. In the URL `venice.ai/c/<id>`, the last segment is the Character ID (also shown as "Public ID" on the Character page).
-  > 3. Paste it here (e.g. `alan-watts`), then press **Preview** to confirm.
-  >
-  > Only takes effect on replies routed through Venice.
-- **Placeholder**: unchanged (`e.g. alan-watts`).
-- **Preview button**: unchanged behaviour (already calls `lookupVeniceCharacter`).
+- A `<Textarea>` labeled "Paste character JSON (from venice.ai export or the Network tab)".
+- **Parse** button runs `z.object({ slug: z.string().min(1), name: z.string().min(1), description: z.string().nullable().optional(), photoUrl: z.string().url().nullable().optional(), author: z.string().optional(), adult: z.boolean().optional() }).parse(JSON.parse(text))`.
+- On success: set `result` to `{ found: true, character: parsed }` locally (bypasses the API), also call `onChange(parsed.slug)` so Save persists the slug, and surface a small "Manually verified — Twinly will re-check on save" note. Do NOT mark the persisted record as verified — the DB still just stores the slug string.
+- On parse failure: inline zod error under the textarea.
+- Clear-textarea button + a link back to the auto-lookup path.
 
-Server field name (`veniceCharacterSlug` / DB column `venice_character_slug`) does not change — only the user-facing label and helper.
+### 4. Onboarding step wrapper (Step 2)
 
-## Files touched
+`src/routes/studio.twin-onboarding.tsx`, step 2 block:
 
-- Add: `src/routes/studio.personas.new.tsx`
-- Add: `src/routes/studio.personas.$personaId.edit.tsx`
-- Edit: `src/routes/studio.personas.tsx` — remove the two dialog components and their state; wire list buttons to `<Link>`s; keep the delete `AlertDialog`.
-- Edit: `src/components/twinly/DashboardNav.tsx` — add labels for the two new routes so breadcrumbs read cleanly.
-- Reuse (no changes): `VeniceCharacterField` moves into a shared spot (either kept in `studio.personas.tsx` and imported, or moved to `src/components/twinly/VeniceCharacterField.tsx`) — I'll extract it to the component folder so both new pages import cleanly.
+- Wrap `<VeniceCharacterField>` in a `<section aria-labelledby="onboarding-venice-heading">` with the existing heading.
+- Above the field, add a static "What you'll see" note: "A live preview of the Character's name, avatar and description will appear here once the ID checks out."
+- Below the field, if `result?.found === true` (via the new `onManualPreview` or by lifting the field's state through a callback), render a larger echo preview card summarising the character — this is the "prominent" preview requested. Reuses the same data, no extra API call.
+- Continue/Skip button behaviour unchanged. If a `found:false` or `error:true` result is on screen, disable "Save & continue" (keep "Skip") and show inline text "Fix or skip this step before continuing" — protects against saving obviously bad IDs during the guided flow, without blocking creators who genuinely want to skip.
 
-## Verification
+### 5. Files touched
 
-- `bunx tsgo --noEmit` clean.
-- Manual: create a new persona from `/studio/personas/new`, land back on the list. Edit an existing one from `/studio/personas/<id>/edit`, tabs deep-linkable via `?tab=training` if it's already implemented (otherwise unchanged).
-- Screenshot the new edit page on mobile viewport and confirm no focus trap and the sticky action bar is reachable.
+- **Edit** `src/lib/venice-character.functions.ts` — add `error` branch, catch upstream failures.
+- **Edit** `src/components/twinly/persona-form-shared.tsx` — enlarge preview, add retry, add JSON textarea fallback, add `onManualPreview` prop.
+- **Edit** `src/routes/studio.twin-onboarding.tsx` — wire the enhanced field into Step 2 with the wrapper section, echo preview, and gated Continue button.
+
+### 6. Accessibility
+
+- Preview cards use `aria-live="polite"` (already present on the field).
+- Retry button carries `aria-label="Retry Venice lookup"`.
+- `<details>` for the JSON fallback keeps it keyboard-toggleable without custom ARIA.
+- Error text keeps `role="alert"` for the "not found" and lookup-failed states.
+
+### Non-goals
+
+- No schema changes (still storing just `venice_character_slug`).
+- No caching layer — retries hit Venice directly, throttled by the existing 500 ms debounce.
+- No changes to the persona-editor call sites' layout beyond the richer preview card that flows naturally from the shared field.
