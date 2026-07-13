@@ -39,7 +39,7 @@ import {
   SingleSelectInput,
   YesNoInput,
 } from "@/components/twinly/RealMeInputs";
-import { ArrowLeft, CheckCircle2, Circle, History, Sparkles, Loader2, RefreshCw, X, Save } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, History, Sparkles, Loader2, RefreshCw, X, Save, Lock, Unlock } from "lucide-react";
 import { Download, RotateCcw, FileJson, FileText, Rows, LayoutGrid } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import {
@@ -99,6 +99,11 @@ function RealMePage() {
   const [activeSectionId, setActiveSectionId] = useState(REAL_ME_QUESTIONNAIRE[0].id);
   const [showHistory, setShowHistory] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
+  // Auto-kick generation the next time the dialog opens (used by Regenerate).
+  const [autoRunGenerate, setAutoRunGenerate] = useState(false);
+  // Snapshot of the picked/edited answers before a Regenerate, so we can diff
+  // the new variants against what the creator had.
+  const [previousPickAnswers, setPreviousPickAnswers] = useState<Record<string, unknown> | null>(null);
   // When set, we're reviewing an unsaved draft (from AI generation OR from
   // restoring an older version). Autosave is suppressed and Save/Discard
   // controls take over.
@@ -109,9 +114,48 @@ function RealMePage() {
   } | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // Per-question locks — locked ids are preserved by the AI on generate and
+  // become read-only in the editor until unlocked.
+  const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
+
+  // Load persisted locks per user.
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const raw = localStorage.getItem(`real-me:locks:${user.id}`);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setLockedIds(new Set(arr.filter((x) => typeof x === "string")));
+      }
+    } catch {}
+  }, [user]);
+
+  const persistLocks = useCallback((next: Set<string>) => {
+    if (!user) return;
+    try {
+      localStorage.setItem(`real-me:locks:${user.id}`, JSON.stringify([...next]));
+    } catch {}
+  }, [user]);
+
+  const toggleLock = useCallback((questionId: string) => {
+    setLockedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      persistLocks(next);
+      return next;
+    });
+  }, [persistLocks]);
+
+  const clearAllLocks = useCallback(() => {
+    setLockedIds(() => {
+      persistLocks(new Set());
+      return new Set();
+    });
+  }, [persistLocks]);
 
   useEffect(() => {
     if (!user) return;
@@ -143,6 +187,10 @@ function RealMePage() {
   }, [saveAnswer]);
 
   function onAnswer(questionId: string, value: unknown) {
+    if (lockedIds.has(questionId)) {
+      toast.message("This answer is locked. Unlock it to edit.");
+      return;
+    }
     if (draft) {
       setDraft((d) => (d ? { ...d, answers: { ...d.answers, [questionId]: value } } : d));
       return;
@@ -318,9 +366,24 @@ function RealMePage() {
         open={showGenerate}
         onOpenChange={setShowGenerate}
         initialSeed={draft?.seed ?? null}
+        autoRun={autoRunGenerate}
+        lockedIds={[...lockedIds]}
+        lockedAnswers={Object.fromEntries(
+          [...lockedIds]
+            .filter((id) => displayedAnswers[id] !== undefined)
+            .map((id) => [id, displayedAnswers[id] as any]),
+        )}
+        previousAnswers={previousPickAnswers}
         generate={(input) => generateVariants(input) as unknown as Promise<{ variants: Variant[] }>}
         onPick={(seed, answers) => {
-          setDraft({ seed, answers });
+          // Preserve any locked answers on top of the AI output as a final safety net.
+          const merged: Answers = { ...(answers as Answers) };
+          for (const id of lockedIds) {
+            if (displayedAnswers[id] !== undefined) merged[id] = displayedAnswers[id] as any;
+          }
+          setDraft({ seed, answers: merged });
+          setPreviousPickAnswers(null);
+          setAutoRunGenerate(false);
           setShowGenerate(false);
           setShowHistory(false);
           setActiveSectionId(REAL_ME_QUESTIONNAIRE[0].id);
