@@ -781,3 +781,71 @@ function VariantCard({ index, variant, onPick }: { index: number; variant: Varia
     </button>
   );
 }
+
+/** Key questions surfaced in the side-by-side comparison view. */
+const COMPARE_QUESTION_IDS: string[] = [
+  "1.1", // Name
+  "1.2", // Pronouns
+  "1.3", // Region
+  "2.1", // Character traits
+  "2.2", // Warmth/spark
+  "3.1", // Interests
+  "4.1", // Outlook
+  "5.1", // Communication style
+  "6.1", // Humor
+];
+
+function VariantCompareTable({ variants, onPick }: { variants: Variant[]; onPick: (v: Variant) => void }) {
+  const byId = new Map<string, QuestionDefinition>();
+  for (const s of REAL_ME_QUESTIONNAIRE) for (const q of s.questions) byId.set(q.id, q);
+  const rows = COMPARE_QUESTION_IDS.map((id) => byId.get(id)).filter((q): q is QuestionDefinition => !!q);
+
+  function fmt(v: unknown) {
+    if (v === null || v === undefined || v === "") return <span className="text-muted-foreground/60">—</span>;
+    if (Array.isArray(v)) return v.join(", ");
+    if (typeof v === "boolean") return v ? "Yes" : "No";
+    return String(v);
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border">
+      <table className="w-full min-w-[560px] border-collapse text-xs">
+        <thead className="bg-surface-elevated/60 text-[10px] uppercase tracking-widest text-muted-foreground">
+          <tr>
+            <th className="sticky left-0 z-10 bg-surface-elevated/60 px-3 py-2 text-left font-semibold">Field</th>
+            {variants.map((v, i) => (
+              <th key={v.id} className="border-l border-border px-3 py-2 text-left font-semibold">
+                <div className="flex items-center justify-between gap-2">
+                  <span>Variant {i + 1}</span>
+                  <Badge variant="outline" className="text-[10px]">{v.completion}%</Badge>
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((q) => (
+            <tr key={q.id} className="border-t border-border align-top">
+              <td className="sticky left-0 z-10 bg-surface px-3 py-2 font-medium text-muted-foreground">{q.promptText}</td>
+              {variants.map((v) => (
+                <td key={v.id + q.id} className="border-l border-border px-3 py-2">
+                  {fmt(v.answers[q.id])}
+                </td>
+              ))}
+            </tr>
+          ))}
+          <tr className="border-t border-border bg-surface-elevated/40">
+            <td className="sticky left-0 z-10 bg-surface-elevated/40 px-3 py-2" />
+            {variants.map((v) => (
+              <td key={"pick-" + v.id} className="border-l border-border px-3 py-2">
+                <Button size="sm" className="w-full" onClick={() => onPick(v)}>
+                  Pick this variant
+                </Button>
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
