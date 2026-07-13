@@ -47,6 +47,7 @@ function TwinOnboardingWizard() {
   const submitReview = useServerFn(submitTwinReferencesForReview);
   const loadBaseline = useServerFn(getBaselineVeniceCharacter);
   const saveBaseline = useServerFn(setBaselineVeniceCharacter);
+  const { ensureConsent } = useMediaUploadConsent();
 
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>((search.step as 1 | 2 | 3 | 4 | 5 | undefined) ?? 1);
   const [data, setData] = useState<Profile | null>(null);
@@ -156,6 +157,7 @@ function TwinOnboardingWizard() {
 
   async function uploadShot(shotLabel: string, file: File) {
     if (!data?.creator) return;
+    if (!(await ensureConsent({ context: "twin.onboarding.reference" }))) return;
     setUploading(shotLabel);
     try {
       const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
