@@ -851,6 +851,7 @@ function BulkUploadDialog({
   const [sharedGlobally, setSharedGlobally] = useState(false);
   const [busy, setBusy] = useState(false);
   const bulkFn = useServerFn(bulkCreateAssets);
+  const { ensureConsent } = useMediaUploadConsent();
 
   useEffect(() => {
     if (open) {
@@ -976,7 +977,12 @@ function BulkUploadDialog({
               multiple
               accept="image/*,video/*,audio/*,.txt,.md,.pdf"
               className="hidden"
-              onChange={(e) => { addFiles(e.target.files); e.currentTarget.value = ""; }}
+              onChange={async (e) => {
+                const files = e.target.files;
+                e.currentTarget.value = "";
+                if (files && files.length > 0 && !(await ensureConsent({ context: "content.vault.bulk_upload" }))) return;
+                addFiles(files);
+              }}
             />
           </label>
 
