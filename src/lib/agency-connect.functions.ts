@@ -44,10 +44,7 @@ function normalizeScopes(input: string[]): AgencyScope[] {
 export const listAvailableAgencies = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("agencies")
-      .select("id, name")
-      .order("name", { ascending: true });
+    const { data, error } = await (context.supabase as any).rpc("list_selectable_agencies");
     if (error) throw new Error(error.message);
     return { agencies: (data ?? []) as { id: string; name: string }[] };
   });
