@@ -1010,6 +1010,79 @@ function PersonaEditForm({
                 })}
               </ul>
             )}
+
+            <div className="mt-6 border-t border-border pt-4">
+              <h3 className="font-display text-sm font-semibold">Supporter invite grants</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                For personas marked <span className="font-semibold">Verified supporters only</span> in Basics. Each code lets one supporter unlock this persona without their own identity verification. Grants auto-revoke if the supporter's identity later expires or is revoked.
+              </p>
+              {!requiresVerifiedSupporter && (
+                <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
+                  Turn on "Verified supporters only" in Basics to make supporter grants meaningful.
+                </div>
+              )}
+              <div className="mt-3 flex flex-wrap items-end gap-2">
+                <div>
+                  <Label htmlFor="grant-expiry" className="text-xs">Expires in (hours)</Label>
+                  <Input
+                    id="grant-expiry"
+                    type="number"
+                    className="mt-1 w-32"
+                    min={1}
+                    max={2160}
+                    value={grantExpiryHours}
+                    onChange={(e) => setGrantExpiryHours(Math.max(1, Number(e.target.value) || 1))}
+                  />
+                </div>
+                <Button type="button" size="sm" onClick={generateGrant} disabled={grantsBusy}>
+                  {grantsBusy ? "Creating…" : "Generate supporter invite"}
+                </Button>
+              </div>
+              {grants === null ? (
+                <div className="mt-3 text-sm text-muted-foreground">Loading grants…</div>
+              ) : grants.length === 0 ? (
+                <div className="mt-3 rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                  No supporter grants yet.
+                </div>
+              ) : (
+                <ul className="mt-3 space-y-2">
+                  {grants.map((g) => {
+                    const url = typeof window !== "undefined" ? `${window.location.origin}/invite-grant/${g.code}` : `/invite-grant/${g.code}`;
+                    const isRevoked = !!g.revoked_at;
+                    const isRedeemed = !!g.redeemed_by_user_id;
+                    const isExpired = g.expires_at && new Date(g.expires_at).getTime() < Date.now();
+                    const label = isRevoked ? "revoked" : isExpired ? "expired" : isRedeemed ? "redeemed" : "pending";
+                    const tone = isRevoked ? "border-rose-400/30 bg-rose-400/10 text-rose-300"
+                      : isExpired ? "border-muted-foreground/30 bg-surface text-muted-foreground"
+                      : isRedeemed ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                      : "border-border bg-surface text-muted-foreground";
+                    return (
+                      <li key={g.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface p-2.5 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest ${tone}`}>{label}</span>
+                            <span className="text-muted-foreground">Created {new Date(g.created_at).toLocaleDateString()}</span>
+                            {g.expires_at && <span className="text-muted-foreground">· Expires {new Date(g.expires_at).toLocaleDateString()}</span>}
+                            {g.revocation_reason && <span className="text-rose-300">· {g.revocation_reason.replace(/_/g, " ")}</span>}
+                          </div>
+                          {!isRevoked && !isExpired && !isRedeemed && (
+                            <button
+                              type="button"
+                              className="mt-1 block truncate text-left text-brand-glow underline"
+                              onClick={() => { navigator.clipboard.writeText(url); toast.success("Supporter link copied"); }}
+                              title={url}
+                            >{url}</button>
+                          )}
+                        </div>
+                        {!isRevoked && (
+                          <Button size="sm" variant="ghost" disabled={grantsBusy} onClick={() => handleRevokeGrant(g.id)}>Revoke</Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           </section>
         )}
 
