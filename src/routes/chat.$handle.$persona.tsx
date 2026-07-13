@@ -21,10 +21,28 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { Moon } from "lucide-react";
 
-function friendlyChatError(message: string | undefined): string {
-  if (message === "AGE_GATE_REQUIRED") return "Confirm your age from your account to continue.";
-  if (message === "ID_VERIFICATION_REQUIRED") return "This persona requires identity verification — verify from your account to continue.";
-  return message ?? "Failed to send";
+function friendlyChatError(message: string | undefined): { text: string; needsIdVerify?: boolean; needsAgeGate?: boolean } {
+  if (message === "AGE_GATE_REQUIRED") return { text: "Confirm your age from your account to continue.", needsAgeGate: true };
+  if (message === "ID_VERIFICATION_REQUIRED") return {
+    text: "This creator restricts this content to verified supporters. Verify your identity to join — Stripe handles it in a few minutes and Twinly never stores your ID.",
+    needsIdVerify: true,
+  };
+  return { text: message ?? "Failed to send" };
+}
+
+function showChatError(err: any) {
+  const info = friendlyChatError(err?.message);
+  if (info.needsIdVerify || info.needsAgeGate) {
+    toast.error(info.text, {
+      duration: 8000,
+      action: {
+        label: info.needsIdVerify ? "Verify identity" : "Verify age",
+        onClick: () => { window.location.href = "/account"; },
+      },
+    });
+    return;
+  }
+  toast.error(info.text);
 }
 
 const loadPersonaChat = createServerFn({ method: "GET" })
@@ -138,7 +156,7 @@ function ChatPage() {
         toast.message("Message delivered to creator", { description: "A team member is handling this conversation directly now." });
       }
     } catch (err: any) {
-      toast.error(friendlyChatError(err.message));
+      showChatError(err);
     } finally { setSending(false); }
   }
 
@@ -175,7 +193,7 @@ function ChatPage() {
         }]);
       }
     } catch (err: any) {
-      toast.error(friendlyChatError(err.message));
+      showChatError(err);
     } finally { setSending(false); }
   }
 

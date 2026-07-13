@@ -11,6 +11,8 @@ import { getMyFeed, listMyFollows, toggleFollow, setFavorite } from "@/lib/follo
 import { PostFeed } from "@/components/twinly/PostFeed";
 import { getHomeFeed } from "@/lib/posts.functions";
 import { getMyProfile } from "@/lib/profile.functions";
+import { getMyIdentityVerificationStatus } from "@/lib/identity-verification.functions";
+import { SetupChecklist, type ChecklistStep } from "@/components/twinly/SetupChecklist";
 import { SupporterJourneyDialog } from "@/components/twinly/SupporterJourneyDialog";
 import { toast } from "sonner";
 import { DoorOpen, UserMinus, Users } from "lucide-react";
@@ -37,10 +39,13 @@ function FanDashboard() {
   const [follows, setFollows] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [journey, setJourney] = useState<{ creatorId: string; creatorName: string; tier: "base" | "plus" | "vip" } | null>(null);
+  const [idStatus, setIdStatus] = useState<{ idVerifiedAt: string | null; latestSession: { status?: string } | null } | null>(null);
+  const [idLoading, setIdLoading] = useState(true);
   const loadFeed = useServerFn(getMyFeed);
   const loadFollows = useServerFn(listMyFollows);
   const loadPosts = useServerFn(getHomeFeed);
   const loadProfile = useServerFn(getMyProfile);
+  const loadIdStatus = useServerFn(getMyIdentityVerificationStatus);
   const unfollow = useServerFn(toggleFollow);
   const favorite = useServerFn(setFavorite);
 
@@ -62,17 +67,20 @@ function FanDashboard() {
       setConvos(c ?? []);
       setProfile(Array.isArray(p) ? (p[0] ?? null) : (p ?? null));
       try {
-        const [f, fol, ps, prof] = await Promise.all([
+        const [f, fol, ps, prof, idres] = await Promise.all([
           loadFeed({}),
           loadFollows({}),
           loadPosts({ data: {} }).catch(() => ({ items: [] })),
           loadProfile().catch(() => ({ profile: null })),
+          loadIdStatus().catch(() => null),
         ]);
         setFeed(f.items ?? []);
         setFollows(fol ?? []);
         setPosts(ps.items ?? []);
         setProfileInfo(prof.profile);
+        setIdStatus(idres as any);
       } catch {}
+      setIdLoading(false);
       setReady(true);
     })();
   }, [user]);
@@ -112,13 +120,75 @@ function FanDashboard() {
 
   const profileComplete = !!profileInfo?.profile_completed_at;
   const ageVerified = !!profile?.age_verified_at;
-  const onboardingSteps = [
-    { key: "profile", label: "Complete your profile", done: profileComplete, cta: "/account/setup", ctaLabel: profileComplete ? "Edit" : "Continue" },
-    { key: "age", label: "Verify your age (18+)", done: ageVerified, cta: "/account", ctaLabel: ageVerified ? "Manage" : "Verify" },
-    { key: "personalise", label: "Personalise a creator experience", done: false, hint: subs.length === 0 ? "Subscribe to a creator to unlock this." : "Tap Personalise on a subscribed creator below." },
+  const idVerified = !!idStatus?.idVerifiedAt;
+  const idPending = !idVerified && idStatus?.latestSession?.status === "pending";
+  const followingAny = follows.length > 0;
+  const hasSub = subs.some((s) => s.status === "active");
+  const supporterSteps: ChecklistStep[] = [
+    {
+      key: "profile",
+      title: "Complete your profile",
+      to: "/account/setup",
+      done: profileComplete,
+      why: "A display name and avatar make your messages feel personal to creators.",
+      who: "Just you — never shown publicly unless you post.",
+      what: "Set display name, avatar, and preferences.",
+      how: "About a minute.",
+    },
+    {
+      key: "age",
+      title: "Verify your age (18+)",
+      to: "/account",
+      done: ageVerified,
+      why: "Required by law to access adult creator content on Twinly.",
+      who: "You — a one-tap self-attestation.",
+      what: "Confirm you're 18 or older.",
+      how: "10 seconds.",
+    },
+    {
+      key: "identity",
+      title: "Verify your identity (optional)",
+      to: "/account",
+      done: idVerified,
+      optional: true,
+      loading: idLoading,
+      statusReason: idVerified
+        ? "Verified — you can join every creator's audience."
+        : idPending
+          ? "Pending — Stripe is reviewing your submission."
+          : "Some creators restrict content to verified supporters. Verify once here to unlock all of them.",
+      statusTone: idVerified ? "ok" : idPending ? "warn" : "info",
+      why: "Creators can restrict chats or posts to verified supporters only. Verifying once here unlocks any creator who requires it.",
+      who: "Stripe Identity handles the ID + selfie — Twinly never sees or stores your document.",
+      what: "Snap your ID and a selfie in Stripe's hosted flow.",
+      how: "Around 2–3 minutes. Result comes back automatically.",
+    },
+    {
+      key: "follow",
+      title: "Follow a creator",
+      to: "/discover",
+      done: followingAny,
+      why: "Following is free — you'll see every public post from that creator in your feed.",
+      who: "You and the creators you pick.",
+      what: "Browse Discover and hit Follow.",
+      how: "One tap per creator.",
+    },
+    {
+      key: "personalise",
+      title: "Personalise a creator experience",
+      to: "/discover",
+      done: false,
+      optional: true,
+      statusReason: hasSub
+        ? "Tap Personalise on a subscribed creator below."
+        : "Subscribe to a creator first to unlock personalisation.",
+      statusTone: "info",
+      why: "Personalisation tailors an AI persona's tone and topics to what you enjoy.",
+      who: "You and the creator's AI persona.",
+      what: "Answer a short questionnaire on any subscribed creator.",
+      how: "About a minute per creator.",
+    },
   ];
-  const doneCount = onboardingSteps.filter((s) => s.done).length;
-  const showChecklist = !profileComplete || !ageVerified;
 
   return (
     <AppShell>
@@ -128,38 +198,7 @@ function FanDashboard() {
         <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
       </div>
 
-      {showChecklist && (
-        <section className="mb-6 rounded-2xl border border-brand/30 bg-brand/10 p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="font-display text-lg font-semibold text-brand-glow">Finish setting up your account</div>
-              <p className="text-xs text-muted-foreground">{doneCount} of {onboardingSteps.length} done — takes about a minute.</p>
-            </div>
-            <Sparkles className="size-5 text-brand-glow" aria-hidden />
-          </div>
-          <ul className="mt-4 space-y-2">
-            {onboardingSteps.map((s) => (
-              <li key={s.key} className="flex items-center gap-3 rounded-xl border border-border/60 bg-surface px-3 py-2.5">
-                <CheckCircle2
-                  className={"size-4 shrink-0 " + (s.done ? "text-emerald-400" : "text-muted-foreground/40")}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
-                  <div className={"text-sm " + (s.done ? "text-muted-foreground line-through" : "font-medium")}>{s.label}</div>
-                  {s.hint && <div className="text-[11px] text-muted-foreground">{s.hint}</div>}
-                </div>
-                {s.cta && (
-                  <Link to={s.cta as any}>
-                    <Button size="sm" variant={s.done ? "ghost" : "default"}>
-                      {s.ctaLabel} <ChevronRight className="ml-1 size-3.5" />
-                    </Button>
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <SetupChecklist steps={supporterSteps} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Active rooms" value={subs.filter((s) => s.status === "active").length} />
