@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { ShieldCheck, Upload, CheckCircle2, Loader2, ArrowRight } from "lucide-react";
@@ -14,6 +15,9 @@ import { VeniceCharacterField } from "@/components/twinly/persona-form-shared";
 
 export const Route = createFileRoute("/studio/twin-onboarding")({
   component: TwinOnboardingWizard,
+  validateSearch: z.object({
+    step: z.coerce.number().int().min(1).max(5).optional(),
+  }),
   head: () => ({ meta: [{ title: "Set up your AI Twin — Twinly.life" }, { name: "robots", content: "noindex" }] }),
 });
 
@@ -35,6 +39,7 @@ type Profile = Awaited<ReturnType<typeof getTwinProfile>>;
 function TwinOnboardingWizard() {
   const { user, loading } = useSession();
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const load = useServerFn(getTwinProfile);
   const add = useServerFn(addTwinReference);
   const upsertConsent = useServerFn(upsertTwinConsent);
@@ -42,7 +47,7 @@ function TwinOnboardingWizard() {
   const loadBaseline = useServerFn(getBaselineVeniceCharacter);
   const saveBaseline = useServerFn(setBaselineVeniceCharacter);
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>((search.step as 1 | 2 | 3 | 4 | 5 | undefined) ?? 1);
   const [data, setData] = useState<Profile | null>(null);
   const [ready, setReady] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -63,6 +68,14 @@ function TwinOnboardingWizard() {
   const [baselineStatus, setBaselineStatus] = useState<"idle" | "ok" | "not_found" | "error">("idle");
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
+
+  // Keep local step synced with ?step=N on subsequent navigations from the
+  // dashboard checklist (arriving mid-session with a new deep link).
+  useEffect(() => {
+    if (search.step && search.step >= 1 && search.step <= 5) {
+      setStep(search.step as 1 | 2 | 3 | 4 | 5);
+    }
+  }, [search.step]);
 
   const refresh = async () => {
     try {
