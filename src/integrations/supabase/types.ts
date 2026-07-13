@@ -2353,6 +2353,8 @@ export type Database = {
           handle: string | null
           id: string
           id_verified_at: string | null
+          legal_accepted_at: string | null
+          legal_accepted_version: string | null
           media_upload_consent_at: string | null
           media_upload_consent_version: string | null
           profile_completed_at: string | null
@@ -2373,6 +2375,8 @@ export type Database = {
           handle?: string | null
           id: string
           id_verified_at?: string | null
+          legal_accepted_at?: string | null
+          legal_accepted_version?: string | null
           media_upload_consent_at?: string | null
           media_upload_consent_version?: string | null
           profile_completed_at?: string | null
@@ -2393,6 +2397,8 @@ export type Database = {
           handle?: string | null
           id?: string
           id_verified_at?: string | null
+          legal_accepted_at?: string | null
+          legal_accepted_version?: string | null
           media_upload_consent_at?: string | null
           media_upload_consent_version?: string | null
           profile_completed_at?: string | null
@@ -3696,6 +3702,8 @@ export type Database = {
           handle: string | null
           id: string
           id_verified_at: string | null
+          legal_accepted_at: string | null
+          legal_accepted_version: string | null
           media_upload_consent_at: string | null
           media_upload_consent_version: string | null
           profile_completed_at: string | null
@@ -3715,6 +3723,10 @@ export type Database = {
           age_verified_at: string
           profile_completed_at: string
         }[]
+      }
+      has_accepted_legal: {
+        Args: { _min_version?: string; _user_id: string }
+        Returns: boolean
       }
       has_creator_access: {
         Args: { _creator_id: string; _min_tier?: string; _user_id: string }
