@@ -114,6 +114,7 @@ function RealMePage() {
   } | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmClearLocks, setConfirmClearLocks] = useState(false);
   // Per-question locks — locked ids are preserved by the AI on generate and
   // become read-only in the editor until unlocked.
   const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
@@ -156,6 +157,33 @@ function RealMePage() {
       return new Set();
     });
   }, [persistLocks]);
+
+  // Collect every question id in the questionnaire (respecting current answers'
+  // conditional visibility) so bulk lock/unlock only targets relevant fields.
+  const allEffectiveQuestionIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const section of REAL_ME_QUESTIONNAIRE) {
+      for (const q of effectiveQuestions(section, (draft?.answers ?? answers) as Answers)) {
+        ids.push(q.id);
+      }
+    }
+    return ids;
+  }, [answers, draft]);
+
+  const lockAll = useCallback(() => {
+    const next = new Set(allEffectiveQuestionIds);
+    persistLocks(next);
+    setLockedIds(next);
+    toast.success(`Locked ${next.size} answer${next.size === 1 ? "" : "s"}.`);
+  }, [allEffectiveQuestionIds, persistLocks]);
+
+  const confirmedClearAllLocks = useCallback(() => {
+    const count = lockedIds.size;
+    persistLocks(new Set());
+    setLockedIds(new Set());
+    setConfirmClearLocks(false);
+    toast.message(`Cleared ${count} lock${count === 1 ? "" : "s"}.`);
+  }, [lockedIds.size, persistLocks]);
 
   useEffect(() => {
     if (!user) return;
@@ -274,18 +302,33 @@ function RealMePage() {
           <h1 className="font-display text-2xl font-bold">Real Me baseline</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-          {lockedIds.size > 0 && (
-            <Badge variant="outline" className="gap-1 border-amber-400/50 text-amber-400">
-              <Lock className="size-3" /> {lockedIds.size} locked
-              <button
-                type="button"
-                onClick={clearAllLocks}
-                className="ml-1 underline hover:text-amber-300"
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className={lockedIds.size > 0 ? "border-amber-400/50 text-amber-400" : undefined}>
+                {lockedIds.size > 0 ? <Lock className="mr-1.5 size-4" /> : <Unlock className="mr-1.5 size-4" />}
+                <span className="hidden sm:inline">Locks</span>
+                {lockedIds.size > 0 && (
+                  <Badge variant="outline" className="ml-1.5 border-amber-400/50 px-1.5 py-0 text-[10px] text-amber-400">
+                    {lockedIds.size}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem
+                onClick={lockAll}
+                disabled={allEffectiveQuestionIds.length === 0 || lockedIds.size >= allEffectiveQuestionIds.length}
               >
-                clear
-              </button>
-            </Badge>
-          )}
+                <Lock className="mr-2 size-4" /> Lock all answers
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setConfirmClearLocks(true)}
+                disabled={lockedIds.size === 0}
+              >
+                <Unlock className="mr-2 size-4" /> Unlock all answers
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" variant="outline" onClick={() => setShowHistory((s) => !s)} disabled={!!draft}>
             <History className="mr-1.5 size-4" />
             <span className="hidden sm:inline">Version history</span>
@@ -429,6 +472,22 @@ function RealMePage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Keep editing</AlertDialogCancel>
             <AlertDialogAction onClick={discardDraft}>Discard draft</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmClearLocks} onOpenChange={setConfirmClearLocks}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unlock all {lockedIds.size} answer{lockedIds.size === 1 ? "" : "s"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              After unlocking, the AI will be free to overwrite these answers the next time
+              you Generate or Regenerate. Your saved values stay the same until then.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep locks</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmedClearAllLocks}>Unlock all</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
