@@ -4,10 +4,9 @@ import { logAudit } from "./audit.server";
 import { screenMessage, recordModerationEvent } from "./moderation.server";
 
 /**
- * List conversations the creator replies to directly: Real Me threads, plus
- * any AI persona conversation a moderator has handed off in place (design
- * doc item 4 — ai_suspended), which lands here rather than in a separate
- * inbox.
+ * List every conversation across the creator's personas so the creator can
+ * jump into any private chat — Real Me, AI on auto-pilot, or AI handed off —
+ * and take over or hand back to the AI twin at their discretion.
  */
 export const listInboxConversations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -27,18 +26,12 @@ export const listInboxConversations = createServerFn({ method: "GET" })
       .in("creator_id", creatorIds);
     const personaIds = (personas ?? []).map((p: any) => p.id);
     if (personaIds.length === 0) return { conversations: [], creators: owned ?? [] };
-    const personaMapPre = new Map((personas ?? []).map((p: any) => [p.id, p]));
 
-    const { data: allConvos } = await supabase
+    const { data: convos } = await supabase
       .from("conversations")
       .select("id, fan_id, creator_id, persona_id, started_at, last_message_at, ai_suspended")
       .in("persona_id", personaIds)
       .order("last_message_at", { ascending: false, nullsFirst: false });
-
-    const convos = (allConvos ?? []).filter((c: any) => {
-      const kind = personaMapPre.get(c.persona_id)?.kind;
-      return kind === "real_me" || c.ai_suspended;
-    });
 
     if (!convos || convos.length === 0) return { conversations: [], creators: owned ?? [] };
 
