@@ -37,6 +37,16 @@ import {
   YesNoInput,
 } from "@/components/twinly/RealMeInputs";
 import { ArrowLeft, CheckCircle2, Circle, History, Sparkles, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { SeedInput } from "@/lib/real-me-generate.functions";
 
 export const Route = createFileRoute("/studio/real-me")({
   component: RealMePage,
