@@ -265,61 +265,229 @@ function TwinOnboardingWizard() {
     }
   }
 
-  // Bulk upload — assign each dropped/selected file to the next unfilled
-  // recommended shot slot in order; overflow goes into "Additional N".
-  async function uploadShotsBulk(files: File[]) {
-    if (!data?.creator || files.length === 0) return;
+  // ---- Bulk-upload staging queue (previews, progress, cancel, persistence)
+  const [pending, setPending] = useState<PendingItem[]>([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  const cancelRef = useRef(false);
+  const blobsRef = useRef<Map<string, Blob>>(new Map());     // id -> live Blob (in-memory only)
+  const bulkStorageKey = user ? `twin-bulk-queue:${user.id}` : null;
+  const hydratedBulkRef = useRef(false);
+
+  const serverLabels = useMemo(
+    () => new Set(identityRefs.map((r: any) => r.slot_label as string)),
+    [identityRefs],
+  );
+
+  // Recompute assignments whenever the server's filled slots change so
+  // pending items don't collide with newly-uploaded ones.
+  useEffect(() => {
+    setPending((prev) => computeAssignments(prev, serverLabels));
+  }, [serverLabels]);
+
+  // Hydrate the queue on mount (once we know the user id).
+  useEffect(() => {
+    if (hydratedBulkRef.current || !bulkStorageKey || typeof window === "undefined") return;
+    hydratedBulkRef.current = true;
+    try {
+      const raw = window.localStorage.getItem(bulkStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as PendingItem[];
+      if (!Array.isArray(parsed)) return;
+      const restored: PendingItem[] = parsed
+        .filter((p) => p && typeof p.id === "string" && typeof p.name === "string")
+        .map((p) => {
+          const hasBody = !!p.bodyDataUrl;
+          return {
+            id: p.id,
+            name: p.name,
+            size: p.size ?? 0,
+            type: p.type ?? "image/jpeg",
+            thumb: p.thumb,
+            bodyDataUrl: p.bodyDataUrl,
+            assignedLabel: p.assignedLabel,
+            status: (hasBody ? "pending" : "needs_reattach") as PendingStatus,
+            error: p.error,
+            hasBlob: hasBody,
+          };
+        });
+      // Rebuild in-memory blobs from any persisted bodies so uploads can run.
+      for (const item of restored) {
+        if (item.bodyDataUrl) {
+          try {
+            const blob = dataUrlToBlob(item.bodyDataUrl);
+            blobsRef.current.set(item.id, blob);
+          } catch {
+            item.hasBlob = false;
+            item.status = "needs_reattach";
+          }
+        }
+      }
+      setPending(computeAssignments(restored, serverLabels));
+    } catch {
+      /* corrupt draft — ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkStorageKey]);
+
+  // Persist queue on every change. Full bodies are stored opportunistically
+  // (biggest-item-first) until the payload budget is reached.
+  useEffect(() => {
+    if (!hydratedBulkRef.current || !bulkStorageKey || typeof window === "undefined") return;
+    try {
+      if (pending.length === 0) {
+        window.localStorage.removeItem(bulkStorageKey);
+        return;
+      }
+      const totalThumbBytes = pending.reduce((sum, p) => sum + p.thumb.length, 0);
+      let remaining = Math.max(0, BULK_PERSIST_BUDGET - totalThumbBytes);
+      const withBodies = [...pending].sort((a, b) => (a.bodyDataUrl?.length ?? 0) - (b.bodyDataUrl?.length ?? 0));
+      const bodyById = new Map<string, string | undefined>();
+      for (const p of withBodies) {
+        const len = p.bodyDataUrl?.length ?? 0;
+        if (len && len <= remaining) {
+          bodyById.set(p.id, p.bodyDataUrl);
+          remaining -= len;
+        } else {
+          bodyById.set(p.id, undefined);
+        }
+      }
+      const persisted = pending.map((p) => ({
+        id: p.id, name: p.name, size: p.size, type: p.type,
+        thumb: p.thumb, bodyDataUrl: bodyById.get(p.id),
+        assignedLabel: p.assignedLabel,
+        status: p.status === "uploading" ? "pending" : p.status,
+        error: p.error,
+      }));
+      window.localStorage.setItem(bulkStorageKey, JSON.stringify(persisted));
+    } catch {
+      /* quota exceeded — best-effort only */
+    }
+  }, [pending, bulkStorageKey]);
+
+  const enqueueFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+    const additions: PendingItem[] = [];
+    let skipped = 0;
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) {
+        toast.error(`Skipped "${file.name}" — not an image.`);
+        skipped++; continue;
+      }
+      if (file.size > BULK_MAX_BYTES) {
+        toast.error(`Skipped "${file.name}" — larger than 15 MB.`);
+        skipped++; continue;
+      }
+      // If a "needs re-attach" item with the same filename exists, refill it.
+      const orphan = pending.find((p) => p.status === "needs_reattach" && p.name === file.name);
+      const id = orphan?.id ?? crypto.randomUUID();
+      blobsRef.current.set(id, file);
+      const thumb = await makeThumb(file);
+      const bodyDataUrl = file.size <= 512 * 1024 ? await blobToDataUrl(file) : undefined;
+      const base: PendingItem = orphan
+        ? { ...orphan, thumb, bodyDataUrl, status: "pending", error: undefined, hasBlob: true, size: file.size, type: file.type }
+        : {
+            id, name: file.name, size: file.size, type: file.type, thumb, bodyDataUrl,
+            assignedLabel: "", status: "pending", hasBlob: true,
+          };
+      if (orphan) {
+        setPending((prev) => computeAssignments(prev.map((p) => p.id === id ? base : p), serverLabels));
+      } else {
+        additions.push(base);
+      }
+    }
+    if (additions.length) {
+      setPending((prev) => computeAssignments([...prev, ...additions], serverLabels));
+    }
+    if (additions.length + (files.length - skipped - additions.length) > 0) {
+      // silent success — the queue UI is the confirmation
+    }
+  }, [pending, serverLabels]);
+
+  const removePending = useCallback((id: string) => {
+    blobsRef.current.delete(id);
+    setPending((prev) => computeAssignments(prev.filter((p) => p.id !== id), serverLabels));
+  }, [serverLabels]);
+
+  const reassignPending = useCallback((id: string, nextLabel: string) => {
+    setPending((prev) => {
+      const withNew = prev.map((p) => p.id === id ? { ...p, assignedLabel: nextLabel } : p);
+      // Bump any conflicting sibling off nextLabel then recompute.
+      const cleared = withNew.map((p) =>
+        p.id !== id && p.assignedLabel === nextLabel ? { ...p, assignedLabel: "" } : p,
+      );
+      return computeAssignments(cleared, serverLabels);
+    });
+  }, [serverLabels]);
+
+  const clearBulkQueue = useCallback(() => {
+    blobsRef.current.clear();
+    setPending([]);
+  }, []);
+
+  const cancelBulkUpload = useCallback(() => { cancelRef.current = true; }, []);
+
+  async function uploadBulkQueue() {
+    if (!data?.creator || pending.length === 0) return;
+    const runnable = pending.filter((p) => (p.status === "pending" || p.status === "error") && p.hasBlob);
+    if (runnable.length === 0) {
+      toast.error("Nothing to upload — re-attach any items marked with a warning first.");
+      return;
+    }
     if (!(await ensureConsent({ context: "twin.onboarding.reference" }))) return;
 
-    const MAX_BYTES = 15 * 1024 * 1024;
-    const eligible = files.filter((f) => {
-      if (!f.type.startsWith("image/")) {
-        toast.error(`Skipped "${f.name}" — not an image.`);
-        return false;
-      }
-      if (f.size > MAX_BYTES) {
-        toast.error(`Skipped "${f.name}" — larger than 15 MB.`);
-        return false;
-      }
-      return true;
-    });
-    if (eligible.length === 0) return;
+    cancelRef.current = false;
+    setBulkBusy(true);
+    setBulkProgress({ done: 0, total: runnable.length });
 
-    // Snapshot which recommended labels are already filled so we don't reuse
-    // them across this batch even before the server round-trip refreshes.
-    const takenLabels = new Set(identityRefs.map((r: any) => r.slot_label as string));
-    const openSlots = RECOMMENDED_SHOTS.filter((s) => !takenLabels.has(s.label)).map((s) => s.label);
-    const existingAdditional = identityRefs
-      .map((r: any) => r.slot_label as string)
-      .filter((l) => /^Additional \d+$/.test(l))
-      .map((l) => Number(l.replace(/^Additional /, "")));
-    let nextAdditional = existingAdditional.length ? Math.max(...existingAdditional) + 1 : 1;
-
-    let ok = 0;
-    let failed = 0;
-    for (const file of eligible) {
-      const label = openSlots.shift() ?? `Additional ${nextAdditional++}`;
-      setUploading(`${label} (${ok + failed + 1}/${eligible.length})`);
+    let ok = 0, failed = 0, canceled = 0;
+    for (const item of runnable) {
+      if (cancelRef.current) {
+        canceled++;
+        setPending((prev) => prev.map((p) => p.id === item.id ? { ...p, status: "canceled" } : p));
+        continue;
+      }
+      setPending((prev) => prev.map((p) => p.id === item.id ? { ...p, status: "uploading", error: undefined } : p));
+      const blob = blobsRef.current.get(item.id);
+      if (!blob) {
+        failed++;
+        setPending((prev) => prev.map((p) => p.id === item.id ? { ...p, status: "needs_reattach", hasBlob: false, error: "Re-attach the file" } : p));
+        continue;
+      }
       try {
-        const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
+        const ext = item.name.includes(".") ? item.name.slice(item.name.lastIndexOf(".")) : "";
         const key = `${data.creator.id}/twin/identity_ref/${crypto.randomUUID()}${ext}`;
         const { error } = await supabase.storage
           .from("content-assets")
-          .upload(key, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
-        if (error) { failed++; toast.error(`${file.name}: ${error.message}`); continue; }
-        await add({ data: { kind: "identity_ref", storagePath: key, mimeType: file.type || undefined, slotLabel: label } });
+          .upload(key, blob, { cacheControl: "3600", upsert: false, contentType: item.type || undefined });
+        if (error) throw error;
+        await add({ data: { kind: "identity_ref", storagePath: key, mimeType: item.type || undefined, slotLabel: item.assignedLabel } });
         ok++;
+        // Successful items are pruned from the queue (server owns them now).
+        blobsRef.current.delete(item.id);
+        setPending((prev) => prev.filter((p) => p.id !== item.id));
       } catch (e: any) {
         failed++;
-        toast.error(`${file.name}: ${e?.message ?? "Upload failed"}`);
+        const msg = e?.message ?? "Upload failed";
+        setPending((prev) => prev.map((p) => p.id === item.id ? { ...p, status: "error", error: msg } : p));
+        toast.error(`${item.name}: ${msg}`);
+      } finally {
+        setBulkProgress((s) => ({ ...s, done: s.done + 1 }));
       }
     }
-    setUploading(null);
+
+    setBulkBusy(false);
+    cancelRef.current = false;
     await refresh();
+
     if (ok > 0) {
       toast.success(
-        `Uploaded ${ok} photo${ok === 1 ? "" : "s"}${failed ? ` (${failed} failed)` : ""}.`,
+        `Uploaded ${ok} photo${ok === 1 ? "" : "s"}` +
+        (failed ? ` — ${failed} failed` : "") +
+        (canceled ? ` — ${canceled} canceled` : ""),
       );
+    } else if (canceled) {
+      toast.message(`Canceled. ${canceled} upload${canceled === 1 ? "" : "s"} skipped.`);
     }
   }
 
