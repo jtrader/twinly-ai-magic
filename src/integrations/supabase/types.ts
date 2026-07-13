@@ -1427,6 +1427,82 @@ export type Database = {
         }
         Relationships: []
       }
+      invite_grants: {
+        Row: {
+          code: string
+          created_at: string
+          created_by_user_id: string | null
+          creator_id: string
+          expires_at: string | null
+          id: string
+          max_uses: number
+          note: string | null
+          persona_id: string
+          redeemed_at: string | null
+          redeemed_by_user_id: string | null
+          revocation_reason: string | null
+          revoked_at: string | null
+          updated_at: string
+          uses_count: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by_user_id?: string | null
+          creator_id: string
+          expires_at?: string | null
+          id?: string
+          max_uses?: number
+          note?: string | null
+          persona_id: string
+          redeemed_at?: string | null
+          redeemed_by_user_id?: string | null
+          revocation_reason?: string | null
+          revoked_at?: string | null
+          updated_at?: string
+          uses_count?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by_user_id?: string | null
+          creator_id?: string
+          expires_at?: string | null
+          id?: string
+          max_uses?: number
+          note?: string | null
+          persona_id?: string
+          redeemed_at?: string | null
+          redeemed_by_user_id?: string | null
+          revocation_reason?: string | null
+          revoked_at?: string | null
+          updated_at?: string
+          uses_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_grants_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invite_grants_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invite_grants_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           ai_generated: boolean
@@ -1964,6 +2040,7 @@ export type Database = {
           persona_type: Database["public"]["Enums"]["persona_type"]
           price_cents: number
           require_id_verification: boolean
+          requires_verified_supporter: boolean
           slug: string
           sort_order: number
           starts_at: string | null
@@ -2009,6 +2086,7 @@ export type Database = {
           persona_type?: Database["public"]["Enums"]["persona_type"]
           price_cents?: number
           require_id_verification?: boolean
+          requires_verified_supporter?: boolean
           slug: string
           sort_order?: number
           starts_at?: string | null
@@ -2054,6 +2132,7 @@ export type Database = {
           persona_type?: Database["public"]["Enums"]["persona_type"]
           price_cents?: number
           require_id_verification?: boolean
+          requires_verified_supporter?: boolean
           slug?: string
           sort_order?: number
           starts_at?: string | null
@@ -3787,6 +3866,10 @@ export type Database = {
       }
       has_accepted_legal: {
         Args: { _min_version?: string; _user_id: string }
+        Returns: boolean
+      }
+      has_active_invite_grant: {
+        Args: { _persona_id: string; _user_id: string }
         Returns: boolean
       }
       has_creator_access: {

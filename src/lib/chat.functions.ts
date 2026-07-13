@@ -96,6 +96,14 @@ export const sendPersonaMessage = createServerFn({ method: "POST" })
       const { assertIdVerified } = await import("./identity-verification.functions");
       await assertIdVerified({ supabase, userId });
     }
+    if (userId !== creator.user_id && (persona as any).requires_verified_supporter) {
+      const { data: hasLevel } = await supabase.rpc("has_id_level", { _user_id: userId, _level: 1 });
+      if (!hasLevel) {
+        const { checkInviteGrantAccess } = await import("./invite-grants.functions");
+        const invited = await checkInviteGrantAccess(supabaseAdmin, persona.id, userId);
+        if (!invited) throw new Error("SUPPORTER_VERIFICATION_REQUIRED");
+      }
+    }
 
     // Create-or-fetch conversation (RLS-scoped user client)
     let conversationId = data.conversationId;

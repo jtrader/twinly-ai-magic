@@ -25,6 +25,9 @@ import {
 import {
   createPersonaInvite, listPersonaInvites, revokePersonaInvite,
 } from "@/lib/persona-invites.functions";
+import {
+  createInviteGrant, listInviteGrants, revokeInviteGrant,
+} from "@/lib/invite-grants.functions";
 import { getPersonaVisibilityPolicy, setPersonaDefaultVisibility } from "@/lib/feed-visibility.functions";
 import type { FeedVisibilityTier } from "@/lib/feed-visibility-access.server";
 import { nextFeedTierForToggle } from "@/lib/feed-visibility-tier-toggle";
@@ -149,6 +152,9 @@ function PersonaEditForm({
   const [voiceSimilarityBoost, setVoiceSimilarityBoost] = useState(((persona as any).voice_similarity_boost as number | null) ?? 0.75);
   const [voiceStyle, setVoiceStyle] = useState(((persona as any).voice_style as number | null) ?? 0);
   const [requireIdVerification, setRequireIdVerification] = useState(!!(persona as any).require_id_verification);
+  const [requiresVerifiedSupporter, setRequiresVerifiedSupporter] = useState(
+    !!(persona as any).requires_verified_supporter,
+  );
   const [veniceCharacterSlug, setVeniceCharacterSlug] = useState(((persona as any).venice_character_slug as string | null) ?? "");
   const [busy, setBusy] = useState(false);
 
@@ -208,6 +214,39 @@ function PersonaEditForm({
       setInvites((s) => s?.map((i) => i.id === inviteId ? { ...i, status: "revoked" } : i) ?? null);
     } catch (e: any) { toast.error(e.message ?? "Could not revoke invite"); }
     finally { setInviteBusy(false); }
+  }
+
+  // Supporter invite grants
+  const createGrantFn = useServerFn(createInviteGrant);
+  const listGrantsFn = useServerFn(listInviteGrants);
+  const revokeGrantFn = useServerFn(revokeInviteGrant);
+  const [grants, setGrants] = useState<any[] | null>(null);
+  const [grantsBusy, setGrantsBusy] = useState(false);
+  const [grantExpiryHours, setGrantExpiryHours] = useState<number>(168);
+  const refreshGrants = useCallback(async () => {
+    try {
+      const r = await listGrantsFn({ data: { personaId: persona.id } });
+      setGrants(r.grants ?? []);
+    } catch (e: any) { toast.error(e?.message ?? "Could not load supporter invites"); }
+  }, [listGrantsFn, persona.id]);
+  useEffect(() => { if (tab === "invites" && grants === null) refreshGrants(); }, [tab, grants, refreshGrants]);
+
+  async function generateGrant() {
+    setGrantsBusy(true);
+    try {
+      await createGrantFn({ data: { personaId: persona.id, expiresInHours: grantExpiryHours } });
+      setGrants(null); await refreshGrants();
+      toast.success("Supporter invite created");
+    } catch (e: any) { toast.error(e?.message ?? "Could not create supporter invite"); }
+    finally { setGrantsBusy(false); }
+  }
+  async function handleRevokeGrant(id: string) {
+    setGrantsBusy(true);
+    try {
+      await revokeGrantFn({ data: { grantId: id } });
+      setGrants((s) => s?.map((g) => g.id === id ? { ...g, revoked_at: new Date().toISOString(), revocation_reason: "creator_revoked" } : g) ?? null);
+    } catch (e: any) { toast.error(e?.message ?? "Could not revoke"); }
+    finally { setGrantsBusy(false); }
   }
   async function addSaved() {
     if (!newLabel.trim()) return;
@@ -380,6 +419,7 @@ function PersonaEditForm({
         voiceSimilarityBoost: persona.kind === "ai" && useClonedVoice ? voiceSimilarityBoost : undefined,
         voiceStyle: persona.kind === "ai" && useClonedVoice ? voiceStyle : undefined,
         requireIdVerification: persona.kind === "ai" ? requireIdVerification : undefined,
+        requiresVerifiedSupporter: persona.kind === "ai" ? requiresVerifiedSupporter : undefined,
         veniceCharacterSlug: persona.kind === "ai" ? veniceCharacterSlug : undefined,
         elevenlabsVoiceId: persona.kind === "ai" ? elevenlabsVoiceIdOverride : undefined,
         trainingNotes: { tone_examples: toneExamples, dos, donts, sample_phrasings: samplePhrasings, voice_ref_url: voiceRefUrl },
@@ -698,6 +738,15 @@ function PersonaEditForm({
                   </div>
                   <Switch id="edit-persona-require-id-verification" checked={requireIdVerification} onCheckedChange={setRequireIdVerification} />
                 </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <Label htmlFor="edit-persona-requires-verified-supporter">Verified supporters only</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      When on, this persona is only reachable by fans with an active Level 1 identity verification — or by anyone you personally invite via the <button type="button" className="text-brand-glow underline" onClick={() => setTab("invites")}>Invites</button> tab. If a supporter's verification later expires or is revoked, their invite-grant access is revoked automatically.
+                    </p>
+                  </div>
+                  <Switch id="edit-persona-requires-verified-supporter" checked={requiresVerifiedSupporter} onCheckedChange={setRequiresVerifiedSupporter} />
+                </div>
                 <div>
                   <Label>Content categories</Label>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -961,6 +1010,79 @@ function PersonaEditForm({
                 })}
               </ul>
             )}
+
+            <div className="mt-6 border-t border-border pt-4">
+              <h3 className="font-display text-sm font-semibold">Supporter invite grants</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                For personas marked <span className="font-semibold">Verified supporters only</span> in Basics. Each code lets one supporter unlock this persona without their own identity verification. Grants auto-revoke if the supporter's identity later expires or is revoked.
+              </p>
+              {!requiresVerifiedSupporter && (
+                <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
+                  Turn on "Verified supporters only" in Basics to make supporter grants meaningful.
+                </div>
+              )}
+              <div className="mt-3 flex flex-wrap items-end gap-2">
+                <div>
+                  <Label htmlFor="grant-expiry" className="text-xs">Expires in (hours)</Label>
+                  <Input
+                    id="grant-expiry"
+                    type="number"
+                    className="mt-1 w-32"
+                    min={1}
+                    max={2160}
+                    value={grantExpiryHours}
+                    onChange={(e) => setGrantExpiryHours(Math.max(1, Number(e.target.value) || 1))}
+                  />
+                </div>
+                <Button type="button" size="sm" onClick={generateGrant} disabled={grantsBusy}>
+                  {grantsBusy ? "Creating…" : "Generate supporter invite"}
+                </Button>
+              </div>
+              {grants === null ? (
+                <div className="mt-3 text-sm text-muted-foreground">Loading grants…</div>
+              ) : grants.length === 0 ? (
+                <div className="mt-3 rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                  No supporter grants yet.
+                </div>
+              ) : (
+                <ul className="mt-3 space-y-2">
+                  {grants.map((g) => {
+                    const url = typeof window !== "undefined" ? `${window.location.origin}/invite-grant/${g.code}` : `/invite-grant/${g.code}`;
+                    const isRevoked = !!g.revoked_at;
+                    const isRedeemed = !!g.redeemed_by_user_id;
+                    const isExpired = g.expires_at && new Date(g.expires_at).getTime() < Date.now();
+                    const label = isRevoked ? "revoked" : isExpired ? "expired" : isRedeemed ? "redeemed" : "pending";
+                    const tone = isRevoked ? "border-rose-400/30 bg-rose-400/10 text-rose-300"
+                      : isExpired ? "border-muted-foreground/30 bg-surface text-muted-foreground"
+                      : isRedeemed ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                      : "border-border bg-surface text-muted-foreground";
+                    return (
+                      <li key={g.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface p-2.5 text-xs">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest ${tone}`}>{label}</span>
+                            <span className="text-muted-foreground">Created {new Date(g.created_at).toLocaleDateString()}</span>
+                            {g.expires_at && <span className="text-muted-foreground">· Expires {new Date(g.expires_at).toLocaleDateString()}</span>}
+                            {g.revocation_reason && <span className="text-rose-300">· {g.revocation_reason.replace(/_/g, " ")}</span>}
+                          </div>
+                          {!isRevoked && !isExpired && !isRedeemed && (
+                            <button
+                              type="button"
+                              className="mt-1 block truncate text-left text-brand-glow underline"
+                              onClick={() => { navigator.clipboard.writeText(url); toast.success("Supporter link copied"); }}
+                              title={url}
+                            >{url}</button>
+                          )}
+                        </div>
+                        {!isRevoked && (
+                          <Button size="sm" variant="ghost" disabled={grantsBusy} onClick={() => handleRevokeGrant(g.id)}>Revoke</Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           </section>
         )}
 
