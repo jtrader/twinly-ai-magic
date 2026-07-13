@@ -1348,37 +1348,82 @@ export type Database = {
       }
       identity_verifications: {
         Row: {
+          client_secret_expires_at: string | null
           created_at: string
+          document_country: string | null
           environment: string
+          expires_at: string | null
           id: string
+          is_adult_verified: boolean
+          last_stripe_event_id: string | null
+          policy_version: string | null
           provider: string
           provider_session_id: string
+          redacted_at: string | null
           status: string
           updated_at: string
           user_id: string
+          verification_method: string | null
           verified_at: string | null
         }
         Insert: {
+          client_secret_expires_at?: string | null
           created_at?: string
+          document_country?: string | null
           environment: string
+          expires_at?: string | null
           id?: string
+          is_adult_verified?: boolean
+          last_stripe_event_id?: string | null
+          policy_version?: string | null
           provider?: string
           provider_session_id: string
+          redacted_at?: string | null
           status?: string
           updated_at?: string
           user_id: string
+          verification_method?: string | null
           verified_at?: string | null
         }
         Update: {
+          client_secret_expires_at?: string | null
           created_at?: string
+          document_country?: string | null
           environment?: string
+          expires_at?: string | null
           id?: string
+          is_adult_verified?: boolean
+          last_stripe_event_id?: string | null
+          policy_version?: string | null
           provider?: string
           provider_session_id?: string
+          redacted_at?: string | null
           status?: string
           updated_at?: string
           user_id?: string
+          verification_method?: string | null
           verified_at?: string | null
+        }
+        Relationships: []
+      }
+      identity_webhook_events: {
+        Row: {
+          environment: string
+          event_id: string
+          event_type: string
+          processed_at: string
+        }
+        Insert: {
+          environment: string
+          event_id: string
+          event_type: string
+          processed_at?: string
+        }
+        Update: {
+          environment?: string
+          event_id?: string
+          event_type?: string
+          processed_at?: string
         }
         Relationships: []
       }
@@ -2352,7 +2397,11 @@ export type Database = {
           full_name: string | null
           handle: string | null
           id: string
+          id_verification_expires_at: string | null
+          id_verification_level: number
+          id_verification_method: string | null
           id_verified_at: string | null
+          is_adult_verified: boolean
           legal_accepted_at: string | null
           legal_accepted_version: string | null
           media_upload_consent_at: string | null
@@ -2374,7 +2423,11 @@ export type Database = {
           full_name?: string | null
           handle?: string | null
           id: string
+          id_verification_expires_at?: string | null
+          id_verification_level?: number
+          id_verification_method?: string | null
           id_verified_at?: string | null
+          is_adult_verified?: boolean
           legal_accepted_at?: string | null
           legal_accepted_version?: string | null
           media_upload_consent_at?: string | null
@@ -2396,7 +2449,11 @@ export type Database = {
           full_name?: string | null
           handle?: string | null
           id?: string
+          id_verification_expires_at?: string | null
+          id_verification_level?: number
+          id_verification_method?: string | null
           id_verified_at?: string | null
+          is_adult_verified?: boolean
           legal_accepted_at?: string | null
           legal_accepted_version?: string | null
           media_upload_consent_at?: string | null
@@ -3701,7 +3758,11 @@ export type Database = {
           full_name: string | null
           handle: string | null
           id: string
+          id_verification_expires_at: string | null
+          id_verification_level: number
+          id_verification_method: string | null
           id_verified_at: string | null
+          is_adult_verified: boolean
           legal_accepted_at: string | null
           legal_accepted_version: string | null
           media_upload_consent_at: string | null
@@ -3730,6 +3791,10 @@ export type Database = {
       }
       has_creator_access: {
         Args: { _creator_id: string; _min_tier?: string; _user_id: string }
+        Returns: boolean
+      }
+      has_id_level: {
+        Args: { _level: number; _user_id: string }
         Returns: boolean
       }
       has_role: {
