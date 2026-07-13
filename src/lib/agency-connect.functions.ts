@@ -349,5 +349,5 @@ export type AgencyTimelineEvent = {
   agencyId: string | null;
   agencyName: string | null;
   reason: string | null;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, unknown> | null;
 };
