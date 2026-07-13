@@ -108,7 +108,7 @@ export const listRealMeVersionHistory = createServerFn({ method: "GET" })
     if (!profile) return { versions: [] };
     const { data: versions, error } = await context.supabase
       .from("real_me_profile_versions")
-      .select("id, version_number, responses, completion_percentage, created_at")
+      .select("id, version_number, responses, completion_percentage, created_at, generation_seed")
       .eq("real_me_profile_id", profile.id)
       .order("version_number", { ascending: false });
     if (error) throw error;

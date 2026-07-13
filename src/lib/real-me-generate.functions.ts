@@ -101,7 +101,11 @@ function sanitizeAnswers(raw: Record<string, unknown>): SavedAnswers {
   return out;
 }
 
-async function callLovableAi(prompt: string, apiKey: string): Promise<Record<string, unknown>> {
+async function callLovableAi(
+  prompt: string,
+  apiKey: string,
+  opts: { temperature?: number } = {},
+): Promise<Record<string, unknown>> {
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -119,6 +123,7 @@ async function callLovableAi(prompt: string, apiKey: string): Promise<Record<str
         { role: "user", content: prompt },
       ],
       response_format: { type: "json_object" },
+      temperature: opts.temperature ?? 0.9,
     }),
   });
   if (res.status === 429) throw new Error("AI is rate limited right now. Try again in a moment.");
@@ -146,42 +151,93 @@ async function requireCreator(supabase: any, userId: string) {
   return creator as { id: string };
 }
 
+/** Flavor prompts per variant so alternates don't collapse to the same character. */
+const VARIANT_STYLES = [
+  "Lean warm, grounded, and relationship-focused. Emphasize sincerity and small everyday joys.",
+  "Lean playful, sharp-witted, and pop-culture literate. A bit more edge and irreverence.",
+  "Lean adventurous, ambitious, and worldly. Big goals, restless curiosity, drives conversations forward.",
+  "Lean introspective, quietly confident, and creative. Values depth over spectacle.",
+];
+
+function buildPrompt(seed: SeedInput, styleHint: string): string {
+  return [
+    "Create a believable, internally consistent fictional creator persona.",
+    "",
+    "Seed traits (must be reflected coherently across the profile):",
+    `- Gender: ${seed.gender}`,
+    `- Age bracket: ${seed.ageBracket}`,
+    `- Lifestyle tags: ${seed.lifestyle.join(", ") || "(none)"}`,
+    `- Character traits: ${seed.traits.join(", ") || "(none)"}`,
+    "",
+    `Style direction for THIS variant: ${styleHint}`,
+    "",
+    "Fill EVERY question below. Multi/single-select answers MUST be picked from the given options exactly (copy the strings verbatim).",
+    "Keep custom_prompt answers concise (1-3 sentences).",
+    "",
+    buildQuestionSpec(),
+    "",
+    'Return a single JSON object. Example shape: {"1.1":"Alex","1.2":"she/her","2.1":["Warm","Playful"],"2.2":6,"3.5":true,"3.5b":"NBA — Lakers"}',
+  ].join("\n");
+}
+
+async function generateOneVariant(
+  seed: SeedInput,
+  styleHint: string,
+  apiKey: string,
+): Promise<SavedAnswers> {
+  const raw = await callLovableAi(buildPrompt(seed, styleHint), apiKey);
+  return sanitizeAnswers(raw);
+}
+
 /**
- * Generate a full Real Me baseline from a few seed answers, sanitize it against
- * the question schema, save it as the next Real Me version, and return the
- * saved answers so the client can hydrate the form immediately.
+ * Generate N alternate Real Me drafts from the same seed answers WITHOUT saving.
+ * The client picks one, optionally edits it, then calls saveGeneratedRealMe to persist.
  */
-export const generateRealMeProfile = createServerFn({ method: "POST" })
+export const generateRealMeVariants = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: SeedInput) => d)
+  .validator((d: { seed: SeedInput; count?: number }) => d)
   .handler(async ({ data, context }) => {
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured for this project.");
+    await requireCreator(context.supabase, context.userId);
 
+    const count = Math.min(Math.max(data.count ?? 3, 1), 3);
+    const styles = VARIANT_STYLES.slice(0, count);
+
+    // Run in parallel. If ALL fail, surface the first error; otherwise return the successes.
+    const results = await Promise.allSettled(
+      styles.map((style) => generateOneVariant(data.seed, style, apiKey)),
+    );
+    const variants = results
+      .map((r, i) => (r.status === "fulfilled" ? { style: styles[i], answers: r.value } : null))
+      .filter((v): v is { style: string; answers: SavedAnswers } => v !== null);
+
+    if (variants.length === 0) {
+      const first = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+      throw new Error(first?.reason?.message ?? "AI generation failed. Please try again.");
+    }
+
+    return {
+      variants: variants.map((v, i) => ({
+        id: `v${i + 1}`,
+        style: v.style,
+        answers: v.answers,
+        completion: computeOverallCompletionPercentage(REAL_ME_QUESTIONNAIRE, v.answers),
+      })),
+    };
+  });
+
+/** Persist an edited AI-generated draft as a NEW Real Me version, tagged with the seed. */
+export const saveGeneratedRealMe = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { answers: SavedAnswers; seed: SeedInput }) => d)
+  .handler(async ({ data, context }) => {
     const creator = await requireCreator(context.supabase, context.userId);
 
-    const prompt = [
-      "Create a believable, internally consistent fictional creator persona.",
-      "",
-      "Seed traits (must be reflected coherently across the profile):",
-      `- Gender: ${data.gender}`,
-      `- Age bracket: ${data.ageBracket}`,
-      `- Lifestyle tags: ${data.lifestyle.join(", ") || "(none)"}`,
-      `- Character traits: ${data.traits.join(", ") || "(none)"}`,
-      "",
-      "Fill EVERY question below. Multi/single-select answers MUST be picked from the given options.",
-      "Keep custom_prompt answers concise (1-3 sentences).",
-      "",
-      buildQuestionSpec(),
-      "",
-      'Return a single JSON object. Example shape: {"1.1":"Alex","1.2":"she/her","2.1":["Warm","Playful"],"2.2":6,"3.5":true,"3.5b":"NBA — Lakers"}',
-    ].join("\n");
-
-    const raw = await callLovableAi(prompt, apiKey);
-    const answers = sanitizeAnswers(raw);
+    // Re-sanitize on the server — never trust client-shaped payloads.
+    const answers = sanitizeAnswers(data.answers as Record<string, unknown>);
     const completion = computeOverallCompletionPercentage(REAL_ME_QUESTIONNAIRE, answers);
 
-    // Ensure profile + fresh version
     const { data: profile } = await context.supabase
       .from("real_me_profiles").select("id").eq("creator_id", creator.id).maybeSingle();
 
@@ -197,6 +253,15 @@ export const generateRealMeProfile = createServerFn({ method: "POST" })
       .from("real_me_profile_versions").select("version_number")
       .eq("real_me_profile_id", profileId).order("version_number", { ascending: false }).limit(1).maybeSingle();
 
+    const seedPayload = {
+      gender: data.seed.gender,
+      ageBracket: data.seed.ageBracket,
+      lifestyle: data.seed.lifestyle,
+      traits: data.seed.traits,
+      source: "ai_generated" as const,
+      generatedAt: new Date().toISOString(),
+    };
+
     const { data: newVersion, error: vErr } = await context.supabase
       .from("real_me_profile_versions")
       .insert({
@@ -204,7 +269,8 @@ export const generateRealMeProfile = createServerFn({ method: "POST" })
         version_number: (maxV?.version_number ?? 0) + 1,
         responses: answers as any,
         completion_percentage: completion,
-      })
+        generation_seed: seedPayload as any,
+      } as any)
       .select("*").single();
     if (vErr) throw vErr;
 
