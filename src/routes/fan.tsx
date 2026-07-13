@@ -120,13 +120,75 @@ function FanDashboard() {
 
   const profileComplete = !!profileInfo?.profile_completed_at;
   const ageVerified = !!profile?.age_verified_at;
-  const onboardingSteps = [
-    { key: "profile", label: "Complete your profile", done: profileComplete, cta: "/account/setup", ctaLabel: profileComplete ? "Edit" : "Continue" },
-    { key: "age", label: "Verify your age (18+)", done: ageVerified, cta: "/account", ctaLabel: ageVerified ? "Manage" : "Verify" },
-    { key: "personalise", label: "Personalise a creator experience", done: false, hint: subs.length === 0 ? "Subscribe to a creator to unlock this." : "Tap Personalise on a subscribed creator below." },
+  const idVerified = !!idStatus?.idVerifiedAt;
+  const idPending = !idVerified && idStatus?.latestSession?.status === "pending";
+  const followingAny = follows.length > 0;
+  const hasSub = subs.some((s) => s.status === "active");
+  const supporterSteps: ChecklistStep[] = [
+    {
+      key: "profile",
+      title: "Complete your profile",
+      to: "/account/setup",
+      done: profileComplete,
+      why: "A display name and avatar make your messages feel personal to creators.",
+      who: "Just you — never shown publicly unless you post.",
+      what: "Set display name, avatar, and preferences.",
+      how: "About a minute.",
+    },
+    {
+      key: "age",
+      title: "Verify your age (18+)",
+      to: "/account",
+      done: ageVerified,
+      why: "Required by law to access adult creator content on Twinly.",
+      who: "You — a one-tap self-attestation.",
+      what: "Confirm you're 18 or older.",
+      how: "10 seconds.",
+    },
+    {
+      key: "identity",
+      title: "Verify your identity (optional)",
+      to: "/account",
+      done: idVerified,
+      optional: true,
+      loading: idLoading,
+      statusReason: idVerified
+        ? "Verified — you can join every creator's audience."
+        : idPending
+          ? "Pending — Stripe is reviewing your submission."
+          : "Some creators restrict content to verified supporters. Verify once here to unlock all of them.",
+      statusTone: idVerified ? "ok" : idPending ? "warn" : "info",
+      why: "Creators can restrict chats or posts to verified supporters only. Verifying once here unlocks any creator who requires it.",
+      who: "Stripe Identity handles the ID + selfie — Twinly never sees or stores your document.",
+      what: "Snap your ID and a selfie in Stripe's hosted flow.",
+      how: "Around 2–3 minutes. Result comes back automatically.",
+    },
+    {
+      key: "follow",
+      title: "Follow a creator",
+      to: "/discover",
+      done: followingAny,
+      why: "Following is free — you'll see every public post from that creator in your feed.",
+      who: "You and the creators you pick.",
+      what: "Browse Discover and hit Follow.",
+      how: "One tap per creator.",
+    },
+    {
+      key: "personalise",
+      title: "Personalise a creator experience",
+      to: "/discover",
+      done: false,
+      optional: true,
+      statusReason: hasSub
+        ? "Tap Personalise on a subscribed creator below."
+        : "Subscribe to a creator first to unlock personalisation.",
+      statusTone: "info",
+      why: "Personalisation tailors an AI persona's tone and topics to what you enjoy.",
+      who: "You and the creator's AI persona.",
+      what: "Answer a short questionnaire on any subscribed creator.",
+      how: "About a minute per creator.",
+    },
   ];
-  const doneCount = onboardingSteps.filter((s) => s.done).length;
-  const showChecklist = !profileComplete || !ageVerified;
 
   return (
     <AppShell>
