@@ -299,6 +299,17 @@ function AdminPage() {
     } catch (e: any) { toast.error(e?.message ?? "Failed"); setBusy(null); }
   }
 
+  async function signInAsSupporter(userId: string, label: string) {
+    if (!window.confirm(`Sign in as supporter "${label}"?\n\nYour admin session will be replaced in this tab. Use the "Return to admin" banner to bounce back.`)) return;
+    setBusy(userId);
+    try {
+      const { url, returnUrl, adminEmail } = await impersonateUserFn({ data: { userId, redirectPath: "/app", label: `supporter:${label}` } });
+      setImpersonationContext({ returnUrl, adminEmail, handle: label, kind: "user", targetName: label });
+      toast.success(`Signing in as ${label}…`);
+      window.location.href = url;
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); setBusy(null); }
+  }
+
   return (
     <AppShell>
       <div className="mb-4">
