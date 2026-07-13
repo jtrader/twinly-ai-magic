@@ -7,6 +7,7 @@ import { useSession } from "@/lib/session";
 import { Sparkles, Library, ShieldCheck, MessageCircle, Wallet, BadgeCheck, Package, User, Wand2, BarChart3, Moon, Flag, UserCheck, DollarSign, Eye, ClipboardList, ListChecks, UserCircle } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { countOpenCreatorFlags } from "@/lib/conversation-flags.functions";
+import { getBaselineVeniceStatus } from "@/lib/venice-character.functions";
 import { SetupChecklist, type ChecklistStep } from "@/components/twinly/SetupChecklist";
 
 export const Route = createFileRoute("/studio/")({
@@ -29,7 +30,14 @@ function StudioHome() {
   const [baselineSlug, setBaselineSlug] = useState<string | null>(null);
   const [hasPricing, setHasPricing] = useState<boolean>(false);
   const [veniceSkipped, setVeniceSkipped] = useState<boolean>(false);
+  const [veniceStatus, setVeniceStatus] = useState<{
+    slug: string | null;
+    status: "empty" | "verified" | "not_found" | "unavailable";
+    characterName?: string;
+    message?: string;
+  } | null>(null);
   const countFlags = useServerFn(countOpenCreatorFlags);
+  const loadVeniceStatus = useServerFn(getBaselineVeniceStatus);
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
   useEffect(() => {
@@ -47,6 +55,7 @@ function StudioHome() {
         setCounts({ personas: personas ?? 0, assets: assets ?? 0 });
         setHasPricing((pricing ?? 0) > 0);
         countFlags({}).then((r) => setOpenFlags(r.count)).catch(() => {});
+        loadVeniceStatus().then(setVeniceStatus).catch(() => {});
 
         // Read-only — never call getRealMeProfile here, it lazily creates
         // the row as a side effect just from viewing the dashboard.
@@ -67,9 +76,10 @@ function StudioHome() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try { setVeniceSkipped(window.localStorage.getItem("twinly:setup:skip-venice") === "1"); }
+    if (!creator?.id) return;
+    try { setVeniceSkipped(window.localStorage.getItem(`twinly:setup:skip-venice:${creator.id}`) === "1"); }
     catch { /* ignore */ }
-  }, []);
+  }, [creator?.id]);
 
   if (!creator) {
     return (
@@ -83,12 +93,54 @@ function StudioHome() {
     );
   }
 
+  // ── Validation-driven per-step status ──────────────────────────────
+  const twinStatus = creator.digital_twin_status as string;
+  const twinDone = !!twinStatus && twinStatus !== "none";
+  const twinReason: { text: string; tone: ChecklistStep["statusTone"] } | null =
+    twinStatus === "approved" ? { text: "Baseline approved", tone: "ok" }
+    : twinStatus === "pending_review" || twinStatus === "pending" ? { text: "Awaiting admin review", tone: "warn" }
+    : twinStatus === "rejected" ? { text: "Rejected — please resubmit", tone: "error" }
+    : twinStatus === "revoked" ? { text: "Consent revoked — restart setup", tone: "error" }
+    : twinDone ? { text: `Status: ${twinStatus}`, tone: "info" }
+    : null;
+
+  const rmPct = realMeCompletion ?? 0;
+  const rmDone = rmPct >= 100;
+  const rmReason = rmDone
+    ? { text: "Baseline complete", tone: "ok" as const }
+    : rmPct > 0
+      ? { text: `${rmPct}% complete — pick up where you left off`, tone: "info" as const }
+      : null;
+
+  const veniceDone =
+    (veniceStatus?.status === "verified") ||
+    (veniceStatus?.status === "empty" && veniceSkipped);
+  const veniceReason: { text: string; tone: NonNullable<ChecklistStep["statusTone"]> } | null =
+    veniceStatus?.status === "verified" && veniceStatus.characterName
+      ? { text: `Verified — ${veniceStatus.characterName}`, tone: "ok" }
+      : veniceStatus?.status === "not_found"
+        ? { text: veniceStatus.message || "Saved ID no longer resolves on Venice.", tone: "error" }
+        : veniceStatus?.status === "unavailable"
+          ? { text: "Verification unavailable — Venice unreachable right now.", tone: "warn" }
+          : veniceStatus?.status === "empty" && veniceSkipped
+            ? { text: "Skipped — you can import one any time.", tone: "info" }
+            : null;
+
+  const verifyStatus = creator.verification_status as string;
+  const verifyReason: { text: string; tone: NonNullable<ChecklistStep["statusTone"]> } | null =
+    verifyStatus === "verified" ? { text: "Verified", tone: "ok" }
+    : verifyStatus === "pending" ? { text: "Awaiting compliance review", tone: "warn" }
+    : verifyStatus === "rejected" ? { text: "Rejected — resubmit documents", tone: "error" }
+    : null;
+
   const setupSteps: ChecklistStep[] = [
     {
       key: "profile",
       title: "Create your creator profile",
       to: "/onboarding",
       done: true, // If we render this page, the creator row exists.
+      statusReason: `Signed in as @${creator.handle}`,
+      statusTone: "ok",
       why: "Your handle, stage name and creator record are the anchor everything else attaches to.",
       who: "Just you — this is the account behind the scenes; fans never see the raw record.",
       what: "Pick a handle and stage name so your studio has an identity.",
@@ -98,7 +150,9 @@ function StudioHome() {
       key: "real-me",
       title: "Fill your Real Me baseline",
       to: "/studio/real-me",
-      done: (realMeCompletion ?? 0) >= 100,
+      done: rmDone,
+      statusReason: rmReason?.text,
+      statusTone: rmReason?.tone,
       why: "Your tone, voice and baseline answers — every AI persona auto-generates its style from this.",
       who: "You. Nothing here goes to fans directly; it seeds the AI personas you'll create.",
       what: "Answer a short questionnaire about how you talk, what you like, what's off-limits.",
@@ -108,7 +162,10 @@ function StudioHome() {
       key: "twin",
       title: "Set up your AI Twin baseline",
       to: "/studio/twin-onboarding",
-      done: !!creator.digital_twin_status && creator.digital_twin_status !== "none",
+      toSearch: twinDone ? undefined : { step: 1 },
+      done: twinDone,
+      statusReason: twinReason?.text,
+      statusTone: twinReason?.tone,
       why: "Reference photos + consent form the shared baseline every persona draws from. No baseline, no generation.",
       who: "You upload; a Twinly admin reviews before anything can be generated.",
       what: "1–8 non-explicit angles (front, 3/4, profile) and granular consent toggles.",
@@ -117,10 +174,12 @@ function StudioHome() {
     {
       key: "venice",
       title: "Import a Venice Character ID",
-      to: "/studio/twin",
-      toHash: "baseline-character",
+      to: "/studio/twin-onboarding",
+      toSearch: { step: 2 },
       optional: true,
-      done: !!baselineSlug || veniceSkipped,
+      done: !!veniceDone,
+      statusReason: veniceReason?.text,
+      statusTone: veniceReason?.tone,
       why: "Optional. If you already have a Venice Character, pinning it here makes every new persona use it as the default.",
       who: "Only relevant if you've published a Character on venice.ai already.",
       what: "Paste the ID (last segment of venice.ai/c/<id>) and confirm the live preview.",
@@ -131,6 +190,8 @@ function StudioHome() {
       title: "Create your first AI persona",
       to: "/studio/personas/new",
       done: counts.personas > 0,
+      statusReason: counts.personas > 0 ? `${counts.personas} persona${counts.personas === 1 ? "" : "s"} created` : undefined,
+      statusTone: counts.personas > 0 ? "ok" : undefined,
       why: "Personas are the actual characters fans chat with — Nice, Naughty, Wicked or fully custom.",
       who: "You configure; fans interact with the finished persona.",
       what: "Name, disclosure label, tone, boundaries, price tier, optional external model IDs.",
@@ -141,6 +202,8 @@ function StudioHome() {
       title: "Upload content to your vault",
       to: "/studio/content",
       done: counts.assets > 0,
+      statusReason: counts.assets > 0 ? `${counts.assets} vault asset${counts.assets === 1 ? "" : "s"}` : undefined,
+      statusTone: counts.assets > 0 ? "ok" : undefined,
       why: "The vault is where images, clips and voice notes live before you attach them to packs or posts.",
       who: "You upload; the moderation pipeline scans before assets go live.",
       what: "Drop in the media you want personas to be able to share.",
@@ -151,6 +214,8 @@ function StudioHome() {
       title: "Set your subscription pricing",
       to: "/studio/pricing",
       done: hasPricing,
+      statusReason: hasPricing ? "Tier prices set" : undefined,
+      statusTone: hasPricing ? "ok" : undefined,
       why: "Monthly Base / Plus / VIP tiers gate premium chats, packs and posts.",
       who: "You decide; fans pay in your chosen currency at checkout.",
       what: "Three monthly prices, or free-for-all if you leave a tier unset.",
@@ -161,6 +226,8 @@ function StudioHome() {
       title: "Get verified (ID + likeness)",
       to: "/studio/twin",
       done: creator.verification_status === "verified",
+      statusReason: verifyReason?.text,
+      statusTone: verifyReason?.tone,
       why: "Verification unlocks payouts, higher trust badges and adult-content generation.",
       who: "Twinly's compliance reviewers, one-time.",
       what: "Photo ID + a matching selfie against your Twin baseline.",

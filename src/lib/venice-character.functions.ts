@@ -77,3 +77,34 @@ export const setBaselineVeniceCharacter = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true, slug: value };
   });
+
+/**
+ * Validation-driven read for the dashboard checklist: returns the saved slug
+ * AND a live Venice lookup so the UI can render "verified: <name>", "no
+ * longer resolves", or "verification unavailable" without a second round-trip.
+ */
+export const getBaselineVeniceStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{
+    slug: string | null;
+    status: "empty" | "verified" | "not_found" | "unavailable";
+    characterName?: string;
+    message?: string;
+  }> => {
+    const { supabase, userId } = context;
+    const { data } = await supabase
+      .from("creators")
+      .select("venice_character_slug")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const slug = ((data as any)?.venice_character_slug as string | null) ?? null;
+    if (!slug) return { slug: null, status: "empty" };
+    try {
+      const { getVeniceCharacter } = await import("./venice.server");
+      const character = await getVeniceCharacter(slug);
+      if (!character) return { slug, status: "not_found", message: "The saved ID no longer resolves on Venice." };
+      return { slug, status: "verified", characterName: character.name };
+    } catch (e: any) {
+      return { slug, status: "unavailable", message: e?.message ?? "Venice lookup failed" };
+    }
+  });
