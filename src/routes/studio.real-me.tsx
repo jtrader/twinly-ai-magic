@@ -400,7 +400,7 @@ function RealMePage() {
             .map((id) => [id, displayedAnswers[id] as any]),
         )}
         previousAnswers={previousPickAnswers}
-        generate={(input) => generateVariants(input) as unknown as Promise<{ variants: Variant[] }>}
+        generate={(input) => generateVariants(input as any) as unknown as Promise<{ variants: Variant[] }>}
         onPick={(seed, answers) => {
           // Preserve any locked answers on top of the AI output as a final safety net.
           const merged: Answers = { ...(answers as Answers) };
