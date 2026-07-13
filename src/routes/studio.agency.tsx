@@ -73,7 +73,7 @@ function StudioAgencyPage() {
       ]);
       setAgencies(ag.agencies);
       setConnection(conn);
-      setLevel({ level: (lv as any)?.level ?? 0, isAdult: !!(lv as any)?.isAdult });
+      setLevel({ level: (lv as any)?.level ?? 0, isAdult: !!(lv as any)?.isAdultVerified });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to load agency data");
     } finally {
