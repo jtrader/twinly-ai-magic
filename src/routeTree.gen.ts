@@ -41,6 +41,7 @@ import { Route as StudioContentRouteImport } from './routes/studio.content'
 import { Route as StudioAwayRouteImport } from './routes/studio.away'
 import { Route as StudioAnalyticsRouteImport } from './routes/studio.analytics'
 import { Route as StudioAiReviewRouteImport } from './routes/studio.ai-review'
+import { Route as StudioAgencyRouteImport } from './routes/studio.agency'
 import { Route as SecurePersonasRouteImport } from './routes/secure.personas'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalTakedownRouteImport } from './routes/legal.takedown'
@@ -238,6 +239,11 @@ const StudioAnalyticsRoute = StudioAnalyticsRouteImport.update({
 const StudioAiReviewRoute = StudioAiReviewRouteImport.update({
   id: '/studio/ai-review',
   path: '/studio/ai-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioAgencyRoute = StudioAgencyRouteImport.update({
+  id: '/studio/agency',
+  path: '/studio/agency',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SecurePersonasRoute = SecurePersonasRouteImport.update({
@@ -473,6 +479,7 @@ export interface FileRoutesByFullPath {
   '/legal/takedown': typeof LegalTakedownRoute
   '/legal/terms': typeof LegalTermsRoute
   '/secure/personas': typeof SecurePersonasRoute
+  '/studio/agency': typeof StudioAgencyRoute
   '/studio/ai-review': typeof StudioAiReviewRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/away': typeof StudioAwayRoute
@@ -544,6 +551,7 @@ export interface FileRoutesByTo {
   '/legal/takedown': typeof LegalTakedownRoute
   '/legal/terms': typeof LegalTermsRoute
   '/secure/personas': typeof SecurePersonasRoute
+  '/studio/agency': typeof StudioAgencyRoute
   '/studio/ai-review': typeof StudioAiReviewRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/away': typeof StudioAwayRoute
@@ -617,6 +625,7 @@ export interface FileRoutesById {
   '/legal/takedown': typeof LegalTakedownRoute
   '/legal/terms': typeof LegalTermsRoute
   '/secure/personas': typeof SecurePersonasRoute
+  '/studio/agency': typeof StudioAgencyRoute
   '/studio/ai-review': typeof StudioAiReviewRoute
   '/studio/analytics': typeof StudioAnalyticsRoute
   '/studio/away': typeof StudioAwayRoute
@@ -691,6 +700,7 @@ export interface FileRouteTypes {
     | '/legal/takedown'
     | '/legal/terms'
     | '/secure/personas'
+    | '/studio/agency'
     | '/studio/ai-review'
     | '/studio/analytics'
     | '/studio/away'
@@ -762,6 +772,7 @@ export interface FileRouteTypes {
     | '/legal/takedown'
     | '/legal/terms'
     | '/secure/personas'
+    | '/studio/agency'
     | '/studio/ai-review'
     | '/studio/analytics'
     | '/studio/away'
@@ -834,6 +845,7 @@ export interface FileRouteTypes {
     | '/legal/takedown'
     | '/legal/terms'
     | '/secure/personas'
+    | '/studio/agency'
     | '/studio/ai-review'
     | '/studio/analytics'
     | '/studio/away'
@@ -901,6 +913,7 @@ export interface RootRouteChildren {
   LegalTakedownRoute: typeof LegalTakedownRoute
   LegalTermsRoute: typeof LegalTermsRoute
   SecurePersonasRoute: typeof SecurePersonasRoute
+  StudioAgencyRoute: typeof StudioAgencyRoute
   StudioAiReviewRoute: typeof StudioAiReviewRoute
   StudioAnalyticsRoute: typeof StudioAnalyticsRoute
   StudioAwayRoute: typeof StudioAwayRoute
@@ -1157,6 +1170,13 @@ declare module '@tanstack/react-router' {
       path: '/studio/ai-review'
       fullPath: '/studio/ai-review'
       preLoaderRoute: typeof StudioAiReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/agency': {
+      id: '/studio/agency'
+      path: '/studio/agency'
+      fullPath: '/studio/agency'
+      preLoaderRoute: typeof StudioAgencyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/secure/personas': {
@@ -1535,6 +1555,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalTakedownRoute: LegalTakedownRoute,
   LegalTermsRoute: LegalTermsRoute,
   SecurePersonasRoute: SecurePersonasRoute,
+  StudioAgencyRoute: StudioAgencyRoute,
   StudioAiReviewRoute: StudioAiReviewRoute,
   StudioAnalyticsRoute: StudioAnalyticsRoute,
   StudioAwayRoute: StudioAwayRoute,

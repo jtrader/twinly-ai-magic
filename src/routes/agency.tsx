@@ -2,12 +2,13 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { LogIn, Building2, Mail } from "lucide-react";
+import { LogIn, Building2, Mail, Check, X, Clock } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSession, useUserRoles } from "@/lib/session";
 import { listAgencyOverview, createMyAgencyWorkspace } from "@/lib/agency.functions";
+import { listPendingCreatorRequests, decideCreatorAgencyRequest } from "@/lib/agency-connect.functions";
 import { impersonateManagedCreator } from "@/lib/demo.functions";
 import { setImpersonationContext } from "@/components/twinly/ImpersonationBanner";
 
@@ -27,9 +28,13 @@ function AgencyPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<{ agencies: any[]; creators: any[] } | null>(null);
   const [enteringId, setEnteringId] = useState<string | null>(null);
+  const [pendingByAgency, setPendingByAgency] = useState<Record<string, any[]>>({});
+  const [decidingKey, setDecidingKey] = useState<string | null>(null);
   const load = useServerFn(listAgencyOverview);
   const impersonate = useServerFn(impersonateManagedCreator);
   const createWorkspace = useServerFn(createMyAgencyWorkspace);
+  const loadPending = useServerFn(listPendingCreatorRequests);
+  const decideRequest = useServerFn(decideCreatorAgencyRequest);
   const [workspaceName, setWorkspaceName] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -40,8 +45,41 @@ function AgencyPage() {
     load({}).then(setData).catch((e) => toast.error(e?.message ?? "Failed to load"));
   }, [user, roles.join(",")]);
 
+  useEffect(() => {
+    if (!data?.agencies?.length) return;
+    (async () => {
+      const entries = await Promise.all(
+        data.agencies.map(async (a: any) => {
+          try {
+            const r = await loadPending({ data: { agencyId: a.id } });
+            return [a.id, r.requests] as const;
+          } catch { return [a.id, []] as const; }
+        }),
+      );
+      setPendingByAgency(Object.fromEntries(entries));
+    })();
+  }, [data?.agencies?.map((a: any) => a.id).join(",")]);
+
   async function refresh() {
     try { setData(await load({})); } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
+  }
+
+  async function decide(agencyId: string, creatorId: string, decision: "approved" | "declined") {
+    const key = `${agencyId}:${creatorId}:${decision}`;
+    setDecidingKey(key);
+    try {
+      await decideRequest({ data: { agencyId, creatorId, decision } });
+      toast.success(decision === "approved" ? "Creator approved and linked" : "Request declined");
+      setPendingByAgency((cur) => ({
+        ...cur,
+        [agencyId]: (cur[agencyId] ?? []).filter((r) => r.creator_id !== creatorId),
+      }));
+      if (decision === "approved") await refresh();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not update request");
+    } finally {
+      setDecidingKey(null);
+    }
   }
 
   async function submitCreateWorkspace(e: React.FormEvent) {
@@ -140,6 +178,7 @@ function AgencyPage() {
         <div className="space-y-4">
           {data.agencies.map((a) => {
             const linked = data.creators.filter((c: any) => c.agency_id === a.id);
+            const pending = pendingByAgency[a.id] ?? [];
             return (
               <div key={a.id} className="rounded-2xl border border-border bg-surface p-5">
                 <div className="flex items-center justify-between">
@@ -148,6 +187,63 @@ function AgencyPage() {
                     <div className="text-xs text-muted-foreground">{linked.length} managed creator{linked.length === 1 ? "" : "s"}</div>
                   </div>
                 </div>
+
+                {pending.length > 0 && (
+                  <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/5 p-4">
+                    <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-300">
+                      <Clock className="size-3.5" /> Pending creator requests ({pending.length})
+                    </div>
+                    <div className="space-y-2">
+                      {pending.map((r: any) => (
+                        <div key={r.creator_id} className="rounded-lg border border-border bg-surface-elevated p-3">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold">{r.creators.stage_name}</div>
+                              <div className="truncate text-xs text-muted-foreground">@{r.creators.handle}</div>
+                              <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
+                                <div><span className="text-muted-foreground">Email:</span> {r.contact_email ?? "—"}</div>
+                                <div><span className="text-muted-foreground">Phone:</span> {r.contact_phone ?? "—"}</div>
+                              </div>
+                              {Array.isArray(r.requested_scopes) && r.requested_scopes.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {r.requested_scopes.map((s: string) => (
+                                    <span key={s} className="rounded-full border border-border bg-surface px-2 py-0.5 text-[10px] uppercase tracking-widest">{s.replace(/_/g, " ")}</span>
+                                  ))}
+                                </div>
+                              )}
+                              {r.request_note && (
+                                <p className="mt-2 rounded-md border border-border bg-surface p-2 text-xs italic text-muted-foreground">"{r.request_note}"</p>
+                              )}
+                              <div className="mt-1 text-[10px] text-muted-foreground">
+                                Agreement {r.agreement_version} accepted {r.agreement_accepted_at ? new Date(r.agreement_accepted_at).toLocaleString() : ""}
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                              <Button
+                                size="sm"
+                                disabled={decidingKey?.startsWith(`${a.id}:${r.creator_id}:`)}
+                                onClick={() => decide(a.id, r.creator_id, "approved")}
+                              >
+                                <Check className="mr-1 size-3.5" />
+                                {decidingKey === `${a.id}:${r.creator_id}:approved` ? "Approving…" : "Approve"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={decidingKey?.startsWith(`${a.id}:${r.creator_id}:`)}
+                                onClick={() => decide(a.id, r.creator_id, "declined")}
+                              >
+                                <X className="mr-1 size-3.5" />
+                                {decidingKey === `${a.id}:${r.creator_id}:declined` ? "Declining…" : "Decline"}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-4 grid gap-2 md:grid-cols-2">
                   {linked.map((row: any) => (
                     <div key={row.creator_id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-elevated px-4 py-3">

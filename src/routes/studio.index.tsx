@@ -4,7 +4,7 @@ import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
-import { Sparkles, Library, ShieldCheck, MessageCircle, Wallet, BadgeCheck, Package, User, Wand2, BarChart3, Moon, Flag, UserCheck, DollarSign, Eye, ClipboardList, ListChecks, UserCircle } from "lucide-react";
+import { Sparkles, Library, ShieldCheck, MessageCircle, Wallet, BadgeCheck, Package, User, Wand2, BarChart3, Moon, Flag, UserCheck, DollarSign, Eye, ClipboardList, ListChecks, UserCircle, Building2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { countOpenCreatorFlags } from "@/lib/conversation-flags.functions";
 import { getBaselineVeniceStatus } from "@/lib/venice-character.functions";
@@ -316,6 +316,7 @@ function StudioHome() {
         <Tile to="/studio/twin" icon={<User className="size-5 text-brand-glow" />} title="Digital twin profile" desc="Identity, voice, style, consent & use rules." />
         <Tile to="/studio/away" icon={<Moon className="size-5 text-brand-glow" />} title="Away mode" desc="Auto-reply for Real Me and route fans to your AI personas when you're offline." />
         <Tile to="/secure/personas" icon={<ShieldCheck className="size-5 text-brand-glow" />} title="Secure persona setup hub" desc="Default personas, custom persona creation, training inputs and content-pack setup — the guided post-signup flow, available any time." />
+        <Tile to="/studio/agency" icon={<Building2 className="size-5 text-brand-glow" />} title="Agency management" desc="Connect with an agency to co-manage your account. Requires Level 1 + Level 2 verification." />
       </div>
     </AppShell>
   );

@@ -115,9 +115,16 @@ export type Database = {
         Row: {
           activated_at: string | null
           agency_id: string
+          agreement_accepted_at: string | null
+          agreement_version: string | null
+          contact_email: string | null
+          contact_phone: string | null
           created_at: string
           creator_id: string
           permissions: Json
+          request_note: string | null
+          requested_by: string
+          requested_scopes: Json | null
           status: string
           suspended_at: string | null
           suspended_reason: string | null
@@ -125,9 +132,16 @@ export type Database = {
         Insert: {
           activated_at?: string | null
           agency_id: string
+          agreement_accepted_at?: string | null
+          agreement_version?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           creator_id: string
           permissions?: Json
+          request_note?: string | null
+          requested_by?: string
+          requested_scopes?: Json | null
           status?: string
           suspended_at?: string | null
           suspended_reason?: string | null
@@ -135,9 +149,16 @@ export type Database = {
         Update: {
           activated_at?: string | null
           agency_id?: string
+          agreement_accepted_at?: string | null
+          agreement_version?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           creator_id?: string
           permissions?: Json
+          request_note?: string | null
+          requested_by?: string
+          requested_scopes?: Json | null
           status?: string
           suspended_at?: string | null
           suspended_reason?: string | null
