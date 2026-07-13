@@ -4,9 +4,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
-import { lookupVeniceCharacter } from "@/lib/venice-character.functions";
+import { lookupVeniceCharacter, type LookupVeniceCharacterResult } from "@/lib/venice-character.functions";
 import type { listMyPersonas } from "@/lib/onboarding.functions";
+import { z } from "zod";
 
 export type Persona = Awaited<ReturnType<typeof listMyPersonas>>["personas"][number];
 export type Visibility = Persona["visibility"];
@@ -95,7 +97,7 @@ export function VoiceSettingSlider({
 }
 
 export function VeniceCharacterField({
-  idPrefix, value, onChange, label, help, autoValidate = true,
+  idPrefix, value, onChange, label, help, autoValidate = true, onPreview,
 }: {
   idPrefix: string;
   value: string;
@@ -104,11 +106,23 @@ export function VeniceCharacterField({
   help?: React.ReactNode;
   /** Debounced automatic lookup as the user types/pastes. Defaults on. */
   autoValidate?: boolean;
+  /** Fires whenever a successful preview (auto or manual) is resolved, so
+   *  a parent (e.g. the onboarding wizard) can render its own echo card. */
+  onPreview?: (preview: {
+    slug: string; name: string; description: string | null;
+    photoUrl: string | null; author: string; adult: boolean;
+    source: "venice" | "manual";
+  } | null) => void;
 }) {
   const lookup = useServerFn(lookupVeniceCharacter);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<Awaited<ReturnType<typeof lookupVeniceCharacter>> | null>(null);
+  const [result, setResult] = useState<LookupVeniceCharacterResult | null>(null);
   const [checkedSlug, setCheckedSlug] = useState<string | null>(null);
+  const [failCount, setFailCount] = useState(0);
+  const [showManual, setShowManual] = useState(false);
+  const [manualJson, setManualJson] = useState("");
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [manualVerified, setManualVerified] = useState(false);
   const reqIdRef = useRef(0);
 
   async function check(slugArg?: string, opts: { silent?: boolean } = {}) {
@@ -121,11 +135,62 @@ export function VeniceCharacterField({
       if (myReq !== reqIdRef.current) return; // a newer lookup superseded us
       setResult(r);
       setCheckedSlug(slug);
+      setManualVerified(false);
+      if ("error" in r && r.error) {
+        setFailCount((n) => {
+          const next = n + 1;
+          if (next >= 2) setShowManual(true);
+          return next;
+        });
+        onPreview?.(null);
+      } else if ("found" in r && r.found) {
+        setFailCount(0);
+        onPreview?.({ ...r.character, source: "venice" });
+      } else {
+        onPreview?.(null);
+      }
     } catch (e: any) {
       if (myReq !== reqIdRef.current) return;
       if (!opts.silent) toast.error(e?.message ?? "Could not look up that character");
     } finally {
       if (myReq === reqIdRef.current) setBusy(false);
+    }
+  }
+
+  const manualSchema = z.object({
+    slug: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    description: z.string().nullable().optional(),
+    photoUrl: z.string().url().nullable().optional(),
+    author: z.string().optional(),
+    adult: z.boolean().optional(),
+  });
+
+  function parseManual() {
+    setManualError(null);
+    try {
+      const raw = JSON.parse(manualJson);
+      const parsed = manualSchema.parse(raw);
+      const character = {
+        slug: parsed.slug,
+        name: parsed.name,
+        description: parsed.description ?? null,
+        photoUrl: parsed.photoUrl ?? null,
+        author: parsed.author ?? "unknown",
+        adult: !!parsed.adult,
+      };
+      onChange(character.slug);
+      setResult({ found: true, character });
+      setCheckedSlug(character.slug);
+      setManualVerified(true);
+      onPreview?.({ ...character, source: "manual" });
+      toast.success("Manual preview loaded");
+    } catch (e: any) {
+      if (e?.issues?.length) {
+        setManualError(e.issues.map((i: any) => `${i.path.join(".") || "value"}: ${i.message}`).join("; "));
+      } else {
+        setManualError(e?.message ?? "Could not parse JSON");
+      }
     }
   }
 
@@ -144,6 +209,9 @@ export function VeniceCharacterField({
   const trimmed = value.trim();
   const stale = !!checkedSlug && checkedSlug !== trimmed;
   const helpId = `${idPrefix}-venice-character-help`;
+  const showFound = result && "found" in result && result.found && checkedSlug === trimmed && !stale;
+  const showNotFound = result && "found" in result && !result.found && checkedSlug === trimmed && !stale;
+  const showLookupErr = result && "error" in result && result.error && checkedSlug === trimmed && !stale;
 
   return (
     <div>
@@ -174,7 +242,7 @@ export function VeniceCharacterField({
         <Input
           id={`${idPrefix}-venice-character`}
           value={value}
-          onChange={(e) => { onChange(e.target.value); setResult(null); }}
+          onChange={(e) => { onChange(e.target.value); setResult(null); setManualVerified(false); onPreview?.(null); }}
           placeholder="e.g. alan-watts"
           maxLength={120}
           aria-describedby={helpId}
@@ -189,28 +257,95 @@ export function VeniceCharacterField({
       {busy && !result && (
         <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">Checking Venice…</p>
       )}
-      {result && checkedSlug === trimmed && !stale && (
-        result.found ? (
-          <div className="mt-2 flex items-center gap-3 rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-2.5" aria-live="polite">
-            {result.character.photoUrl && (
-              <img src={result.character.photoUrl} alt="" className="size-10 shrink-0 rounded-full object-cover" />
-            )}
-            <div className="min-w-0 text-xs">
-              <div className="font-semibold text-emerald-300">✓ {result.character.name}</div>
-              <div className="truncate text-muted-foreground">
-                by {result.character.author || "unknown"}{result.character.adult ? " · 18+" : ""}
-              </div>
-              {result.character.description && (
-                <p className="mt-1 line-clamp-2 text-muted-foreground">{result.character.description}</p>
+      {showFound && result && "found" in result && result.found && (
+        <div className="mt-2 flex items-start gap-3 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3" aria-live="polite">
+          {result.character.photoUrl ? (
+            <img src={result.character.photoUrl} alt="" className="size-16 shrink-0 rounded-lg object-cover" />
+          ) : (
+            <div className="size-16 shrink-0 rounded-lg bg-emerald-400/20" aria-hidden />
+          )}
+          <div className="min-w-0 flex-1 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-emerald-300">✓ {result.character.name}</span>
+              {result.character.adult && (
+                <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">18+</span>
+              )}
+              {manualVerified && (
+                <span className="rounded-full border border-sky-400/40 bg-sky-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-sky-300">Manual</span>
               )}
             </div>
+            <div className="mt-0.5 truncate text-muted-foreground">by {result.character.author || "unknown"}</div>
+            {result.character.description && (
+              <p className="mt-1 line-clamp-3 text-muted-foreground">{result.character.description}</p>
+            )}
+            {manualVerified && (
+              <p className="mt-1 text-[11px] text-sky-300">Manually verified — Twinly will re-check with Venice on save.</p>
+            )}
           </div>
-        ) : (
-          <p className="mt-2 text-xs text-rose-300" role="alert">No published Venice Character found with that ID.</p>
-        )
+        </div>
+      )}
+      {showNotFound && (
+        <div className="mt-2 rounded-lg border border-rose-400/30 bg-rose-400/10 p-2.5" role="alert">
+          <p className="text-xs text-rose-300">No published Venice Character found with that ID.</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Double-check the ID on venice.ai — the slug is the last segment of the Character URL.</p>
+          <div className="mt-2">
+            <Button type="button" variant="outline" size="sm" aria-label="Retry Venice lookup" onClick={() => check()} disabled={busy}>
+              {busy ? "Retrying…" : "Retry lookup"}
+            </Button>
+          </div>
+        </div>
+      )}
+      {showLookupErr && result && "error" in result && (
+        <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 p-2.5" role="alert">
+          <p className="text-xs font-semibold text-amber-300">Couldn't reach Venice</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">{result.message}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" aria-label="Retry Venice lookup" onClick={() => check()} disabled={busy}>
+              {busy ? "Retrying…" : "Retry lookup"}
+            </Button>
+            {!showManual && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setShowManual(true)}>
+                Paste JSON instead
+              </Button>
+            )}
+          </div>
+        </div>
       )}
       {stale && !busy && (
         <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">Validating new ID…</p>
+      )}
+      {showManual && (
+        <details open className="mt-3 rounded-lg border border-border bg-surface p-3">
+          <summary className="cursor-pointer text-xs font-semibold">Paste character JSON instead</summary>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            If Venice keeps failing, paste the raw character JSON here (from venice.ai's export or your browser's
+            Network tab). Required keys: <span className="font-mono">slug</span>, <span className="font-mono">name</span>.
+            Optional: <span className="font-mono">description</span>, <span className="font-mono">photoUrl</span>,
+            <span className="font-mono"> author</span>, <span className="font-mono">adult</span>.
+          </p>
+          <Textarea
+            className="mt-2 min-h-28 font-mono text-xs"
+            value={manualJson}
+            onChange={(e) => { setManualJson(e.target.value); setManualError(null); }}
+            placeholder='{"slug":"alan-watts","name":"Alan Watts","description":"…","photoUrl":"https://…","author":"you","adult":false}'
+            aria-label="Character JSON"
+            spellCheck={false}
+          />
+          {manualError && (
+            <p className="mt-1 text-[11px] text-rose-300" role="alert">{manualError}</p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button type="button" size="sm" onClick={parseManual} disabled={!manualJson.trim()}>
+              Parse & preview
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => { setManualJson(""); setManualError(null); }}>
+              Clear
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setShowManual(false)}>
+              Back to auto-lookup
+            </Button>
+          </div>
+        </details>
       )}
     </div>
   );

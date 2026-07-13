@@ -55,6 +55,12 @@ function TwinOnboardingWizard() {
   const [baselineSlug, setBaselineSlug] = useState("");
   const [baselineInitial, setBaselineInitial] = useState<string | null>(null);
   const [savingBaseline, setSavingBaseline] = useState(false);
+  const [baselinePreview, setBaselinePreview] = useState<{
+    slug: string; name: string; description: string | null;
+    photoUrl: string | null; author: string; adult: boolean;
+    source: "venice" | "manual";
+  } | null>(null);
+  const [baselineStatus, setBaselineStatus] = useState<"idle" | "ok" | "not_found" | "error">("idle");
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
@@ -195,9 +201,9 @@ function TwinOnboardingWizard() {
         )}
 
         {step === 2 && (
-          <div className="space-y-4">
+          <section aria-labelledby="onboarding-venice-heading" className="space-y-4">
             <div className="flex items-baseline justify-between">
-              <h1 className="font-display text-2xl font-bold">Character ID (optional)</h1>
+              <h1 id="onboarding-venice-heading" className="font-display text-2xl font-bold">Character ID (optional)</h1>
               <span className="text-xs text-muted-foreground">Step 2 of 5</span>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -205,24 +211,73 @@ function TwinOnboardingWizard() {
               pick it up as the default — no need to paste it into each persona later. You can skip this
               and add or change it any time from your Digital Twin Profile.
             </p>
+            <p className="text-xs text-muted-foreground">
+              A live preview of the Character's name, avatar and description appears below once the ID checks out.
+              If Venice can't be reached after a couple of tries, you can paste the raw character JSON as a fallback.
+            </p>
             <VeniceCharacterField
               idPrefix="onboarding-baseline"
               value={baselineSlug}
               onChange={setBaselineSlug}
+              onPreview={(p) => {
+                setBaselinePreview(p);
+                setBaselineStatus(p ? "ok" : baselineSlug.trim() ? baselineStatus : "idle");
+              }}
             />
+            {baselinePreview && (
+              <aside
+                aria-label="Character preview"
+                className="flex items-start gap-4 rounded-2xl border border-brand/30 bg-brand/5 p-4"
+              >
+                {baselinePreview.photoUrl ? (
+                  <img
+                    src={baselinePreview.photoUrl}
+                    alt={`${baselinePreview.name} avatar`}
+                    className="size-20 shrink-0 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="size-20 shrink-0 rounded-xl bg-brand/20" aria-hidden />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-display text-lg font-semibold">{baselinePreview.name}</span>
+                    {baselinePreview.adult && (
+                      <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">18+</span>
+                    )}
+                    {baselinePreview.source === "manual" && (
+                      <span className="rounded-full border border-sky-400/40 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-sky-300">Manual</span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    by {baselinePreview.author || "unknown"} · <span className="font-mono">{baselinePreview.slug}</span>
+                  </div>
+                  {baselinePreview.description && (
+                    <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{baselinePreview.description}</p>
+                  )}
+                </div>
+              </aside>
+            )}
             <div className="flex justify-between pt-2">
               <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
               <div className="flex gap-2">
                 <Button variant="ghost" onClick={() => setStep(3)} disabled={savingBaseline}>
                   Skip
                 </Button>
-                <Button onClick={saveBaselineAndContinue} disabled={savingBaseline}>
+                <Button
+                  onClick={saveBaselineAndContinue}
+                  disabled={savingBaseline || (!!baselineSlug.trim() && !baselinePreview)}
+                >
                   {savingBaseline ? "Saving…" : "Save & continue"}
                   <ArrowRight className="ml-2 size-4" />
                 </Button>
               </div>
             </div>
-          </div>
+            {!!baselineSlug.trim() && !baselinePreview && (
+              <p className="text-[11px] text-muted-foreground">
+                Fix or skip this step before continuing — the ID hasn't been verified yet.
+              </p>
+            )}
+          </section>
         )}
 
         {step === 3 && (

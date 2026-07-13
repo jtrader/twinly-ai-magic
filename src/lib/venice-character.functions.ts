@@ -3,7 +3,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type LookupVeniceCharacterResult =
   | { found: true; character: { slug: string; name: string; description: string | null; photoUrl: string | null; author: string; adult: boolean } }
-  | { found: false };
+  | { found: false }
+  | { error: true; message: string };
 
 /**
  * Auth-gated preview lookup for the "quick-start from a Venice Character"
@@ -22,20 +23,27 @@ export const lookupVeniceCharacter = createServerFn({ method: "POST" })
     const slug = data.slug.trim();
     if (!slug) throw new Error("Enter a Venice Character slug first.");
 
-    const { getVeniceCharacter } = await import("./venice.server");
-    const character = await getVeniceCharacter(slug);
-    if (!character) return { found: false };
-    return {
-      found: true,
-      character: {
-        slug: character.slug,
-        name: character.name,
-        description: character.description,
-        photoUrl: character.photoUrl,
-        author: character.author,
-        adult: character.adult,
-      },
-    };
+    try {
+      const { getVeniceCharacter } = await import("./venice.server");
+      const character = await getVeniceCharacter(slug);
+      if (!character) return { found: false };
+      return {
+        found: true,
+        character: {
+          slug: character.slug,
+          name: character.name,
+          description: character.description,
+          photoUrl: character.photoUrl,
+          author: character.author,
+          adult: character.adult,
+        },
+      };
+    } catch (e: any) {
+      // Transport / upstream failure — return as a soft error so the UI can
+      // distinguish "no such character" from "Venice is unreachable" and
+      // offer a retry / manual-JSON fallback.
+      return { error: true, message: e?.message ?? "Venice lookup failed" };
+    }
   });
 
 /**
