@@ -694,6 +694,86 @@ function AdminPage() {
         </div>
       )}
 
+      {tab === "supporters" && (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100">
+            <span className="font-semibold">Supporters:</span> Fans who aren't also creators or agency owners. Sign in as any of them to see the app exactly as they see it — subscriptions, feed, chats. Your admin session is replaced in this tab; use the return banner to bounce back.
+          </div>
+          {allSupporters && (() => {
+            const q = supportersQuery.trim().toLowerCase();
+            const filtered = q
+              ? allSupporters.supporters.filter((s: any) =>
+                  (s.display_name ?? "").toLowerCase().includes(q) ||
+                  (s.handle ?? "").toLowerCase().includes(q) ||
+                  (allSupporters.emails[s.id] ?? "").toLowerCase().includes(q))
+              : allSupporters.supporters;
+            const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+            const page = Math.min(supportersPage, totalPages);
+            const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+            return (
+            <>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                className="max-w-xs"
+                placeholder="Search name, handle, or email…"
+                value={supportersQuery}
+                onChange={(e) => { setSupportersQuery(e.target.value); setSupportersPage(1); }}
+              />
+              <div className="text-xs text-muted-foreground">
+                {filtered.length} of {allSupporters.supporters.length}
+              </div>
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-surface-elevated text-left text-xs uppercase tracking-widest text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2">Supporter</th>
+                    <th className="px-4 py-2">Email</th>
+                    <th className="px-4 py-2">Age-verified</th>
+                    <th className="px-4 py-2">Strikes</th>
+                    <th className="px-4 py-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((s: any) => {
+                    const label = s.display_name || s.handle || (allSupporters.emails[s.id] ?? "supporter");
+                    return (
+                      <tr key={s.id} className="border-b border-border/50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {s.avatar_url && <img src={s.avatar_url} alt="" className="size-9 rounded-full object-cover" />}
+                            <div className="min-w-0">
+                              <div className="font-semibold">{s.display_name ?? "—"}</div>
+                              <div className="text-xs text-muted-foreground">{s.handle ? `@${s.handle}` : `id: ${s.id.slice(0, 8)}…`}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs">{allSupporters.emails[s.id] ?? "—"}</td>
+                        <td className="px-4 py-3 text-xs">
+                          {s.age_verified_at ? <Pill value="verified" /> : <span className="text-muted-foreground">no</span>}
+                        </td>
+                        <td className={"px-4 py-3 text-xs " + ((s.strike_count ?? 0) > 0 ? "font-semibold text-amber-300" : "text-muted-foreground")}>
+                          {s.strike_count ?? 0}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button size="sm" variant="outline" disabled={busy === s.id} onClick={() => signInAsSupporter(s.id, label)}>
+                            {busy === s.id ? "Minting…" : "Sign in as"}
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {rows.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">{q ? "No supporters match this search." : "No supporters yet."}</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <Pager page={page} totalPages={totalPages} onChange={setSupportersPage} />
+            </>
+            );
+          })()}
+        </div>
+      )}
+
       {tab === "settings" && (
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-surface p-4">
