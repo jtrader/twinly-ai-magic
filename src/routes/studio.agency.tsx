@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import * as React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -349,7 +350,7 @@ function ConnectForm(props: {
     </form>
   );
 }
-const TIMELINE_META: Record<string, { label: string; tone: string; icon: JSX.Element }> = {
+const TIMELINE_META: Record<string, { label: string; tone: string; icon: React.ReactNode }> = {
   agency_client_link_requested_by_creator: {
     label: "Request submitted",
     tone: "border-brand/30 bg-brand/10 text-brand-glow",
