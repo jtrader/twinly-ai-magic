@@ -5,9 +5,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { verifyAge } from "@/lib/age-gate.functions";
+import { acceptLegal, LEGAL_ACCEPTANCE_VERSION } from "@/lib/legal-acceptance.functions";
 
-const KEY = "twinly.agegate.v2";
-const LEGAL_VERSION = "2026-07-13";
+export const AGE_GATE_STORAGE_KEY = "twinly.agegate.v2";
+export const LEGAL_STORAGE_KEY = "twinly.legal.accepted";
+const LEGAL_VERSION = LEGAL_ACCEPTANCE_VERSION;
 
 export function AgeGateDialog() {
   const [open, setOpen] = useState(false);
@@ -15,10 +17,11 @@ export function AgeGateDialog() {
   const [error, setError] = useState<string | null>(null);
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const verify = useServerFn(verifyAge);
+  const recordLegal = useServerFn(acceptLegal);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!localStorage.getItem(KEY)) setOpen(true);
+    if (!localStorage.getItem(AGE_GATE_STORAGE_KEY)) setOpen(true);
   }, []);
 
   async function confirm() {
@@ -33,10 +36,15 @@ export function AgeGateDialog() {
       if (userData.user) {
         // Signed-in: persist self-attestation to profile + audit.
         await verify({ data: { attested: true } });
+        try {
+          await recordLegal({ data: { version: LEGAL_VERSION, context: "age_gate_dialog" } });
+        } catch (e) {
+          console.warn("[age-gate] legal acceptance record failed", e);
+        }
       }
       const accepted = { at: new Date().toISOString(), version: LEGAL_VERSION };
-      localStorage.setItem(KEY, JSON.stringify(accepted));
-      localStorage.setItem("twinly.legal.accepted", JSON.stringify(accepted));
+      localStorage.setItem(AGE_GATE_STORAGE_KEY, JSON.stringify(accepted));
+      localStorage.setItem(LEGAL_STORAGE_KEY, JSON.stringify(accepted));
       setOpen(false);
     } catch (e: any) {
       setError(e?.message ?? "Could not verify age.");
