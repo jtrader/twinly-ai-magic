@@ -6,6 +6,7 @@ import {
   ArrowLeft, Upload, Trash2, Send, Loader2, X, Users, Plus, Image as ImageIcon, Video, Music, FileText, History, Star, Sparkles, CheckCircle2, Clock, AlertTriangle, RotateCw, Tag,
 } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
+import { useMediaUploadConsent } from "@/components/twinly/MediaUploadConsentGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -465,6 +466,7 @@ function BulkUploadDialog({ open, onOpenChange, creatorId, packId, onDone }: {
   const uploadFn = useServerFn(bulkUploadToPack);
   const rowsRef = useRef<UploadRow[]>([]);
   useEffect(() => { rowsRef.current = rows; }, [rows]);
+  const { ensureConsent } = useMediaUploadConsent();
 
   useEffect(() => { if (open) { setRows([]); setSharedCategory(""); setSharedSynthetic(false); setSharedTags(""); setBusy(false); } }, [open]);
 
@@ -563,7 +565,12 @@ function BulkUploadDialog({ open, onOpenChange, creatorId, packId, onDone }: {
             <span className="text-sm">Click to add files</span>
             <span className="text-xs text-muted-foreground">image, video, audio, PDF, or text — up to 50 total, ≤500 MB each</span>
             <input type="file" multiple accept="image/*,video/*,audio/*,.txt,.md,.pdf" className="hidden"
-              onChange={(e) => { addFiles(e.target.files); e.currentTarget.value = ""; }} />
+              onChange={async (e) => {
+                const files = e.target.files;
+                e.currentTarget.value = "";
+                if (files && files.length > 0 && !(await ensureConsent({ context: "packs.bulk_upload" }))) return;
+                addFiles(files);
+              }} />
           </label>
 
           <div className="grid gap-3 sm:grid-cols-3">
