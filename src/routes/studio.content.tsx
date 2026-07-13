@@ -498,6 +498,7 @@ function UploadDialog({
   const [externalType, setExternalType] = useState<AssetType>("image");
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
+  const { ensureConsent } = useMediaUploadConsent();
   const [isSynthetic, setIsSynthetic] = useState(false);
   const [selectedPersonas, setSelectedPersonas] = useState<Set<string>>(new Set());
   const [permission, setPermission] = useState<PermissionType>("included");
@@ -592,8 +593,12 @@ function UploadDialog({
                 ref={inputRef}
                 type="file"
                 accept="image/*,video/*,audio/*,.txt,.md,.pdf"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const f = e.target.files?.[0] ?? null;
+                  if (f && !(await ensureConsent({ context: "content.vault.upload" }))) {
+                    e.target.value = "";
+                    return;
+                  }
                   setFile(f);
                   if (f && !title) setTitle(f.name.replace(/\.[^/.]+$/, ""));
                 }}
