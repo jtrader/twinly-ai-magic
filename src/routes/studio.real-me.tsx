@@ -235,7 +235,7 @@ function RealMePage() {
         open={showGenerate}
         onOpenChange={setShowGenerate}
         initialSeed={draft?.seed ?? null}
-        generate={(input) => generateVariants({ data: input })}
+        generate={(input) => generateVariants({ data: input }) as unknown as Promise<{ variants: Variant[] }>}
         onPick={(seed, answers) => {
           setDraft({ seed, answers });
           setShowGenerate(false);
