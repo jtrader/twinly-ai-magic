@@ -4,10 +4,9 @@ import { logAudit } from "./audit.server";
 import { screenMessage, recordModerationEvent } from "./moderation.server";
 
 /**
- * List conversations the creator replies to directly: Real Me threads, plus
- * any AI persona conversation a moderator has handed off in place (design
- * doc item 4 — ai_suspended), which lands here rather than in a separate
- * inbox.
+ * List every conversation across the creator's personas so the creator can
+ * jump into any private chat — Real Me, AI on auto-pilot, or AI handed off —
+ * and take over or hand back to the AI twin at their discretion.
  */
 export const listInboxConversations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -27,18 +26,12 @@ export const listInboxConversations = createServerFn({ method: "GET" })
       .in("creator_id", creatorIds);
     const personaIds = (personas ?? []).map((p: any) => p.id);
     if (personaIds.length === 0) return { conversations: [], creators: owned ?? [] };
-    const personaMapPre = new Map((personas ?? []).map((p: any) => [p.id, p]));
 
-    const { data: allConvos } = await supabase
+    const { data: convos } = await supabase
       .from("conversations")
       .select("id, fan_id, creator_id, persona_id, started_at, last_message_at, ai_suspended")
       .in("persona_id", personaIds)
       .order("last_message_at", { ascending: false, nullsFirst: false });
-
-    const convos = (allConvos ?? []).filter((c: any) => {
-      const kind = personaMapPre.get(c.persona_id)?.kind;
-      return kind === "real_me" || c.ai_suspended;
-    });
 
     if (!convos || convos.length === 0) return { conversations: [], creators: owned ?? [] };
 
@@ -184,5 +177,73 @@ export const sendCreatorReply = createServerFn({ method: "POST" })
       isAiGenerated: false,
     }).catch(() => {});
 
+    return { ok: true };
+  });
+
+/**
+ * Creator jumps into any private chat and takes over from the AI twin.
+ * Sets ai_suspended=true and posts a system note. Safe to call on Real Me
+ * threads (no-op effect since AI wouldn't reply there anyway).
+ */
+export const takeOverConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { conversationId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: convo, error } = await supabase
+      .from("conversations")
+      .select("id, ai_suspended, persona_id, creators!inner(id, user_id, handle), personas:persona_id(display_name, kind)")
+      .eq("id", data.conversationId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!convo) throw new Error("Conversation not found");
+    if ((convo as any).creators.user_id !== userId) throw new Error("Not authorized");
+    if ((convo as any).ai_suspended) return { ok: true, alreadySuspended: true };
+
+    const s = supabase as any;
+    await s.from("conversations").update({ ai_suspended: true }).eq("id", data.conversationId);
+    await s.from("messages").insert({
+      conversation_id: data.conversationId,
+      sender_type: "system",
+      body: `${(convo as any).creators.handle} has taken over this conversation directly. ${(convo as any).personas?.display_name ?? "The AI persona"} won't reply here until auto-pilot is resumed.`,
+      ai_generated: false,
+      persona_id: (convo as any).persona_id,
+    });
+    await logAudit(userId, "inbox.takeover", { type: "conversation", id: data.conversationId }, {});
+    return { ok: true };
+  });
+
+/**
+ * Creator hands the conversation back to the AI twin (auto-pilot).
+ * Only meaningful for AI personas; Real Me personas ignore the flag.
+ */
+export const resumeAutoPilot = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { conversationId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: convo, error } = await supabase
+      .from("conversations")
+      .select("id, ai_suspended, persona_id, creators!inner(id, user_id, handle), personas:persona_id(display_name, kind)")
+      .eq("id", data.conversationId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!convo) throw new Error("Conversation not found");
+    if ((convo as any).creators.user_id !== userId) throw new Error("Not authorized");
+    if ((convo as any).personas?.kind === "real_me") {
+      throw new Error("Real Me conversations don't have an AI auto-pilot to resume.");
+    }
+    if (!(convo as any).ai_suspended) return { ok: true, alreadyActive: true };
+
+    const s = supabase as any;
+    await s.from("conversations").update({ ai_suspended: false }).eq("id", data.conversationId);
+    await s.from("messages").insert({
+      conversation_id: data.conversationId,
+      sender_type: "system",
+      body: `${(convo as any).personas?.display_name ?? "The AI persona"} is back on auto-pilot in this conversation.`,
+      ai_generated: false,
+      persona_id: (convo as any).persona_id,
+    });
+    await logAudit(userId, "inbox.resume_autopilot", { type: "conversation", id: data.conversationId }, {});
     return { ok: true };
   });
