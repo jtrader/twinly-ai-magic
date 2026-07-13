@@ -475,6 +475,22 @@ function RealMePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={confirmClearLocks} onOpenChange={setConfirmClearLocks}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unlock all {lockedIds.size} answer{lockedIds.size === 1 ? "" : "s"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              After unlocking, the AI will be free to overwrite these answers the next time
+              you Generate or Regenerate. Your saved values stay the same until then.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep locks</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmedClearAllLocks}>Unlock all</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }
