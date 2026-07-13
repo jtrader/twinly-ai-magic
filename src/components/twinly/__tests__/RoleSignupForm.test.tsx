@@ -104,4 +104,19 @@ describe("RoleSignupForm legal acceptance", () => {
       ]),
     );
   });
+
+  it("shows an error and does not celebrate signup when the server acceptLegal call fails", async () => {
+    h.recordLegalMock.mockRejectedValueOnce(new Error("audit write failed"));
+    await renderForm();
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: "a@b.co" } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: "password123" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Accept legal policies/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Create account/i }));
+
+    await waitFor(() =>
+      expect(h.toastErrorMock).toHaveBeenCalledWith(expect.stringMatching(/audit write failed/i)),
+    );
+    // The optimistic success toast must NOT fire when the audit record failed.
+    expect(h.toastSuccessMock).not.toHaveBeenCalled();
+  });
 });
