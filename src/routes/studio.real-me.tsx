@@ -350,7 +350,13 @@ function QuestionField({ question, value, onChange }: { question: QuestionDefini
   );
 }
 
-function VersionHistoryPanel() {
+function VersionHistoryPanel({
+  disabled,
+  onRestore,
+}: {
+  disabled?: boolean;
+  onRestore: (v: any) => void;
+}) {
   const list = useServerFn(listRealMeVersionHistory);
   const [versions, setVersions] = useState<any[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -386,6 +392,52 @@ function VersionHistoryPanel() {
               <div><span className="font-medium text-foreground">Traits:</span> {(v.generation_seed.traits ?? []).join(", ") || "—"}</div>
             </div>
           ) : null}
+          <div className="mt-2 flex flex-wrap justify-end gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost">
+                  <Download className="mr-1.5 size-4" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() =>
+                    exportRealMeJson({
+                      label: `Real Me v${v.version_number}`,
+                      answers: (v.responses ?? {}) as Answers,
+                      seed: v.generation_seed ?? null,
+                      completion: v.completion_percentage,
+                      versionNumber: v.version_number,
+                      createdAt: v.created_at,
+                    })
+                  }
+                >
+                  <FileJson className="mr-2 size-4" /> Download JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    try {
+                      exportRealMePdf({
+                        label: `Real Me v${v.version_number}`,
+                        answers: (v.responses ?? {}) as Answers,
+                        seed: v.generation_seed ?? null,
+                        completion: v.completion_percentage,
+                        versionNumber: v.version_number,
+                        createdAt: v.created_at,
+                      });
+                    } catch (e: any) {
+                      toast.error(e?.message ?? "Export failed.");
+                    }
+                  }}
+                >
+                  <FileText className="mr-2 size-4" /> Print / Save as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" variant="outline" onClick={() => onRestore(v)} disabled={disabled}>
+              <RotateCcw className="mr-1.5 size-4" /> Restore as draft
+            </Button>
+          </div>
         </div>
       ))}
     </div>
