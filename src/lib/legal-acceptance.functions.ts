@@ -28,6 +28,43 @@ const AcceptSchema = z.object({
 });
 
 /**
+ * Testable helper that performs the legal-acceptance write + audit log.
+ * Exposed so unit tests can invoke it against a mocked Supabase context
+ * without going through the `createServerFn` RPC wrapper.
+ */
+export async function recordLegalAcceptance(
+  context: { supabase: any; userId: string },
+  data: { version?: string; context?: string } = {},
+): Promise<{ ok: true; acceptedAt: string; version: string }> {
+  const { supabase, userId } = context;
+  const nowIso = new Date().toISOString();
+  const version = data.version ?? LEGAL_ACCEPTANCE_VERSION;
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      legal_accepted_at: nowIso,
+      legal_accepted_version: version,
+    })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
+  try {
+    await supabase.rpc("log_audit", {
+      _action: "legal.accepted",
+      _subject_type: "profile",
+      _subject_id: userId,
+      _metadata: {
+        version,
+        context: data.context ?? null,
+        accepted_at: nowIso,
+      },
+    });
+  } catch (e) {
+    console.warn("[legal-acceptance] audit log failed", e);
+  }
+  return { ok: true, acceptedAt: nowIso, version };
+}
+
+/**
  * Server-authoritative record of legal acceptance. Writes to profile + audit_logs
  * so the acceptance is visible in the admin user log — the client cannot bypass
  * this by skipping the checkbox because every legal-gated server fn calls
@@ -36,34 +73,7 @@ const AcceptSchema = z.object({
 export const acceptLegal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => AcceptSchema.parse(input ?? {}))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const nowIso = new Date().toISOString();
-    const version = data.version ?? LEGAL_ACCEPTANCE_VERSION;
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        legal_accepted_at: nowIso,
-        legal_accepted_version: version,
-      } as any)
-      .eq("id", userId);
-    if (error) throw new Error(error.message);
-    try {
-      await (supabase as any).rpc("log_audit", {
-        _action: "legal.accepted",
-        _subject_type: "profile",
-        _subject_id: userId,
-        _metadata: {
-          version,
-          context: data.context ?? null,
-          accepted_at: nowIso,
-        },
-      });
-    } catch (e) {
-      console.warn("[legal-acceptance] audit log failed", e);
-    }
-    return { ok: true, acceptedAt: nowIso, version };
-  });
+  .handler(async ({ data, context }) => recordLegalAcceptance(context as any, data));
 
 /**
  * Reusable server-side guard: throws if the caller has not accepted the current
