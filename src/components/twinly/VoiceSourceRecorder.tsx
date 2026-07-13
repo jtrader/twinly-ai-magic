@@ -48,6 +48,7 @@ export function VoiceSourceRecorder({
   const durationRef = useRef<number>(0);
 
   const upload = useServerFn(uploadVoiceSourceRecording);
+  const { ensureConsent } = useMediaUploadConsent();
 
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -124,6 +125,7 @@ export function VoiceSourceRecorder({
   }
 
   async function submitBlob(blob: Blob, sourceType: "uploaded" | "recorded_in_app", fallbackDurationSeconds?: number) {
+    if (!(await ensureConsent({ context: `voice.${sourceType}` }))) return;
     setBusy(true);
     try {
       const bytes = await blob.arrayBuffer();
