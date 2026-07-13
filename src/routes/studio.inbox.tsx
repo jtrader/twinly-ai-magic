@@ -296,6 +296,16 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
           <div className="text-center text-xs text-muted-foreground">No messages yet.</div>
         )}
         {messages.map((m: any) => {
+          if (m.sender_type === "system") {
+            return (
+              <div key={m.id} className="my-2 flex justify-center">
+                <div className="max-w-[85%] rounded-full border border-border bg-surface-elevated/60 px-3 py-1 text-center text-[11px] text-muted-foreground">
+                  <span className="whitespace-pre-wrap break-words">{m.body}</span>
+                  <span className="ml-2 opacity-70">· {new Date(m.created_at).toLocaleString()}</span>
+                </div>
+              </div>
+            );
+          }
           const mine = m.sender_type === "creator";
           return (
             <div key={m.id} className={"flex " + (mine ? "justify-end" : "justify-start")}>
