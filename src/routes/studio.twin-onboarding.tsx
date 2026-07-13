@@ -137,7 +137,7 @@ function TwinOnboardingWizard() {
     if (!likenessOk) return toast.error("Likeness consent is required to generate any synthetic content.");
     try {
       await upsertConsent({ data: { likenessOk, imageOk, voiceOk, videoOk } });
-      setStep(4);
+      setStep(5);
     } catch (e: any) {
       toast.error(e.message ?? "Could not save consent");
     }
