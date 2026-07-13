@@ -337,7 +337,6 @@ export const getMyAgencyTimeline = createServerFn({ method: "GET" })
         (r.metadata as any)?.decline_reason ??
         (r.metadata as any)?.suspended_reason ??
         null,
-      metadata: (r.metadata as any) ?? {},
     }));
     return { events };
   });
@@ -349,5 +348,4 @@ export type AgencyTimelineEvent = {
   agencyId: string | null;
   agencyName: string | null;
   reason: string | null;
-  metadata: Record<string, unknown> | null;
 };
