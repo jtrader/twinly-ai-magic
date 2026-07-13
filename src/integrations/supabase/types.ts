@@ -56,24 +56,91 @@ export type Database = {
         }
         Relationships: []
       }
+      agency_client_consents: {
+        Row: {
+          agency_id: string
+          agreed_scopes: Json
+          consented_at: string
+          creator_id: string
+          id: string
+          policy_version: string
+          revoked_at: string | null
+          revoked_reason: string | null
+        }
+        Insert: {
+          agency_id: string
+          agreed_scopes?: Json
+          consented_at?: string
+          creator_id: string
+          id?: string
+          policy_version: string
+          revoked_at?: string | null
+          revoked_reason?: string | null
+        }
+        Update: {
+          agency_id?: string
+          agreed_scopes?: Json
+          consented_at?: string
+          creator_id?: string
+          id?: string
+          policy_version?: string
+          revoked_at?: string | null
+          revoked_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_client_consents_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_client_consents_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_client_consents_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agency_creators: {
         Row: {
+          activated_at: string | null
           agency_id: string
           created_at: string
           creator_id: string
           permissions: Json
+          status: string
+          suspended_at: string | null
+          suspended_reason: string | null
         }
         Insert: {
+          activated_at?: string | null
           agency_id: string
           created_at?: string
           creator_id: string
           permissions?: Json
+          status?: string
+          suspended_at?: string | null
+          suspended_reason?: string | null
         }
         Update: {
+          activated_at?: string | null
           agency_id?: string
           created_at?: string
           creator_id?: string
           permissions?: Json
+          status?: string
+          suspended_at?: string | null
+          suspended_reason?: string | null
         }
         Relationships: [
           {
@@ -95,6 +162,59 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agency_subscriptions: {
+        Row: {
+          agency_id: string
+          base_price_cents: number
+          billed_client_count: number
+          created_at: string
+          currency: string
+          current_period_end: string | null
+          environment: string
+          per_client_price_cents: number
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          base_price_cents?: number
+          billed_client_count?: number
+          created_at?: string
+          currency?: string
+          current_period_end?: string | null
+          environment?: string
+          per_client_price_cents?: number
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          base_price_cents?: number
+          billed_client_count?: number
+          created_at?: string
+          currency?: string
+          current_period_end?: string | null
+          environment?: string
+          per_client_price_cents?: number
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_subscriptions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "agencies"
             referencedColumns: ["id"]
           },
         ]
@@ -3822,6 +3942,10 @@ export type Database = {
         Args: { _bucket: string; _limit: number; _window_seconds: number }
         Returns: boolean
       }
+      count_active_agency_clients: {
+        Args: { _agency_id: string }
+        Returns: number
+      }
       get_my_profile: {
         Args: never
         Returns: {
@@ -3866,6 +3990,10 @@ export type Database = {
       }
       has_accepted_legal: {
         Args: { _min_version?: string; _user_id: string }
+        Returns: boolean
+      }
+      has_active_agency_consent: {
+        Args: { _agency_id: string; _creator_id: string }
         Returns: boolean
       }
       has_active_invite_grant: {
