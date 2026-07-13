@@ -222,6 +222,16 @@ function TwinOnboardingWizard() {
               A live preview of the Character's name, avatar and description appears below once the ID checks out.
               If Venice can't be reached after a couple of tries, you can paste the raw character JSON as a fallback.
             </p>
+            {baselineInitial && (
+              <p
+                id="onboarding-venice-current"
+                className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted-foreground"
+                role="status"
+              >
+                Currently saved baseline: <span className="font-mono text-foreground">{baselineInitial}</span>.
+                Skip keeps it untouched — clearing the field and choosing Save &amp; continue is the only way to remove it.
+              </p>
+            )}
             <VeniceCharacterField
               idPrefix="onboarding-baseline"
               value={baselineSlug}
@@ -231,11 +241,12 @@ function TwinOnboardingWizard() {
                 setBaselineStatus(p ? "ok" : baselineSlug.trim() ? baselineStatus : "idle");
               }}
             />
-            {baselinePreview && (
-              <aside
-                aria-label="Character preview"
-                className="flex items-start gap-4 rounded-2xl border border-brand/30 bg-brand/5 p-4"
-              >
+            <div aria-live="polite" aria-atomic="true">
+              {baselinePreview && (
+                <aside
+                  aria-label={`Character preview: ${baselinePreview.name}`}
+                  className="flex items-start gap-4 rounded-2xl border border-brand/30 bg-brand/5 p-4"
+                >
                 {baselinePreview.photoUrl ? (
                   <img
                     src={baselinePreview.photoUrl}
@@ -249,10 +260,10 @@ function TwinOnboardingWizard() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-display text-lg font-semibold">{baselinePreview.name}</span>
                     {baselinePreview.adult && (
-                      <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">18+</span>
+                      <span aria-label="Adult content, 18 and over" className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">18+</span>
                     )}
                     {baselinePreview.source === "manual" && (
-                      <span className="rounded-full border border-sky-400/40 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-sky-300">Manual</span>
+                      <span aria-label="Manually verified from pasted JSON" className="rounded-full border border-sky-400/40 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-sky-300">Manual</span>
                     )}
                   </div>
                   <div className="mt-0.5 text-xs text-muted-foreground">
@@ -262,26 +273,44 @@ function TwinOnboardingWizard() {
                     <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{baselinePreview.description}</p>
                   )}
                 </div>
-              </aside>
-            )}
+                </aside>
+              )}
+            </div>
             <div className="flex justify-between pt-2">
               <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
               <div className="flex gap-2">
-                <Button variant="ghost" onClick={() => setStep(3)} disabled={savingBaseline}>
+                <Button
+                  variant="ghost"
+                  onClick={() => setStep(3)}
+                  disabled={savingBaseline}
+                  aria-label={baselineInitial ? `Skip this step and keep the saved baseline ${baselineInitial}` : "Skip this step"}
+                >
                   Skip
                 </Button>
                 <Button
                   onClick={saveBaselineAndContinue}
                   disabled={savingBaseline || (!!baselineSlug.trim() && !baselinePreview)}
+                  aria-describedby={
+                    !!baselineSlug.trim() && !baselinePreview
+                      ? "onboarding-venice-savehint"
+                      : baselineInitial && !baselineSlug.trim()
+                        ? "onboarding-venice-clearhint"
+                        : undefined
+                  }
                 >
                   {savingBaseline ? "Saving…" : "Save & continue"}
-                  <ArrowRight className="ml-2 size-4" />
+                  <ArrowRight className="ml-2 size-4" aria-hidden />
                 </Button>
               </div>
             </div>
             {!!baselineSlug.trim() && !baselinePreview && (
-              <p className="text-[11px] text-muted-foreground">
+              <p id="onboarding-venice-savehint" className="text-[11px] text-muted-foreground">
                 Fix or skip this step before continuing — the ID hasn't been verified yet.
+              </p>
+            )}
+            {baselineInitial && !baselineSlug.trim() && (
+              <p id="onboarding-venice-clearhint" className="text-[11px] text-amber-300" role="status">
+                Saving now will clear your baseline (<span className="font-mono">{baselineInitial}</span>). Choose Skip to keep it.
               </p>
             )}
           </section>
