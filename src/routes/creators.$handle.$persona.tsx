@@ -138,7 +138,7 @@ function PersonaFeedPage() {
       )}
       {(persona.isExplicit || (persona as any).requireIdVerification) && viewer.isAdult && !(viewer as any).idVerified && (
         <div className="mb-6 rounded-xl border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-200">
-          This persona's most explicit content requires identity verification.{" "}
+          This creator restricts this persona to verified supporters. ID verification isn't required on Twinly overall — it's this creator's choice. Verify once (~3 minutes, handled by Stripe; Twinly never stores your ID) and you'll unlock every verified-only creator.{" "}
           <Link to="/account" className="underline">Verify your identity →</Link>
         </div>
       )}
