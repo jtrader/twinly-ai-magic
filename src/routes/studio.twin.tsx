@@ -720,3 +720,84 @@ function ForbiddenUsesSection({ data, onChanged }: { data: any; onChanged: () =>
     </section>
   );
 }
+
+function BaselineCharacterSection() {
+  const load = useServerFn(getBaselineVeniceCharacter);
+  const save = useServerFn(setBaselineVeniceCharacter);
+  const [slug, setSlug] = useState("");
+  const [initial, setInitial] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await load();
+        if (!alive) return;
+        setSlug(r.slug ?? "");
+        setInitial(r.slug);
+      } catch { /* ignore */ }
+      finally { if (alive) setLoaded(true); }
+    })();
+    return () => { alive = false; };
+  }, [load]);
+
+  const dirty = (slug.trim() || null) !== (initial?.trim() || null);
+
+  async function onSave() {
+    setBusy(true);
+    try {
+      const r = await save({ data: { slug: slug.trim() || null } });
+      setInitial(r.slug);
+      toast.success(r.slug ? "Baseline Character ID saved" : "Baseline Character ID cleared");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not save");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <section
+      id="baseline-character"
+      aria-labelledby="baseline-character-heading"
+      className="rounded-2xl border border-brand/30 bg-brand/5 p-5"
+    >
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 text-brand-glow" />
+            <h2 id="baseline-character-heading" className="font-display text-lg font-semibold">
+              Baseline Venice Character ID
+            </h2>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Import a Venice Character once here and every new AI persona picks it up as the default —
+            no need to paste it into each persona. Personas can still override it individually.
+          </p>
+        </div>
+      </header>
+
+      <div className="mt-4">
+        {loaded ? (
+          <VeniceCharacterField idPrefix="baseline" value={slug} onChange={setSlug} />
+        ) : (
+          <div className="text-xs text-muted-foreground">Loading…</div>
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center justify-end gap-2">
+        {initial && !slug.trim() && (
+          <span className="mr-auto text-[11px] text-amber-300">
+            Saving will clear the current baseline (<span className="font-mono">{initial}</span>).
+          </span>
+        )}
+        <Button size="sm" variant="outline" disabled={!dirty || busy} onClick={() => setSlug(initial ?? "")}>
+          Reset
+        </Button>
+        <Button size="sm" disabled={!dirty || busy} onClick={onSave} className="min-h-9">
+          {busy ? "Saving…" : "Save baseline"}
+        </Button>
+      </div>
+    </section>
+  );
+}
