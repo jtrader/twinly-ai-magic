@@ -39,10 +39,13 @@ function FanDashboard() {
   const [follows, setFollows] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [journey, setJourney] = useState<{ creatorId: string; creatorName: string; tier: "base" | "plus" | "vip" } | null>(null);
+  const [idStatus, setIdStatus] = useState<{ idVerifiedAt: string | null; latestSession: { status?: string } | null } | null>(null);
+  const [idLoading, setIdLoading] = useState(true);
   const loadFeed = useServerFn(getMyFeed);
   const loadFollows = useServerFn(listMyFollows);
   const loadPosts = useServerFn(getHomeFeed);
   const loadProfile = useServerFn(getMyProfile);
+  const loadIdStatus = useServerFn(getMyIdentityVerificationStatus);
   const unfollow = useServerFn(toggleFollow);
   const favorite = useServerFn(setFavorite);
 
@@ -64,17 +67,20 @@ function FanDashboard() {
       setConvos(c ?? []);
       setProfile(Array.isArray(p) ? (p[0] ?? null) : (p ?? null));
       try {
-        const [f, fol, ps, prof] = await Promise.all([
+        const [f, fol, ps, prof, idres] = await Promise.all([
           loadFeed({}),
           loadFollows({}),
           loadPosts({ data: {} }).catch(() => ({ items: [] })),
           loadProfile().catch(() => ({ profile: null })),
+          loadIdStatus().catch(() => null),
         ]);
         setFeed(f.items ?? []);
         setFollows(fol ?? []);
         setPosts(ps.items ?? []);
         setProfileInfo(prof.profile);
+        setIdStatus(idres as any);
       } catch {}
+      setIdLoading(false);
       setReady(true);
     })();
   }, [user]);
