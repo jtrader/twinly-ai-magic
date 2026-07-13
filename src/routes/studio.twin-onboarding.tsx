@@ -294,7 +294,15 @@ function TwinOnboardingWizard() {
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
-                  onClick={() => setStep(3)}
+                  onClick={() => {
+                    // Persist a per-creator "skipped" flag so the dashboard
+                    // checklist stops nagging across sessions on this browser.
+                    if (!baselineInitial && data?.creator?.id) {
+                      try { window.localStorage.setItem(`twinly:setup:skip-venice:${data.creator.id}`, "1"); }
+                      catch { /* ignore */ }
+                    }
+                    setStep(3);
+                  }}
                   disabled={savingBaseline}
                   aria-label={baselineInitial ? `Skip this step and keep the saved baseline ${baselineInitial}` : "Skip this step"}
                 >
