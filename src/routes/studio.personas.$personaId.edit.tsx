@@ -25,6 +25,9 @@ import {
 import {
   createPersonaInvite, listPersonaInvites, revokePersonaInvite,
 } from "@/lib/persona-invites.functions";
+import {
+  createInviteGrant, listInviteGrants, revokeInviteGrant,
+} from "@/lib/invite-grants.functions";
 import { getPersonaVisibilityPolicy, setPersonaDefaultVisibility } from "@/lib/feed-visibility.functions";
 import type { FeedVisibilityTier } from "@/lib/feed-visibility-access.server";
 import { nextFeedTierForToggle } from "@/lib/feed-visibility-tier-toggle";
@@ -149,6 +152,9 @@ function PersonaEditForm({
   const [voiceSimilarityBoost, setVoiceSimilarityBoost] = useState(((persona as any).voice_similarity_boost as number | null) ?? 0.75);
   const [voiceStyle, setVoiceStyle] = useState(((persona as any).voice_style as number | null) ?? 0);
   const [requireIdVerification, setRequireIdVerification] = useState(!!(persona as any).require_id_verification);
+  const [requiresVerifiedSupporter, setRequiresVerifiedSupporter] = useState(
+    !!(persona as any).requires_verified_supporter,
+  );
   const [veniceCharacterSlug, setVeniceCharacterSlug] = useState(((persona as any).venice_character_slug as string | null) ?? "");
   const [busy, setBusy] = useState(false);
 
@@ -380,6 +386,7 @@ function PersonaEditForm({
         voiceSimilarityBoost: persona.kind === "ai" && useClonedVoice ? voiceSimilarityBoost : undefined,
         voiceStyle: persona.kind === "ai" && useClonedVoice ? voiceStyle : undefined,
         requireIdVerification: persona.kind === "ai" ? requireIdVerification : undefined,
+        requiresVerifiedSupporter: persona.kind === "ai" ? requiresVerifiedSupporter : undefined,
         veniceCharacterSlug: persona.kind === "ai" ? veniceCharacterSlug : undefined,
         elevenlabsVoiceId: persona.kind === "ai" ? elevenlabsVoiceIdOverride : undefined,
         trainingNotes: { tone_examples: toneExamples, dos, donts, sample_phrasings: samplePhrasings, voice_ref_url: voiceRefUrl },
