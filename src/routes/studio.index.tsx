@@ -25,6 +25,8 @@ function StudioHome() {
   const navigate = useNavigate();
   const [creator, setCreator] = useState<any>(null);
   const [counts, setCounts] = useState({ personas: 0, assets: 0 });
+  const [countsLoaded, setCountsLoaded] = useState(false);
+  const [pricingLoaded, setPricingLoaded] = useState(false);
   const [openFlags, setOpenFlags] = useState(0);
   const [realMeCompletion, setRealMeCompletion] = useState<number | null>(null);
   const [baselineSlug, setBaselineSlug] = useState<string | null>(null);
@@ -36,6 +38,7 @@ function StudioHome() {
     characterName?: string;
     message?: string;
   } | null>(null);
+  const [veniceLoading, setVeniceLoading] = useState(true);
   const countFlags = useServerFn(countOpenCreatorFlags);
   const loadVeniceStatus = useServerFn(getBaselineVeniceStatus);
 
@@ -53,9 +56,15 @@ function StudioHome() {
           supabase.from("creator_tier_prices").select("id", { count: "exact", head: true }).eq("creator_id", c.id),
         ]);
         setCounts({ personas: personas ?? 0, assets: assets ?? 0 });
+        setCountsLoaded(true);
         setHasPricing((pricing ?? 0) > 0);
+        setPricingLoaded(true);
         countFlags({}).then((r) => setOpenFlags(r.count)).catch(() => {});
-        loadVeniceStatus().then(setVeniceStatus).catch(() => {});
+        setVeniceLoading(true);
+        loadVeniceStatus()
+          .then((s) => { setVeniceStatus(s); })
+          .catch(() => { setVeniceStatus({ slug: null, status: "unavailable", message: "Could not reach verification service." }); })
+          .finally(() => setVeniceLoading(false));
 
         // Read-only — never call getRealMeProfile here, it lazily creates
         // the row as a side effect just from viewing the dashboard.
@@ -80,6 +89,16 @@ function StudioHome() {
     try { setVeniceSkipped(window.localStorage.getItem(`twinly:setup:skip-venice:${creator.id}`) === "1"); }
     catch { /* ignore */ }
   }, [creator?.id]);
+
+  const retryVeniceStatus = () => {
+    setVeniceLoading(true);
+    // Preserve the previous status while re-running so a transient failure
+    // doesn't wipe the saved slug badge from view mid-check.
+    loadVeniceStatus()
+      .then((s) => setVeniceStatus(s))
+      .catch(() => setVeniceStatus((prev) => prev ?? { slug: null, status: "unavailable", message: "Could not reach verification service." }))
+      .finally(() => setVeniceLoading(false));
+  };
 
   if (!creator) {
     return (
@@ -106,6 +125,7 @@ function StudioHome() {
 
   const rmPct = realMeCompletion ?? 0;
   const rmDone = rmPct >= 100;
+  const rmLoading = realMeCompletion === null;
   const rmReason = rmDone
     ? { text: "Baseline complete", tone: "ok" as const }
     : rmPct > 0
@@ -151,6 +171,7 @@ function StudioHome() {
       title: "Fill your Real Me baseline",
       to: "/studio/real-me",
       done: rmDone,
+      loading: rmLoading,
       statusReason: rmReason?.text,
       statusTone: rmReason?.tone,
       why: "Your tone, voice and baseline answers — every AI persona auto-generates its style from this.",
@@ -178,8 +199,11 @@ function StudioHome() {
       toSearch: { step: 2 },
       optional: true,
       done: !!veniceDone,
+      loading: veniceLoading,
       statusReason: veniceReason?.text,
       statusTone: veniceReason?.tone,
+      onRetry: retryVeniceStatus,
+      retryLabel: "Re-check Venice",
       why: "Optional. If you already have a Venice Character, pinning it here makes every new persona use it as the default.",
       who: "Only relevant if you've published a Character on venice.ai already.",
       what: "Paste the ID (last segment of venice.ai/c/<id>) and confirm the live preview.",
@@ -190,6 +214,7 @@ function StudioHome() {
       title: "Create your first AI persona",
       to: "/studio/personas/new",
       done: counts.personas > 0,
+      loading: !countsLoaded,
       statusReason: counts.personas > 0 ? `${counts.personas} persona${counts.personas === 1 ? "" : "s"} created` : undefined,
       statusTone: counts.personas > 0 ? "ok" : undefined,
       why: "Personas are the actual characters fans chat with — Nice, Naughty, Wicked or fully custom.",
@@ -202,6 +227,7 @@ function StudioHome() {
       title: "Upload content to your vault",
       to: "/studio/content",
       done: counts.assets > 0,
+      loading: !countsLoaded,
       statusReason: counts.assets > 0 ? `${counts.assets} vault asset${counts.assets === 1 ? "" : "s"}` : undefined,
       statusTone: counts.assets > 0 ? "ok" : undefined,
       why: "The vault is where images, clips and voice notes live before you attach them to packs or posts.",
@@ -214,6 +240,7 @@ function StudioHome() {
       title: "Set your subscription pricing",
       to: "/studio/pricing",
       done: hasPricing,
+      loading: !pricingLoaded,
       statusReason: hasPricing ? "Tier prices set" : undefined,
       statusTone: hasPricing ? "ok" : undefined,
       why: "Monthly Base / Plus / VIP tiers gate premium chats, packs and posts.",
