@@ -27,6 +27,28 @@ export const Route = createFileRoute("/studio/inbox")({
 
 type Convo = Awaited<ReturnType<typeof listInboxConversations>>["conversations"][number];
 
+function ModeBadge({
+  personaKind,
+  suspended,
+  size = "sm",
+}: {
+  personaKind?: string | null;
+  suspended?: boolean;
+  size?: "xs" | "sm";
+}) {
+  const cls =
+    size === "xs"
+      ? "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+      : "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold";
+  if (personaKind === "real_me") {
+    return <span className={cls + " bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"}><User className="size-3" /> Real Me</span>;
+  }
+  if (suspended) {
+    return <span className={cls + " bg-amber-500/15 text-amber-400 border border-amber-500/30"} title="You have taken over from the AI twin"><Hand className="size-3" /> Take over</span>;
+  }
+  return <span className={cls + " bg-brand/15 text-brand border border-brand/30"} title="AI twin is replying on auto-pilot"><Sparkles className="size-3" /> Auto-pilot</span>;
+}
+
 function InboxPage() {
   const { user, loading } = useSession();
   const navigate = useNavigate();
@@ -100,11 +122,9 @@ function InboxPage() {
                       <div className="truncate text-sm font-semibold">{c.fan?.display_name ?? "Fan"}</div>
                       <div className="truncate text-[11px] text-muted-foreground">
                         {c.creator?.stage_name} · {c.persona?.display_name}
-                        {(c as any).persona?.kind === "ai"
-                          ? (c as any).ai_suspended
-                            ? " · you're replying"
-                            : " · auto-pilot"
-                          : " · Real Me"}
+                      </div>
+                      <div className="mt-1">
+                        <ModeBadge personaKind={(c as any).persona?.kind} suspended={(c as any).ai_suspended} size="xs" />
                       </div>
                     </div>
                   </div>
@@ -251,10 +271,10 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold">{fan?.display_name ?? "Fan"}</div>
           <div className="truncate text-[11px] text-muted-foreground">
-            {convo.creators?.stage_name} ·{" "}
-            {isAi
-              ? `${convo.personas?.display_name} · ${suspended ? "you're replying" : "AI auto-pilot"}`
-              : `Real Me — ${convo.personas?.display_name}`}
+            {convo.creators?.stage_name} · {convo.personas?.display_name}
+          </div>
+          <div className="mt-1">
+            <ModeBadge personaKind={convo.personas?.kind} suspended={suspended} />
           </div>
         </div>
         {isAi && (
