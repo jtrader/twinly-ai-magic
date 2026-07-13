@@ -375,7 +375,14 @@ function RealMePage() {
           <div className="space-y-4">
             <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{activeSection.title}</div>
             {activeQuestions.map((q) => (
-              <QuestionField key={q.id} question={q} value={displayedAnswers[q.id]} onChange={(v) => onAnswer(q.id, v)} />
+              <QuestionField
+                key={q.id}
+                question={q}
+                value={displayedAnswers[q.id]}
+                onChange={(v) => onAnswer(q.id, v)}
+                locked={lockedIds.has(q.id)}
+                onToggleLock={() => toggleLock(q.id)}
+              />
             ))}
           </div>
         </div>
@@ -429,25 +436,58 @@ function RealMePage() {
   );
 }
 
-function QuestionField({ question, value, onChange }: { question: QuestionDefinition; value: unknown; onChange: (v: unknown) => void }) {
+function QuestionField({
+  question,
+  value,
+  onChange,
+  locked,
+  onToggleLock,
+}: {
+  question: QuestionDefinition;
+  value: unknown;
+  onChange: (v: unknown) => void;
+  locked: boolean;
+  onToggleLock: () => void;
+}) {
+  const handleChange = (v: unknown) => {
+    if (locked) return;
+    onChange(v);
+  };
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4">
-      <div className="mb-2 text-sm font-medium">{question.promptText}{question.optional && <span className="ml-1 text-xs font-normal text-muted-foreground">(optional)</span>}</div>
-      {question.type === "multi_select" && (
-        <MultiSelectInput options={question.options ?? []} value={(value as string[]) ?? []} onChange={onChange} />
-      )}
-      {question.type === "single_select" && (
-        <SingleSelectInput options={question.options ?? []} value={(value as string) ?? ""} onChange={onChange} allowCustomOption={question.allowCustomOption} />
-      )}
-      {question.type === "yes_no" && (
-        <YesNoInput value={value === undefined ? null : (value as boolean)} onChange={onChange} />
-      )}
-      {question.type === "rating" && (
-        <RatingInput value={(value as number) ?? 5} onChange={onChange} />
-      )}
-      {question.type === "custom_prompt" && (
-        <CustomPromptInput value={(value as string) ?? ""} onChange={onChange} maxLength={question.maxLength} />
-      )}
+    <div className={"rounded-2xl border p-4 transition " + (locked ? "border-amber-400/40 bg-amber-500/5" : "border-border bg-surface")}>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="text-sm font-medium">
+          {question.promptText}
+          {question.optional && <span className="ml-1 text-xs font-normal text-muted-foreground">(optional)</span>}
+          {locked && <span className="ml-2 text-[10px] font-semibold uppercase tracking-widest text-amber-400">Locked</span>}
+        </div>
+        <button
+          type="button"
+          onClick={onToggleLock}
+          className={"shrink-0 rounded-md p-1 transition " + (locked ? "text-amber-400 hover:bg-amber-500/10" : "text-muted-foreground hover:bg-surface-elevated hover:text-foreground")}
+          title={locked ? "Unlock — AI can update this answer" : "Lock — AI will preserve this answer"}
+          aria-label={locked ? "Unlock answer" : "Lock answer"}
+        >
+          {locked ? <Lock className="size-4" /> : <Unlock className="size-4" />}
+        </button>
+      </div>
+      <div className={locked ? "pointer-events-none opacity-70" : ""} aria-disabled={locked}>
+        {question.type === "multi_select" && (
+          <MultiSelectInput options={question.options ?? []} value={(value as string[]) ?? []} onChange={handleChange} />
+        )}
+        {question.type === "single_select" && (
+          <SingleSelectInput options={question.options ?? []} value={(value as string) ?? ""} onChange={handleChange} allowCustomOption={question.allowCustomOption} />
+        )}
+        {question.type === "yes_no" && (
+          <YesNoInput value={value === undefined ? null : (value as boolean)} onChange={handleChange} />
+        )}
+        {question.type === "rating" && (
+          <RatingInput value={(value as number) ?? 5} onChange={handleChange} />
+        )}
+        {question.type === "custom_prompt" && (
+          <CustomPromptInput value={(value as string) ?? ""} onChange={handleChange} maxLength={question.maxLength} />
+        )}
+      </div>
     </div>
   );
 }
