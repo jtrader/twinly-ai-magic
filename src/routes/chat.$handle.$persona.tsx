@@ -156,7 +156,7 @@ function ChatPage() {
         toast.message("Message delivered to creator", { description: "A team member is handling this conversation directly now." });
       }
     } catch (err: any) {
-      toast.error(friendlyChatError(err.message));
+      showChatError(err);
     } finally { setSending(false); }
   }
 
@@ -193,7 +193,7 @@ function ChatPage() {
         }]);
       }
     } catch (err: any) {
-      toast.error(friendlyChatError(err.message));
+      showChatError(err);
     } finally { setSending(false); }
   }
 
