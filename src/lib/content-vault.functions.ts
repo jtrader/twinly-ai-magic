@@ -21,7 +21,7 @@ async function requireCreator(supabase: any, userId: string) {
  * Falls back to the client-declared size if the storage lookup fails —
  * uploads should not hard-fail on a metadata read hiccup.
  */
-async function resolveByteSize(storagePath: string | null | undefined, declaredSize?: number): Promise<number> {
+export async function resolveByteSize(storagePath: string | null | undefined, declaredSize?: number): Promise<number> {
   if (!storagePath) return 0;
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -69,7 +69,7 @@ export async function getPersonaStorageUsageBytes(supabase: any, personaId: stri
     .reduce((sum: number, a: any) => sum + (a.byte_size ?? 0), 0);
 }
 
-async function assertPersonaHasRoom(supabase: any, personaId: string, additionalBytes: number) {
+export async function assertPersonaHasRoom(supabase: any, personaId: string, additionalBytes: number) {
   if (additionalBytes <= 0) return;
   const used = await getPersonaStorageUsageBytes(supabase, personaId);
   if (used + additionalBytes > PERSONA_STORAGE_CAP_BYTES) {

@@ -3,6 +3,7 @@ import { createServerFn, useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { PersonaCard } from "@/components/twinly/PersonaCard";
+import { IntroVideoDialog } from "@/components/twinly/IntroVideoDialog";
 import { AiDisclosureBanner } from "@/components/twinly/AiDisclosureBanner";
 import { ReportDialog } from "@/components/twinly/ReportDialog";
 import { BlockButton } from "@/components/twinly/BlockButton";
@@ -43,7 +44,7 @@ const loadCreator = createServerFn({ method: "GET" })
     const [{ data: personas }, { count: postCount }] = await Promise.all([
       supabaseAdmin
         .from("personas")
-        .select("id, slug, display_name, description, kind, disclosure_label, price_cents, visibility, starts_at, ends_at, sort_order, is_explicit, cover_url")
+        .select("id, slug, display_name, description, kind, disclosure_label, price_cents, visibility, starts_at, ends_at, sort_order, is_explicit, cover_url, intro_video_asset_id")
         .eq("creator_id", creator.id)
         .in("visibility", ["public", "subscribers", "vip"])
         .order("sort_order", { ascending: true }),
@@ -53,7 +54,24 @@ const loadCreator = createServerFn({ method: "GET" })
         .eq("creator_id", creator.id)
         .eq("is_removed", false),
     ]);
-    return { creator, profile: profile ?? null, personas: personas ?? [], postCount: postCount ?? 0 };
+
+    // Cheap existence+approval check for the video-icon badge — the actual
+    // signed URL is only minted on click, via getPersonaIntroVideoUrl.
+    const introAssetIds = (personas ?? []).map((p: any) => p.intro_video_asset_id).filter(Boolean);
+    let approvedIntroAssetIds = new Set<string>();
+    if (introAssetIds.length) {
+      const { data: introAssets } = await supabaseAdmin
+        .from("content_assets")
+        .select("id, approval_status")
+        .in("id", introAssetIds);
+      approvedIntroAssetIds = new Set((introAssets ?? []).filter((a: any) => a.approval_status === "approved").map((a: any) => a.id));
+    }
+    const personasWithIntro = (personas ?? []).map((p: any) => ({
+      ...p,
+      hasIntroVideo: !!p.intro_video_asset_id && approvedIntroAssetIds.has(p.intro_video_asset_id),
+    }));
+
+    return { creator, profile: profile ?? null, personas: personasWithIntro, postCount: postCount ?? 0 };
   });
 
 export const Route = createFileRoute("/creators/$handle")({
@@ -68,6 +86,7 @@ function CreatorProfile() {
   const avatarUrl = profile?.avatar_url ?? null;
   const { user } = useSession();
   const isOwner = !!user && user.id === creator.user_id;
+  const [introVideoPersona, setIntroVideoPersona] = useState<{ slug: string; displayName: string } | null>(null);
   const [activeSub, setActiveSub] = useState<{ tier: ActiveTier; cancelAtPeriodEnd: boolean } | null>(null);
   useEffect(() => {
     if (!user || isOwner) { setActiveSub(null); return; }
@@ -252,6 +271,8 @@ function CreatorProfile() {
                   disclosureLabel={p.disclosure_label}
                   priceCents={p.price_cents ?? 0}
                   avatarUrl={p.cover_url}
+                  hasIntroVideo={p.hasIntroVideo}
+                  onPlayIntro={() => setIntroVideoPersona({ slug: p.slug, displayName: p.display_name })}
                   {...cardProps}
                 />
               );
@@ -262,6 +283,14 @@ function CreatorProfile() {
           </p>
         </section>
       )}
+      <IntroVideoDialog
+        open={!!introVideoPersona}
+        onOpenChange={(o) => { if (!o) setIntroVideoPersona(null); }}
+        creatorHandle={creator.handle}
+        personaSlug={introVideoPersona?.slug ?? null}
+        displayName={introVideoPersona?.displayName}
+        userId={user?.id ?? null}
+      />
     </AppShell>
   );
 }

@@ -76,7 +76,7 @@ export const listMyPersonas = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { data: creator } = await supabase
-      .from("creators").select("id, handle, stage_name, onboarding_completed_at, verification_status, elevenlabs_voice_id")
+      .from("creators").select("id, handle, stage_name, onboarding_completed_at, verification_status, elevenlabs_voice_id, digital_twin_status")
       .eq("user_id", userId).maybeSingle();
     if (!creator) return { creator: null, personas: [] };
     // Real (legal) name, distinct from the public stage_name — used only for

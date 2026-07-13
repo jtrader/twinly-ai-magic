@@ -220,6 +220,61 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
     };
   });
 
+/**
+ * Public: mint a short-lived signed URL for a persona's approved intro
+ * video teaser. Deliberately no auth middleware — the teaser is meant to
+ * play for anyone who can see the persona card at all, including
+ * logged-out visitors (the card's own click-through routes them to /auth,
+ * but the video icon should bypass that). Mirrors getPersonaFeed's own
+ * visibility gate exactly so a draft/hidden/un-invited persona's intro
+ * video can never leak through this path.
+ */
+export const getPersonaIntroVideoUrl = createServerFn({ method: "POST" })
+  .validator((d: { handle: string; personaSlug: string; userId?: string | null }) => d)
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: creator } = await supabaseAdmin
+      .from("creators")
+      .select("id, user_id, verification_status")
+      .eq("handle", data.handle)
+      .maybeSingle();
+    if (!creator) return null;
+
+    const isOwnerPreCheck = !!(data.userId && data.userId === creator.user_id);
+    if (!isOwnerPreCheck && creator.verification_status !== "verified") return null;
+
+    const { data: persona } = await supabaseAdmin
+      .from("personas")
+      .select("id, visibility, intro_video_asset_id")
+      .eq("creator_id", creator.id)
+      .eq("slug", data.personaSlug)
+      .maybeSingle();
+    if (!persona || !persona.intro_video_asset_id) return null;
+
+    if (persona.visibility === "invite_only") {
+      const { checkPersonaInviteAccess } = await import("./persona-invites.functions");
+      const invited = isOwnerPreCheck ? true : await checkPersonaInviteAccess(supabaseAdmin, persona.id, data.userId ?? null);
+      if (!invited) return null;
+    } else if (!["public", "subscribers", "vip"].includes(persona.visibility as string)) {
+      return null;
+    }
+
+    const { data: asset } = await supabaseAdmin
+      .from("content_assets")
+      .select("storage_path, approval_status, moderation_status")
+      .eq("id", persona.intro_video_asset_id)
+      .maybeSingle();
+    if (!asset || !asset.storage_path) return null;
+    if (asset.approval_status !== "approved") return null;
+    if (asset.moderation_status === "removed") return null;
+
+    const { data: signed } = await supabaseAdmin.storage
+      .from("content-assets").createSignedUrl(asset.storage_path, 600);
+    if (!signed?.signedUrl) return null;
+    return { url: signed.signedUrl };
+  });
+
 /** Authenticated: mint a short-lived signed URL for an asset the fan has access to. */
 export const getFanAssetUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

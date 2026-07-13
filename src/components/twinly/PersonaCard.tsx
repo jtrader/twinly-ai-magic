@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Play } from "lucide-react";
 import { PersonaBadge } from "./PersonaBadge";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +15,8 @@ export interface PersonaCardProps {
   href?: string;
   onClick?: () => void;
   className?: string;
+  hasIntroVideo?: boolean;
+  onPlayIntro?: () => void;
 }
 
 export function PersonaCard(p: PersonaCardProps) {
@@ -42,6 +45,16 @@ export function PersonaCard(p: PersonaCardProps) {
               loading="lazy"
               className="relative size-16 rounded-full border-2 border-brand-glow/70 object-cover shadow-[0_0_18px_-2px_hsl(var(--brand-glow)/0.55)] sm:size-20"
             />
+            {p.hasIntroVideo && (
+              <button
+                type="button"
+                aria-label={`Play ${p.displayName}'s intro video`}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); p.onPlayIntro?.(); }}
+                className="absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-background bg-brand text-brand-foreground shadow-md transition hover:bg-brand/90"
+              >
+                <Play className="size-3.5 fill-current" />
+              </button>
+            )}
           </div>
         )}
       </div>

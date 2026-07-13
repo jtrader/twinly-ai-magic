@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Trash2, Camera, X as XIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Trash2, Camera, X as XIcon, Film } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { PersonaBadge } from "@/components/twinly/PersonaBadge";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,6 +44,10 @@ import { getPersonaVisibilityPolicy, setPersonaDefaultVisibility } from "@/lib/f
 import type { FeedVisibilityTier } from "@/lib/feed-visibility-access.server";
 import { nextFeedTierForToggle } from "@/lib/feed-visibility-tier-toggle";
 import { lookupVeniceCharacter } from "@/lib/venice-character.functions";
+import {
+  uploadPersonaIntroVideo, requestPersonaIntroVideoGeneration, getMyPersonaIntroVideoStatus, removePersonaIntroVideo,
+  type PersonaIntroVideoStatus,
+} from "@/lib/persona-intro-video.functions";
 
 export const Route = createFileRoute("/studio/personas")({ component: PersonaStudioPage });
 
@@ -130,7 +134,7 @@ function PersonaStudioPage() {
   const { user, loading } = useSession();
   const navigate = useNavigate();
   const [personas, setPersonas] = useState<Persona[]>([]);
-  const [creator, setCreator] = useState<{ handle: string; verification_status?: string; fullName?: string | null; elevenlabsVoiceId?: string | null; hasRealMeProfile?: boolean } | null>(null);
+  const [creator, setCreator] = useState<{ id: string; handle: string; verification_status?: string; fullName?: string | null; elevenlabsVoiceId?: string | null; hasRealMeProfile?: boolean; digitalTwinStatus?: string } | null>(null);
   const [ready, setReady] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Persona | null>(null);
@@ -151,11 +155,13 @@ function PersonaStudioPage() {
       return;
     }
     setCreator({
+      id: res.creator.id,
       handle: res.creator.handle,
       verification_status: (res.creator as any).verification_status,
       fullName: (res.creator as any).fullName ?? null,
       elevenlabsVoiceId: (res.creator as any).elevenlabs_voice_id ?? null,
       hasRealMeProfile: !!(res.creator as any).hasRealMeProfile,
+      digitalTwinStatus: (res.creator as any).digital_twin_status,
     });
     setPersonas(res.personas);
     setReady(true);
@@ -338,6 +344,8 @@ function PersonaStudioPage() {
         onSaved={() => { setEditing(null); refresh(); }}
         onLocalPatch={patchPersona}
         elevenlabsVoiceId={creator?.elevenlabsVoiceId ?? null}
+        creatorId={creator?.id}
+        digitalTwinStatus={creator?.digitalTwinStatus}
       />
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => { if (!o) setDeleting(null); }}>
@@ -684,13 +692,15 @@ function VeniceCharacterField({
 }
 
 function EditPersonaDialog({
-  persona, onOpenChange, onSaved, onLocalPatch, elevenlabsVoiceId,
+  persona, onOpenChange, onSaved, onLocalPatch, elevenlabsVoiceId, creatorId, digitalTwinStatus,
 }: {
   persona: Persona | null;
   onOpenChange: (v: boolean) => void;
   onSaved: () => void;
   onLocalPatch?: (id: string, patch: Partial<Persona>) => void;
   elevenlabsVoiceId?: string | null;
+  creatorId?: string;
+  digitalTwinStatus?: string;
 }) {
   const { user } = useSession();
   const update = useServerFn(updatePersona);
@@ -699,6 +709,14 @@ function EditPersonaDialog({
   const setFeedPolicy = useServerFn(setPersonaDefaultVisibility);
   const [feedTier, setFeedTier] = useState<FeedVisibilityTier>("subscribers_only");
   const [feedTierBusy, setFeedTierBusy] = useState(false);
+  const getIntroStatus = useServerFn(getMyPersonaIntroVideoStatus);
+  const uploadIntro = useServerFn(uploadPersonaIntroVideo);
+  const generateIntro = useServerFn(requestPersonaIntroVideoGeneration);
+  const removeIntro = useServerFn(removePersonaIntroVideo);
+  const [introStatus, setIntroStatus] = useState<PersonaIntroVideoStatus | null>(null);
+  const [introPrompt, setIntroPrompt] = useState("");
+  const [introUploadBusy, setIntroUploadBusy] = useState(false);
+  const [introGenerateBusy, setIntroGenerateBusy] = useState(false);
   const [displayName, setName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -911,6 +929,81 @@ function EditPersonaDialog({
       .then((r) => setFeedTier(r.defaultVisibility))
       .catch(() => {});
   }, [persona, getFeedPolicy]);
+
+  const refreshIntroStatus = useCallback(async () => {
+    if (!persona) return;
+    try {
+      const r = await getIntroStatus({ data: { personaId: persona.id } });
+      setIntroStatus(r);
+    } catch {
+      setIntroStatus(null);
+    }
+  }, [persona, getIntroStatus]);
+
+  useEffect(() => { refreshIntroStatus(); }, [refreshIntroStatus]);
+
+  async function handleIntroVideoPick(file: File) {
+    if (!persona || !creatorId) return;
+    const allowed = ["video/mp4", "video/webm", "video/quicktime"];
+    if (!allowed.includes(file.type)) { toast.error("Use an MP4, WebM, or MOV video."); return; }
+    if (file.size > 50 * 1024 * 1024) { toast.error("Video must be under 50MB."); return; }
+
+    // Soft duration check only — no server-side video decoder exists in this
+    // repo to enforce it authoritatively, so this is a helpful guard, not a
+    // security boundary. A spoofed/edited file could bypass it client-side.
+    const durationOk = await new Promise<boolean>((resolve) => {
+      const url = URL.createObjectURL(file);
+      const videoEl = document.createElement("video");
+      videoEl.preload = "metadata";
+      videoEl.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        resolve(videoEl.duration >= 3 && videoEl.duration <= 15);
+      };
+      videoEl.onerror = () => { URL.revokeObjectURL(url); resolve(true); }; // can't read metadata — don't block the upload on that alone
+      videoEl.src = url;
+    });
+    if (!durationOk) { toast.error("Intro video should be roughly 3–15 seconds long."); return; }
+
+    setIntroUploadBusy(true);
+    try {
+      const ext = file.type === "video/webm" ? "webm" : file.type === "video/quicktime" ? "mov" : "mp4";
+      const path = `${creatorId}/intro-video/${persona.id}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("content-assets").upload(path, file, {
+        upsert: false,
+        contentType: file.type,
+      });
+      if (upErr) throw upErr;
+      await uploadIntro({ data: { personaId: persona.id, storagePath: path, byteSize: file.size } });
+      toast.success("Intro video uploaded — pending admin approval.");
+      await refreshIntroStatus();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Upload failed");
+    } finally { setIntroUploadBusy(false); }
+  }
+
+  async function handleGenerateIntroVideo() {
+    if (!persona || !introPrompt.trim()) return;
+    setIntroGenerateBusy(true);
+    try {
+      await generateIntro({ data: { personaId: persona.id, prompt: introPrompt.trim() } });
+      toast.success("Intro video queued — this can take a few minutes, then needs admin approval.");
+      setIntroPrompt("");
+      await refreshIntroStatus();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not queue the intro video");
+    } finally { setIntroGenerateBusy(false); }
+  }
+
+  async function handleRemoveIntroVideo() {
+    if (!persona) return;
+    try {
+      await removeIntro({ data: { personaId: persona.id } });
+      setIntroStatus({ state: "none" });
+      toast.success("Intro video removed");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not remove intro video");
+    }
+  }
 
   async function applyFeedTier(next: FeedVisibilityTier) {
     if (!persona) return;
@@ -1154,6 +1247,73 @@ function EditPersonaDialog({
               Subscribers can always see everything. This sets the default for new feed posts — for per-post overrides and full control, see{" "}
               <Link to="/studio/feed-visibility" className="underline">Feed visibility →</Link>
             </p>
+          </div>
+          <div className="rounded-lg border p-3 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label className="flex items-center gap-1.5"><Film className="size-3.5" /> Intro video</Label>
+              {introStatus && (
+                <Badge
+                  variant="outline"
+                  className={
+                    "text-[10px] uppercase " +
+                    (introStatus.state === "approved" ? "border-emerald-400/40 text-emerald-300"
+                      : introStatus.state === "rejected" ? "border-rose-400/40 text-rose-300"
+                      : introStatus.state === "none" ? "text-muted-foreground"
+                      : "border-amber-400/40 text-amber-300")
+                  }
+                >
+                  {introStatus.state === "none" ? "None"
+                    : introStatus.state === "processing" ? "Processing"
+                    : introStatus.state === "pending_review" ? "Pending review"
+                    : introStatus.state === "approved" ? "Live"
+                    : "Rejected"}
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              A short (~10s) teaser shown as a play icon on this persona's public card. Uploaded or generated clips need admin approval before they're visible to fans.
+            </p>
+            {(introStatus?.state === "pending_review" || introStatus?.state === "approved") && introStatus.previewUrl && (
+              <video src={introStatus.previewUrl} controls className="max-h-40 w-full rounded-md bg-black" />
+            )}
+            <div className="flex flex-wrap gap-2">
+              <label className="inline-flex cursor-pointer items-center rounded-md border border-border bg-surface-elevated px-3 py-1.5 text-xs font-medium hover:border-brand/40">
+                <Camera className="mr-1 size-3.5" />
+                {introUploadBusy ? "Uploading…" : "Upload a clip"}
+                <input
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime"
+                  className="hidden"
+                  disabled={introUploadBusy}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleIntroVideoPick(f); e.target.value = ""; }}
+                />
+              </label>
+              {introStatus && introStatus.state !== "none" && (
+                <Button type="button" size="sm" variant="ghost" onClick={handleRemoveIntroVideo}>
+                  <XIcon className="mr-1 size-3.5" /> Remove
+                </Button>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Textarea
+                rows={2}
+                maxLength={2000}
+                value={introPrompt}
+                onChange={(e) => setIntroPrompt(e.target.value)}
+                placeholder="Or describe a 10-second clip to generate via Venice…"
+                disabled={digitalTwinStatus !== "approved"}
+              />
+              {digitalTwinStatus !== "approved" ? (
+                <p className="text-[11px] text-amber-300">
+                  Your Digital Twin Profile must be approved before generating video — see{" "}
+                  <Link to="/studio/twin-onboarding" className="underline">Twin baseline →</Link>
+                </p>
+              ) : (
+                <Button type="button" size="sm" disabled={introGenerateBusy || !introPrompt.trim()} onClick={handleGenerateIntroVideo}>
+                  {introGenerateBusy ? "Queuing…" : "Generate (10s)"}
+                </Button>
+              )}
+            </div>
           </div>
           <div>
             <Label htmlFor="edit-persona-description">Description</Label>
