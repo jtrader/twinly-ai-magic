@@ -209,5 +209,5 @@ export const generateRealMeProfile = createServerFn({ method: "POST" })
     await context.supabase
       .from("real_me_profiles").update({ current_version_id: newVersion.id }).eq("id", profileId);
 
-    return { version: newVersion, answers };
+    return { version: newVersion, answers: answers as Record<string, unknown> as Answers };
   });
