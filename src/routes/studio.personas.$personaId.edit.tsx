@@ -895,22 +895,9 @@ function PersonaEditForm({
                 </div>
               )
             )}
-            <div className="rounded-lg border border-border bg-surface p-3 text-xs">
-              <h3 className="mb-1 text-sm font-semibold">HeyGen render IDs (talking-head)</h3>
-              <p className="mb-2 text-muted-foreground">
-                Paste the avatar and (optional) voice IDs from your HeyGen account. Used when this persona queues a talking-head clip. Leave blank to fall back to workspace defaults.
-              </p>
-              <div className="grid gap-2 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="edit-persona-heygen-avatar-id" className="text-[11px]">Avatar ID</Label>
-                  <Input id="edit-persona-heygen-avatar-id" className="mt-1" value={heygenAvatarId} onChange={(e) => setHeygenAvatarId(e.target.value)} placeholder="e.g. Daisy_sitting_sofa_side_public" maxLength={120} />
-                </div>
-                <div>
-                  <Label htmlFor="edit-persona-heygen-voice-id" className="text-[11px]">Voice ID (optional)</Label>
-                  <Input id="edit-persona-heygen-voice-id" className="mt-1" value={heygenVoiceId} onChange={(e) => setHeygenVoiceId(e.target.value)} placeholder="Leave blank to use our TTS voice selection" maxLength={120} />
-                </div>
-              </div>
-            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Looking for HeyGen avatar/voice IDs? They're in the persona <button type="button" className="text-brand-glow underline" onClick={() => setTab("basics")}>Basics</button> tab under <span className="font-medium">External model IDs</span>.
+            </p>
           </section>
         )}
 
