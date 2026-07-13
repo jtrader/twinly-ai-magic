@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { ImpersonationBanner } from "@/components/twinly/ImpersonationBanner";
 import { NotificationBell } from "@/components/twinly/NotificationBell";
 import { PaymentTestModeBanner } from "@/components/twinly/PaymentTestModeBanner";
+import { DashboardNav } from "@/components/twinly/DashboardNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession, useUserRoles } from "@/lib/session";
 import {
@@ -27,6 +28,7 @@ export function AppShell({ children, mobileNav = true }: { children: ReactNode; 
       <PaymentTestModeBanner />
       <TopBar />
       <ImpersonationBanner />
+      <DashboardNav />
       <main className={cn("mx-auto max-w-6xl px-4 pb-24 pt-4 md:pt-8", mobileNav && "pb-24")}>{children}</main>
       {mobileNav && <BottomNav />}
     </div>
