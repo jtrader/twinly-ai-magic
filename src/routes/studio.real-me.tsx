@@ -553,6 +553,7 @@ function GenerateProfileDialog({
   const [variants, setVariants] = useState<Variant[]>([]);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [attempt, setAttempt] = useState(0);
+  const [pickView, setPickView] = useState<"cards" | "compare">("cards");
 
   // Rehydrate previous seeds when dialog re-opens (e.g. Regenerate from draft banner)
   useEffect(() => {
@@ -566,6 +567,7 @@ function GenerateProfileDialog({
     setStep("seeds");
     setVariants([]);
     setErrorMsg("");
+    setPickView("cards");
   }, [open, initialSeed]);
 
   function toggle(list: string[], value: string, setter: (v: string[]) => void, limit: number) {
@@ -686,10 +688,37 @@ function GenerateProfileDialog({
         )}
 
         {step === "pick" && (
-          <div className="grid gap-3 py-2 md:grid-cols-3">
-            {variants.map((v, i) => (
-              <VariantCard key={v.id} index={i + 1} variant={v} onPick={() => pickVariant(v)} />
-            ))}
+          <div className="py-2">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-xs text-muted-foreground">
+                {variants.length} variant{variants.length === 1 ? "" : "s"} · pick one to edit
+              </div>
+              <div className="inline-flex rounded-lg border border-border p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setPickView("cards")}
+                  className={"flex items-center gap-1 rounded-md px-2 py-1 " + (pickView === "cards" ? "bg-surface-elevated text-foreground" : "text-muted-foreground hover:text-foreground")}
+                >
+                  <LayoutGrid className="size-3.5" /> Cards
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPickView("compare")}
+                  className={"flex items-center gap-1 rounded-md px-2 py-1 " + (pickView === "compare" ? "bg-surface-elevated text-foreground" : "text-muted-foreground hover:text-foreground")}
+                >
+                  <Rows className="size-3.5" /> Compare
+                </button>
+              </div>
+            </div>
+            {pickView === "cards" ? (
+              <div className="grid gap-3 md:grid-cols-3">
+                {variants.map((v, i) => (
+                  <VariantCard key={v.id} index={i + 1} variant={v} onPick={() => pickVariant(v)} />
+                ))}
+              </div>
+            ) : (
+              <VariantCompareTable variants={variants} onPick={pickVariant} />
+            )}
           </div>
         )}
 
