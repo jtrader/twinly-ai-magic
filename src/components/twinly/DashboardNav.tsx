@@ -28,6 +28,8 @@ const LABELS: Record<string, string> = {
   account: "Account",
   secure: "Secure",
   personas: "Personas",
+  new: "New",
+  edit: "Edit",
   "ai-review": "AI Review",
   "real-me": "Real Me",
   "twin-onboarding": "Twin Onboarding",

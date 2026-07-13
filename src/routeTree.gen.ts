@@ -54,11 +54,13 @@ import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-imag
 import { Route as AccountSubscriptionsRouteImport } from './routes/account.subscriptions'
 import { Route as AccountSetupRouteImport } from './routes/account.setup'
 import { Route as AccountFollowingRouteImport } from './routes/account.following'
+import { Route as StudioPersonasNewRouteImport } from './routes/studio.personas.new'
 import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$packId'
 import { Route as CreatorsHandlePersonaRouteImport } from './routes/creators.$handle.$persona'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 import { Route as ApiPublicBootstrapSupportAdminRouteImport } from './routes/api/public/bootstrap-support-admin'
 import { Route as ApiPublicBootstrapDemoCreatorsRouteImport } from './routes/api/public/bootstrap-demo-creators'
+import { Route as StudioPersonasPersonaIdEditRouteImport } from './routes/studio.personas.$personaId.edit'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicIdentityWebhookRouteImport } from './routes/api/public/identity/webhook'
 import { Route as ApiPublicHooksHeygenRouteImport } from './routes/api/public/hooks/heygen'
@@ -291,6 +293,11 @@ const AccountFollowingRoute = AccountFollowingRouteImport.update({
   path: '/following',
   getParentRoute: () => AccountRoute,
 } as any)
+const StudioPersonasNewRoute = StudioPersonasNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => StudioPersonasRoute,
+} as any)
 const StudioPacksPackIdRoute = StudioPacksPackIdRouteImport.update({
   id: '/$packId',
   path: '/$packId',
@@ -317,6 +324,12 @@ const ApiPublicBootstrapDemoCreatorsRoute =
     id: '/api/public/bootstrap-demo-creators',
     path: '/api/public/bootstrap-demo-creators',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const StudioPersonasPersonaIdEditRoute =
+  StudioPersonasPersonaIdEditRouteImport.update({
+    id: '/$personaId/edit',
+    path: '/$personaId/edit',
+    getParentRoute: () => StudioPersonasRoute,
   } as any)
 const ApiPublicPaymentsWebhookRoute =
   ApiPublicPaymentsWebhookRouteImport.update({
@@ -390,7 +403,7 @@ export interface FileRoutesByFullPath {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
-  '/studio/personas': typeof StudioPersonasRoute
+  '/studio/personas': typeof StudioPersonasRouteWithChildren
   '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
   '/studio/real-me': typeof StudioRealMeRoute
@@ -403,12 +416,14 @@ export interface FileRoutesByFullPath {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/studio/personas/new': typeof StudioPersonasNewRoute
   '/api/public/cron/close-polls': typeof ApiPublicCronClosePollsRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/cron/venice-video-poll': typeof ApiPublicCronVeniceVideoPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
   '/api/public/identity/webhook': typeof ApiPublicIdentityWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/studio/personas/$personaId/edit': typeof StudioPersonasPersonaIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -447,7 +462,7 @@ export interface FileRoutesByTo {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
-  '/studio/personas': typeof StudioPersonasRoute
+  '/studio/personas': typeof StudioPersonasRouteWithChildren
   '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
   '/studio/real-me': typeof StudioRealMeRoute
@@ -460,12 +475,14 @@ export interface FileRoutesByTo {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/studio/personas/new': typeof StudioPersonasNewRoute
   '/api/public/cron/close-polls': typeof ApiPublicCronClosePollsRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/cron/venice-video-poll': typeof ApiPublicCronVeniceVideoPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
   '/api/public/identity/webhook': typeof ApiPublicIdentityWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/studio/personas/$personaId/edit': typeof StudioPersonasPersonaIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -506,7 +523,7 @@ export interface FileRoutesById {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
-  '/studio/personas': typeof StudioPersonasRoute
+  '/studio/personas': typeof StudioPersonasRouteWithChildren
   '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
   '/studio/real-me': typeof StudioRealMeRoute
@@ -519,12 +536,14 @@ export interface FileRoutesById {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/studio/personas/new': typeof StudioPersonasNewRoute
   '/api/public/cron/close-polls': typeof ApiPublicCronClosePollsRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/cron/venice-video-poll': typeof ApiPublicCronVeniceVideoPollRoute
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
   '/api/public/identity/webhook': typeof ApiPublicIdentityWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/studio/personas/$personaId/edit': typeof StudioPersonasPersonaIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -579,12 +598,14 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/studio/personas/new'
     | '/api/public/cron/close-polls'
     | '/api/public/cron/heygen-poll'
     | '/api/public/cron/venice-video-poll'
     | '/api/public/hooks/heygen'
     | '/api/public/identity/webhook'
     | '/api/public/payments/webhook'
+    | '/studio/personas/$personaId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -636,12 +657,14 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/studio/personas/new'
     | '/api/public/cron/close-polls'
     | '/api/public/cron/heygen-poll'
     | '/api/public/cron/venice-video-poll'
     | '/api/public/hooks/heygen'
     | '/api/public/identity/webhook'
     | '/api/public/payments/webhook'
+    | '/studio/personas/$personaId/edit'
   id:
     | '__root__'
     | '/'
@@ -694,12 +717,14 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/studio/personas/new'
     | '/api/public/cron/close-polls'
     | '/api/public/cron/heygen-poll'
     | '/api/public/cron/venice-video-poll'
     | '/api/public/hooks/heygen'
     | '/api/public/identity/webhook'
     | '/api/public/payments/webhook'
+    | '/studio/personas/$personaId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -734,7 +759,7 @@ export interface RootRouteChildren {
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
   StudioPayoutsRoute: typeof StudioPayoutsRoute
   StudioPersonaOnboardingRoute: typeof StudioPersonaOnboardingRoute
-  StudioPersonasRoute: typeof StudioPersonasRoute
+  StudioPersonasRoute: typeof StudioPersonasRouteWithChildren
   StudioPollsRoute: typeof StudioPollsRoute
   StudioPricingRoute: typeof StudioPricingRoute
   StudioRealMeRoute: typeof StudioRealMeRoute
@@ -1069,6 +1094,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountFollowingRouteImport
       parentRoute: typeof AccountRoute
     }
+    '/studio/personas/new': {
+      id: '/studio/personas/new'
+      path: '/new'
+      fullPath: '/studio/personas/new'
+      preLoaderRoute: typeof StudioPersonasNewRouteImport
+      parentRoute: typeof StudioPersonasRoute
+    }
     '/studio/packs/$packId': {
       id: '/studio/packs/$packId'
       path: '/$packId'
@@ -1103,6 +1135,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/bootstrap-demo-creators'
       preLoaderRoute: typeof ApiPublicBootstrapDemoCreatorsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/studio/personas/$personaId/edit': {
+      id: '/studio/personas/$personaId/edit'
+      path: '/$personaId/edit'
+      fullPath: '/studio/personas/$personaId/edit'
+      preLoaderRoute: typeof StudioPersonasPersonaIdEditRouteImport
+      parentRoute: typeof StudioPersonasRoute
     }
     '/api/public/payments/webhook': {
       id: '/api/public/payments/webhook'
@@ -1212,6 +1251,20 @@ const StudioPacksRouteWithChildren = StudioPacksRoute._addFileChildren(
   StudioPacksRouteChildren,
 )
 
+interface StudioPersonasRouteChildren {
+  StudioPersonasNewRoute: typeof StudioPersonasNewRoute
+  StudioPersonasPersonaIdEditRoute: typeof StudioPersonasPersonaIdEditRoute
+}
+
+const StudioPersonasRouteChildren: StudioPersonasRouteChildren = {
+  StudioPersonasNewRoute: StudioPersonasNewRoute,
+  StudioPersonasPersonaIdEditRoute: StudioPersonasPersonaIdEditRoute,
+}
+
+const StudioPersonasRouteWithChildren = StudioPersonasRoute._addFileChildren(
+  StudioPersonasRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRouteWithChildren,
@@ -1244,7 +1297,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioPacksRoute: StudioPacksRouteWithChildren,
   StudioPayoutsRoute: StudioPayoutsRoute,
   StudioPersonaOnboardingRoute: StudioPersonaOnboardingRoute,
-  StudioPersonasRoute: StudioPersonasRoute,
+  StudioPersonasRoute: StudioPersonasRouteWithChildren,
   StudioPollsRoute: StudioPollsRoute,
   StudioPricingRoute: StudioPricingRoute,
   StudioRealMeRoute: StudioRealMeRoute,
