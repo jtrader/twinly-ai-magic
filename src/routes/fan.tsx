@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
-import { MessageCircle, ShieldCheck, Compass, Heart, Rss, CheckCircle2, ChevronRight } from "lucide-react";
+import { Sparkles, MessageCircle, ShieldCheck, Compass, Heart, Rss, CheckCircle2, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyFeed, listMyFollows, toggleFollow, setFavorite } from "@/lib/follows.functions";
 import { PostFeed } from "@/components/twinly/PostFeed";
