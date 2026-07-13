@@ -2817,6 +2817,7 @@ export type Database = {
         Row: {
           completion_percentage: number
           created_at: string
+          generation_seed: Json | null
           id: string
           real_me_profile_id: string
           responses: Json
@@ -2826,6 +2827,7 @@ export type Database = {
         Insert: {
           completion_percentage?: number
           created_at?: string
+          generation_seed?: Json | null
           id?: string
           real_me_profile_id: string
           responses?: Json
@@ -2835,6 +2837,7 @@ export type Database = {
         Update: {
           completion_percentage?: number
           created_at?: string
+          generation_seed?: Json | null
           id?: string
           real_me_profile_id?: string
           responses?: Json
