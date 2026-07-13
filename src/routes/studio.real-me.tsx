@@ -40,6 +40,7 @@ import {
   YesNoInput,
 } from "@/components/twinly/RealMeInputs";
 import { ArrowLeft, CheckCircle2, Circle, History, Sparkles, Loader2, RefreshCw, X, Save } from "lucide-react";
+import { Download, RotateCcw, FileJson, FileText, Rows, LayoutGrid } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -48,6 +49,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportRealMeJson, exportRealMePdf } from "@/lib/real-me-export";
 import type { SeedInput } from "@/lib/real-me-generate.functions";
 
 export const Route = createFileRoute("/studio/real-me")({
@@ -81,10 +99,16 @@ function RealMePage() {
   const [activeSectionId, setActiveSectionId] = useState(REAL_ME_QUESTIONNAIRE[0].id);
   const [showHistory, setShowHistory] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
-  // When set, we're reviewing an AI-generated draft that has NOT been saved yet.
-  // Autosave is suppressed and Save/Regenerate/Discard controls take over.
-  const [draft, setDraft] = useState<{ answers: Answers; seed: SeedInput } | null>(null);
+  // When set, we're reviewing an unsaved draft (from AI generation OR from
+  // restoring an older version). Autosave is suppressed and Save/Discard
+  // controls take over.
+  const [draft, setDraft] = useState<{
+    answers: Answers;
+    seed: SeedInput | null;
+    restoredFrom?: { id: string; versionNumber: number };
+  } | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
@@ -136,7 +160,13 @@ function RealMePage() {
     if (!draft) return;
     setSavingDraft(true);
     try {
-      const result = await saveGenerated({ data: { answers: draft.answers as any, seed: draft.seed } });
+      const result = await saveGenerated({
+        data: {
+          answers: draft.answers as any,
+          seed: draft.seed,
+          restoredFromVersionId: draft.restoredFrom?.id ?? null,
+        },
+      });
       setVersionId(result.version.id);
       setAnswers((result.answers ?? {}) as Answers);
       setDraft(null);
@@ -150,7 +180,26 @@ function RealMePage() {
 
   function discardDraft() {
     setDraft(null);
+    setConfirmDiscard(false);
     toast.message("Discarded AI draft — original answers restored.");
+  }
+
+  function handleExportDraft(kind: "json" | "pdf") {
+    if (!draft) return;
+    const label = draft.restoredFrom
+      ? `Restored draft (v${draft.restoredFrom.versionNumber})`
+      : "AI-generated draft";
+    const payload = {
+      label,
+      answers: draft.answers,
+      seed: draft.seed ?? (draft.restoredFrom ? { restoredFromVersionId: draft.restoredFrom.id } : null),
+    };
+    try {
+      if (kind === "json") exportRealMeJson(payload);
+      else exportRealMePdf(payload);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Export failed.");
+    }
   }
 
   if (loading || !ready) {
@@ -178,10 +227,12 @@ function RealMePage() {
       {draft ? (
         <DraftReviewBanner
           seed={draft.seed}
+          restoredFrom={draft.restoredFrom}
           saving={savingDraft}
           onSave={commitDraft}
-          onDiscard={discardDraft}
-          onRegenerate={() => setShowGenerate(true)}
+          onDiscard={() => setConfirmDiscard(true)}
+          onRegenerate={draft.seed ? () => setShowGenerate(true) : undefined}
+          onExport={handleExportDraft}
         />
       ) : (
         <p className="mb-3 text-sm text-muted-foreground">
@@ -200,7 +251,19 @@ function RealMePage() {
       </div>
 
       {showHistory ? (
-        <VersionHistoryPanel />
+        <VersionHistoryPanel
+          disabled={!!draft}
+          onRestore={(v) => {
+            setDraft({
+              answers: (v.responses ?? {}) as Answers,
+              seed: null,
+              restoredFrom: { id: v.id, versionNumber: v.version_number },
+            });
+            setShowHistory(false);
+            setActiveSectionId(REAL_ME_QUESTIONNAIRE[0].id);
+            toast.success(`Loaded Version ${v.version_number} as an editable draft.`);
+          }}
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
           <nav className="flex gap-1.5 overflow-x-auto pb-2 md:flex-col md:overflow-visible md:pb-0">
@@ -244,6 +307,22 @@ function RealMePage() {
           toast.success("Draft loaded — review, edit, then Save as a new version.");
         }}
       />
+
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your edits to this {draft?.restoredFrom ? "restored" : "AI-generated"} draft will be
+              lost. This can't be undone. Your last saved version is unaffected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction onClick={discardDraft}>Discard draft</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }
