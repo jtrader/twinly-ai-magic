@@ -25,3 +25,38 @@ export const listAgencyOverview = createServerFn({ method: "GET" })
     if (linkErr) throw linkErr;
     return { agencies, creators: links ?? [], isAdmin: !!isAdmin };
   });
+
+export const createMyAgencyWorkspace = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { name: string }) => {
+    const name = (d?.name ?? "").trim();
+    if (name.length < 2 || name.length > 80) throw new Error("Workspace name must be 2–80 characters.");
+    return { name };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: roleRow } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .in("role", ["agency", "admin"])
+      .maybeSingle();
+    if (!roleRow) throw new Error("Only agency accounts can create a workspace.");
+
+    const { data: existing } = await supabase
+      .from("agencies")
+      .select("id")
+      .eq("owner_user_id", userId)
+      .limit(1);
+    if (existing && existing.length > 0) {
+      return { id: existing[0].id, alreadyExisted: true as const };
+    }
+
+    const { data: created, error } = await supabase
+      .from("agencies")
+      .insert({ owner_user_id: userId, name: data.name })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { id: created.id, alreadyExisted: false as const };
+  });

@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
-import { Sparkles, MessageCircle, ShieldCheck, Compass, Heart, Rss } from "lucide-react";
+import { Sparkles, MessageCircle, ShieldCheck, Compass, Heart, Rss, CheckCircle2, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyFeed, listMyFollows, toggleFollow, setFavorite } from "@/lib/follows.functions";
 import { PostFeed } from "@/components/twinly/PostFeed";
 import { getHomeFeed } from "@/lib/posts.functions";
+import { getMyProfile } from "@/lib/profile.functions";
+import { SupporterJourneyDialog } from "@/components/twinly/SupporterJourneyDialog";
 import { toast } from "sonner";
 import { DoorOpen, UserMinus, Users } from "lucide-react";
 
@@ -29,13 +31,16 @@ function FanDashboard() {
   const [subs, setSubs] = useState<any[]>([]);
   const [convos, setConvos] = useState<any[]>([]);
   const [profile, setProfile] = useState<{ age_verified_at: string | null } | null>(null);
+  const [profileInfo, setProfileInfo] = useState<Awaited<ReturnType<typeof getMyProfile>>["profile"]>(null);
   const [ready, setReady] = useState(false);
   const [feed, setFeed] = useState<any[]>([]);
   const [follows, setFollows] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
+  const [journey, setJourney] = useState<{ creatorId: string; creatorName: string; tier: "base" | "plus" | "vip" } | null>(null);
   const loadFeed = useServerFn(getMyFeed);
   const loadFollows = useServerFn(listMyFollows);
   const loadPosts = useServerFn(getHomeFeed);
+  const loadProfile = useServerFn(getMyProfile);
   const unfollow = useServerFn(toggleFollow);
   const favorite = useServerFn(setFavorite);
 
@@ -57,14 +62,16 @@ function FanDashboard() {
       setConvos(c ?? []);
       setProfile(Array.isArray(p) ? (p[0] ?? null) : (p ?? null));
       try {
-        const [f, fol, ps] = await Promise.all([
+        const [f, fol, ps, prof] = await Promise.all([
           loadFeed({}),
           loadFollows({}),
           loadPosts({ data: {} }).catch(() => ({ items: [] })),
+          loadProfile().catch(() => ({ profile: null })),
         ]);
         setFeed(f.items ?? []);
         setFollows(fol ?? []);
         setPosts(ps.items ?? []);
+        setProfileInfo(prof.profile);
       } catch {}
       setReady(true);
     })();
@@ -103,6 +110,16 @@ function FanDashboard() {
     return <AppShell><div className="py-20 text-center text-muted-foreground">Loading…</div></AppShell>;
   }
 
+  const profileComplete = !!profileInfo?.profile_completed_at;
+  const ageVerified = !!profile?.age_verified_at;
+  const onboardingSteps = [
+    { key: "profile", label: "Complete your profile", done: profileComplete, cta: "/account/setup", ctaLabel: profileComplete ? "Edit" : "Continue" },
+    { key: "age", label: "Verify your age (18+)", done: ageVerified, cta: "/account", ctaLabel: ageVerified ? "Manage" : "Verify" },
+    { key: "personalise", label: "Personalise a creator experience", done: false, hint: subs.length === 0 ? "Subscribe to a creator to unlock this." : "Tap Personalise on a subscribed creator below." },
+  ];
+  const doneCount = onboardingSteps.filter((s) => s.done).length;
+  const showChecklist = !profileComplete || !ageVerified;
+
   return (
     <AppShell>
       <div className="mb-6">
@@ -110,6 +127,39 @@ function FanDashboard() {
         <h1 className="mt-1 font-display text-3xl font-bold">Your Twinly</h1>
         <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
       </div>
+
+      {showChecklist && (
+        <section className="mb-6 rounded-2xl border border-brand/30 bg-brand/10 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="font-display text-lg font-semibold text-brand-glow">Finish setting up your account</div>
+              <p className="text-xs text-muted-foreground">{doneCount} of {onboardingSteps.length} done — takes about a minute.</p>
+            </div>
+            <Sparkles className="size-5 text-brand-glow" aria-hidden />
+          </div>
+          <ul className="mt-4 space-y-2">
+            {onboardingSteps.map((s) => (
+              <li key={s.key} className="flex items-center gap-3 rounded-xl border border-border/60 bg-surface px-3 py-2.5">
+                <CheckCircle2
+                  className={"size-4 shrink-0 " + (s.done ? "text-emerald-400" : "text-muted-foreground/40")}
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1">
+                  <div className={"text-sm " + (s.done ? "text-muted-foreground line-through" : "font-medium")}>{s.label}</div>
+                  {s.hint && <div className="text-[11px] text-muted-foreground">{s.hint}</div>}
+                </div>
+                {s.cta && (
+                  <Link to={s.cta as any}>
+                    <Button size="sm" variant={s.done ? "ghost" : "default"}>
+                      {s.ctaLabel} <ChevronRight className="ml-1 size-3.5" />
+                    </Button>
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Active rooms" value={subs.filter((s) => s.status === "active").length} />
@@ -233,13 +283,28 @@ function FanDashboard() {
                   </div>
                   <Badge variant="outline" className="text-xs">{s.tier ?? "sub"} · {s.status}</Badge>
                 </div>
-                {s.creators?.handle && (
-                  <div className="mt-3">
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {s.creators?.handle && (
                     <Link to="/creators/$handle" params={{ handle: s.creators.handle }}>
                       <Button size="sm" variant="outline">Open profile</Button>
                     </Link>
-                  </div>
-                )}
+                  )}
+                  {s.creator_id && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        setJourney({
+                          creatorId: s.creator_id,
+                          creatorName: s.creators?.stage_name ?? "Creator",
+                          tier: (["base", "plus", "vip"].includes(s.tier) ? s.tier : "base") as "base" | "plus" | "vip",
+                        })
+                      }
+                    >
+                      <Sparkles className="mr-1 size-3.5" />Personalise
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -280,6 +345,20 @@ function FanDashboard() {
           <Link to="/discover"><Tile title="Discover" desc="Browse verified creators and personas." icon={<Compass className="size-4 text-brand-glow" />} /></Link>
         </div>
       </section>
+
+      {journey && (
+        <SupporterJourneyDialog
+          open={!!journey}
+          onOpenChange={(open) => { if (!open) setJourney(null); }}
+          creatorId={journey.creatorId}
+          creatorName={journey.creatorName}
+          tier={journey.tier}
+          onComplete={() => {
+            toast.success("Preferences saved — the creator's AI will use these next time.");
+            setJourney(null);
+          }}
+        />
+      )}
     </AppShell>
   );
 }

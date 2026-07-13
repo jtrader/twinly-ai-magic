@@ -2,11 +2,12 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { LogIn } from "lucide-react";
+import { LogIn, Building2, Mail } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useSession, useUserRoles } from "@/lib/session";
-import { listAgencyOverview } from "@/lib/agency.functions";
+import { listAgencyOverview, createMyAgencyWorkspace } from "@/lib/agency.functions";
 import { impersonateManagedCreator } from "@/lib/demo.functions";
 import { setImpersonationContext } from "@/components/twinly/ImpersonationBanner";
 
@@ -28,6 +29,9 @@ function AgencyPage() {
   const [enteringId, setEnteringId] = useState<string | null>(null);
   const load = useServerFn(listAgencyOverview);
   const impersonate = useServerFn(impersonateManagedCreator);
+  const createWorkspace = useServerFn(createMyAgencyWorkspace);
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const canAccess = roles.includes("agency") || roles.includes("admin");
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
@@ -35,6 +39,25 @@ function AgencyPage() {
     if (!user || !canAccess) return;
     load({}).then(setData).catch((e) => toast.error(e?.message ?? "Failed to load"));
   }, [user, roles.join(",")]);
+
+  async function refresh() {
+    try { setData(await load({})); } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
+  }
+
+  async function submitCreateWorkspace(e: React.FormEvent) {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      await createWorkspace({ data: { name: workspaceName.trim() } });
+      toast.success("Workspace created");
+      setWorkspaceName("");
+      await refresh();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Could not create workspace");
+    } finally {
+      setCreating(false);
+    }
+  }
 
   async function enterStudio(creatorId: string, handle: string, stageName: string | null) {
     setEnteringId(creatorId);
@@ -60,8 +83,15 @@ function AgencyPage() {
       <AppShell>
         <div className="mx-auto max-w-md rounded-2xl border border-border bg-surface p-6 text-center">
           <h1 className="font-display text-xl font-bold">Agency only</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Contact Twinly.life to onboard an agency workspace.</p>
-          <Link to="/app" className="mt-4 inline-block"><Button variant="outline">Back to app</Button></Link>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Agency workspaces are invite-only right now. Contact the Twinly team to request access.
+          </p>
+          <div className="mt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:justify-center">
+            <a href="mailto:support@lovekey.com.au?subject=Agency%20workspace%20request">
+              <Button className="w-full sm:w-auto"><Mail className="mr-2 size-4" />Request access</Button>
+            </a>
+            <Link to="/app"><Button variant="outline" className="w-full sm:w-auto">Back to app</Button></Link>
+          </div>
         </div>
       </AppShell>
     );
@@ -76,7 +106,35 @@ function AgencyPage() {
 
       {!data && <div className="py-20 text-center text-muted-foreground">Loading...</div>}
       {data && data.agencies.length === 0 && (
-        <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">You don't own any agency workspace yet.</div>
+        <div className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
+          <div className="flex items-center gap-3">
+            <Building2 className="size-5 text-brand-glow" />
+            <div>
+              <div className="font-display text-lg font-semibold">Create your agency workspace</div>
+              <p className="text-sm text-muted-foreground">Name it now — you can link creators to it afterward, or ask Twinly support to attach existing creators.</p>
+            </div>
+          </div>
+          <form onSubmit={submitCreateWorkspace} className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={workspaceName}
+              onChange={(e) => setWorkspaceName(e.target.value)}
+              placeholder="e.g. Nova Talent Group"
+              maxLength={80}
+              minLength={2}
+              required
+              className="flex-1"
+            />
+            <Button type="submit" disabled={creating || workspaceName.trim().length < 2}>
+              {creating ? "Creating…" : "Create workspace"}
+            </Button>
+          </form>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Need help onboarding managed creators?{" "}
+            <a href="mailto:support@lovekey.com.au?subject=Agency%20onboarding" className="text-brand-glow underline">
+              Email Twinly support
+            </a>.
+          </p>
+        </div>
       )}
       {data && data.agencies.length > 0 && (
         <div className="space-y-4">
