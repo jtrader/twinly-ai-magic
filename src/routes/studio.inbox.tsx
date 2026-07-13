@@ -4,7 +4,7 @@ import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/lib/session";
-import { listInboxConversations, loadInboxThread, sendCreatorReply } from "@/lib/inbox.functions";
+import { listInboxConversations, loadInboxThread, sendCreatorReply, takeOverConversation, resumeAutoPilot } from "@/lib/inbox.functions";
 import { transcribeVoiceObject } from "@/lib/chat.functions";
 import { listSavedMessagesForConversation } from "@/lib/saved-messages.functions";
 import { VoiceRecorder } from "@/components/twinly/VoiceRecorder";
@@ -12,7 +12,7 @@ import { VoicePlayer } from "@/components/twinly/VoicePlayer";
 import { BlockButton } from "@/components/twinly/BlockButton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, BookmarkCheck, MessageCircle, Send, User } from "lucide-react";
+import { ArrowLeft, BookmarkCheck, Hand, MessageCircle, Send, Sparkles, User } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/studio/inbox")({
@@ -64,7 +64,7 @@ function InboxPage() {
         </div>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Real Me conversations, plus any AI chat you've taken over directly from <Link to="/studio/flags" className="underline">Flagged AI chats</Link>.
+        Every private chat across your personas. Jump in on any AI thread to take over, and hand it back to auto-pilot whenever you want.
       </p>
 
       <div className="grid gap-4 md:grid-cols-[320px_1fr]">
@@ -100,7 +100,11 @@ function InboxPage() {
                       <div className="truncate text-sm font-semibold">{c.fan?.display_name ?? "Fan"}</div>
                       <div className="truncate text-[11px] text-muted-foreground">
                         {c.creator?.stage_name} · {c.persona?.display_name}
-                        {(c as any).persona?.kind === "ai" && (c as any).ai_suspended && " · handed off"}
+                        {(c as any).persona?.kind === "ai"
+                          ? (c as any).ai_suspended
+                            ? " · you're replying"
+                            : " · auto-pilot"
+                          : " · Real Me"}
                       </div>
                     </div>
                   </div>
@@ -135,6 +139,7 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
   const [state, setState] = useState<Awaited<ReturnType<typeof loadInboxThread>> | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const [saved, setSaved] = useState<any[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -214,6 +219,28 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
   }
 
   const { convo, messages, fan } = state as any;
+  const isAi = convo.personas?.kind === "ai";
+  const suspended = !!convo.ai_suspended;
+
+  const toggleAutopilot = async () => {
+    if (toggling) return;
+    setToggling(true);
+    try {
+      if (suspended) {
+        await resumeAutoPilot({ data: { conversationId } });
+        toast.success("Auto-pilot resumed");
+      } else {
+        await takeOverConversation({ data: { conversationId } });
+        toast.success("You're replying now");
+      }
+      await load();
+      onReplied();
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to toggle");
+    } finally {
+      setToggling(false);
+    }
+  };
 
   return (
     <section className="flex h-[70vh] flex-col rounded-2xl border border-border bg-surface">
@@ -225,9 +252,22 @@ function ThreadPane({ conversationId, onReplied }: { conversationId: string; onR
           <div className="truncate font-semibold">{fan?.display_name ?? "Fan"}</div>
           <div className="truncate text-[11px] text-muted-foreground">
             {convo.creators?.stage_name} ·{" "}
-            {convo.personas?.kind === "ai" ? `${convo.personas?.display_name} (handed off)` : `Real Me — ${convo.personas?.display_name}`}
+            {isAi
+              ? `${convo.personas?.display_name} · ${suspended ? "you're replying" : "AI auto-pilot"}`
+              : `Real Me — ${convo.personas?.display_name}`}
           </div>
         </div>
+        {isAi && (
+          <Button
+            variant={suspended ? "outline" : "secondary"}
+            size="sm"
+            onClick={toggleAutopilot}
+            disabled={toggling}
+            title={suspended ? "Hand back to your AI twin" : "Take over from your AI twin"}
+          >
+            {suspended ? <><Sparkles className="mr-1 size-3.5" /> Resume auto-pilot</> : <><Hand className="mr-1 size-3.5" /> Take over</>}
+          </Button>
+        )}
         <BlockButton targetType="fan" targetId={fan?.id} size="sm" variant="ghost" />
       </header>
 
