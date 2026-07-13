@@ -279,3 +279,75 @@ export const decideCreatorAgencyRequest = createServerFn({ method: "POST" })
 
     return { ok: true as const, status: "approved" as const };
   });
+
+/**
+ * Return a chronological timeline of agency-agreement events for the current
+ * creator (submitted / cancelled / approved / declined / suspended / revoked).
+ * Audit rows are admin-only via RLS, so we read them with the service role
+ * inside the handler, scoped to the caller's own creator id.
+ */
+export const getMyAgencyTimeline = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: creator } = await supabase
+      .from("creators").select("id").eq("user_id", userId).maybeSingle();
+    if (!creator) return { events: [] as AgencyTimelineEvent[] };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const relevantActions = [
+      "agency_client_link_requested_by_creator",
+      "agency_client_link_request_cancelled",
+      "agency_client_link_request_approved",
+      "agency_client_link_request_declined",
+      "agency_client_auto_suspended",
+      "agency_client_link_revoked",
+    ];
+    const { data, error } = await supabaseAdmin
+      .from("audit_logs")
+      .select("id, action, created_at, metadata, actor_user_id")
+      .eq("subject_type", "creator")
+      .eq("subject_id", creator.id)
+      .in("action", relevantActions)
+      .order("created_at", { ascending: true })
+      .limit(200);
+    if (error) throw new Error(error.message);
+
+    // Resolve agency names for a friendlier UI.
+    const agencyIds = Array.from(new Set(
+      (data ?? []).map((r: any) => (r.metadata as any)?.agency_id).filter(Boolean)
+    )) as string[];
+    const agencyNames: Record<string, string> = {};
+    if (agencyIds.length > 0) {
+      const { data: ags } = await supabaseAdmin
+        .from("agencies").select("id, name").in("id", agencyIds);
+      for (const a of ags ?? []) agencyNames[a.id] = a.name;
+    }
+
+    const events: AgencyTimelineEvent[] = (data ?? []).map((r: any) => ({
+      id: r.id as string,
+      action: r.action as string,
+      createdAt: r.created_at as string,
+      agencyId: (r.metadata as any)?.agency_id ?? null,
+      agencyName: (r.metadata as any)?.agency_id
+        ? (agencyNames[(r.metadata as any).agency_id] ?? null)
+        : null,
+      reason:
+        (r.metadata as any)?.reason ??
+        (r.metadata as any)?.decline_reason ??
+        (r.metadata as any)?.suspended_reason ??
+        null,
+      metadata: (r.metadata as any) ?? {},
+    }));
+    return { events };
+  });
+
+export type AgencyTimelineEvent = {
+  id: string;
+  action: string;
+  createdAt: string;
+  agencyId: string | null;
+  agencyName: string | null;
+  reason: string | null;
+  metadata: Record<string, unknown>;
+};
