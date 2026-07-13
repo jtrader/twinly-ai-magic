@@ -4,9 +4,11 @@ import {
   REAL_ME_QUESTIONNAIRE,
   computeOverallCompletionPercentage,
   effectiveQuestions,
-  type Answers,
   type QuestionDefinition,
 } from "./real-me-questionnaire-schema";
+
+type SavedAnswerValue = string | number | boolean | string[];
+type SavedAnswers = Record<string, SavedAnswerValue>;
 
 export type SeedInput = {
   gender: string;
@@ -48,8 +50,8 @@ function buildQuestionSpec(): string {
 }
 
 /** Validate + coerce AI output against the question schema; drop anything malformed. */
-function sanitizeAnswers(raw: Record<string, unknown>): Answers {
-  const out: Answers = {};
+function sanitizeAnswers(raw: Record<string, unknown>): SavedAnswers {
+  const out: SavedAnswers = {};
   // First pass: everything except conditional questions
   const byId = new Map<string, QuestionDefinition>();
   for (const s of REAL_ME_QUESTIONNAIRE) for (const q of s.questions) byId.set(q.id, q);
@@ -209,5 +211,5 @@ export const generateRealMeProfile = createServerFn({ method: "POST" })
     await context.supabase
       .from("real_me_profiles").update({ current_version_id: newVersion.id }).eq("id", profileId);
 
-    return { version: newVersion, answers: answers as Record<string, unknown> as Answers };
+    return { version: newVersion, answers };
   });
