@@ -85,7 +85,7 @@ export const loadAiConversationThread = createServerFn({ method: "GET" })
     const convo = await requireConversationOwnership(supabase, userId, data.conversationId);
     const [{ data: messages }, { data: fan }, { data: persona }] = await Promise.all([
       supabase.from("messages").select("*").eq("conversation_id", data.conversationId).order("created_at", { ascending: true }),
-      supabase.from("profiles").select("id, display_name, avatar_url").eq("id", convo.fan_id).maybeSingle(),
+      supabase.from("profiles_public" as any).select("id, display_name, avatar_url").eq("id", convo.fan_id).maybeSingle(),
       supabase.from("personas").select("id, display_name, slug").eq("id", convo.persona_id).maybeSingle(),
     ]);
     return { messages: messages ?? [], fan, persona };
