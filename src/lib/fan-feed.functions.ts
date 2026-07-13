@@ -80,7 +80,7 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
 
     const { data: persona } = await supabaseAdmin
       .from("personas")
-      .select("id, slug, display_name, description, kind, disclosure_label, visibility, is_explicit, price_cents, require_id_verification")
+      .select("id, slug, display_name, description, kind, disclosure_label, visibility, is_explicit, price_cents, require_id_verification, requires_verified_supporter")
       .eq("creator_id", creator.id)
       .eq("slug", data.personaSlug)
       .maybeSingle();
@@ -134,7 +134,7 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
 
     if (data.userId) {
       const [{ data: prof }, { data: sub }] = await Promise.all([
-        supabaseAdmin.from("profiles").select("age_verified_at, id_verified_at").eq("id", data.userId).maybeSingle(),
+        supabaseAdmin.from("profiles").select("age_verified_at, id_verified_at, id_verification_level, id_verification_expires_at").eq("id", data.userId).maybeSingle(),
         supabaseAdmin
           .from("subscriptions")
           .select("tier, status, current_period_end")
@@ -148,6 +148,17 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
       const stillValid = sub?.current_period_end ? new Date(sub.current_period_end).getTime() > Date.now() : true;
       if (sub && stillValid) subTier = sub.tier as string;
     }
+
+    // requires_verified_supporter: additional per-persona bar beyond visibility.
+    // Owner always passes. Otherwise the viewer either holds Level 1
+    // verification OR has redeemed a live supporter invite grant.
+    let hasSupporterInvite = false;
+    let requiresVerifiedSupporter = !!(persona as any).requires_verified_supporter;
+    if (!isOwner && requiresVerifiedSupporter && data.userId) {
+      const { checkInviteGrantAccess } = await import("./invite-grants.functions");
+      hasSupporterInvite = await checkInviteGrantAccess(supabaseAdmin, persona.id, data.userId);
+    }
+    const supporterGateBlocked = !isOwner && requiresVerifiedSupporter && !idVerified && !hasSupporterInvite;
 
     let purchasedAssetIds = new Set<string>();
     if (data.userId && assetIds.length) {
@@ -167,11 +178,11 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
           permission,
           personaVisibility: persona.visibility as any,
           isExplicit: !!persona.is_explicit,
-          requireIdVerification: !!persona.require_id_verification,
+          requireIdVerification: !!persona.require_id_verification || supporterGateBlocked,
           priceCents: a.price_cents ?? 0,
           isAuthed,
           isAdult,
-          idVerified,
+          idVerified: idVerified || hasSupporterInvite,
           subTier,
           isOwner,
           purchased: purchasedAssetIds.has(a.id),
@@ -213,9 +224,10 @@ export const getPersonaFeed = createServerFn({ method: "POST" })
         visibility: persona.visibility as "public" | "subscribers" | "vip",
         isExplicit: !!persona.is_explicit,
         requireIdVerification: !!persona.require_id_verification,
+        requiresVerifiedSupporter,
         priceCents: persona.price_cents ?? 0,
       },
-      viewer: { isAuthed, isAdult, idVerified, subTier, isOwner },
+      viewer: { isAuthed, isAdult, idVerified, subTier, isOwner, hasSupporterInvite, supporterGateBlocked },
       items,
     };
   });

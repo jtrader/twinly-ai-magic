@@ -56,6 +56,7 @@ import { Route as LegalBiometricRouteImport } from './routes/legal.biometric'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
 import { Route as LegalAcceptableUseRouteImport } from './routes/legal.acceptable-use'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
+import { Route as InviteGrantCodeRouteImport } from './routes/invite-grant.$code'
 import { Route as FanUnlocksRouteImport } from './routes/fan.unlocks'
 import { Route as FanFlagsRouteImport } from './routes/fan.flags'
 import { Route as CreatorsHandleRouteImport } from './routes/creators.$handle'
@@ -314,6 +315,11 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InviteGrantCodeRoute = InviteGrantCodeRouteImport.update({
+  id: '/invite-grant/$code',
+  path: '/invite-grant/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FanUnlocksRoute = FanUnlocksRouteImport.update({
   id: '/unlocks',
   path: '/unlocks',
@@ -451,6 +457,7 @@ export interface FileRoutesByFullPath {
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
+  '/invite-grant/$code': typeof InviteGrantCodeRoute
   '/invite/$token': typeof InviteTokenRoute
   '/legal/acceptable-use': typeof LegalAcceptableUseRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
@@ -521,6 +528,7 @@ export interface FileRoutesByTo {
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
+  '/invite-grant/$code': typeof InviteGrantCodeRoute
   '/invite/$token': typeof InviteTokenRoute
   '/legal/acceptable-use': typeof LegalAcceptableUseRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
@@ -593,6 +601,7 @@ export interface FileRoutesById {
   '/creators/$handle': typeof CreatorsHandleRouteWithChildren
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
+  '/invite-grant/$code': typeof InviteGrantCodeRoute
   '/invite/$token': typeof InviteTokenRoute
   '/legal/acceptable-use': typeof LegalAcceptableUseRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
@@ -666,6 +675,7 @@ export interface FileRouteTypes {
     | '/creators/$handle'
     | '/fan/flags'
     | '/fan/unlocks'
+    | '/invite-grant/$code'
     | '/invite/$token'
     | '/legal/acceptable-use'
     | '/legal/ai-disclosure'
@@ -736,6 +746,7 @@ export interface FileRouteTypes {
     | '/creators/$handle'
     | '/fan/flags'
     | '/fan/unlocks'
+    | '/invite-grant/$code'
     | '/invite/$token'
     | '/legal/acceptable-use'
     | '/legal/ai-disclosure'
@@ -807,6 +818,7 @@ export interface FileRouteTypes {
     | '/creators/$handle'
     | '/fan/flags'
     | '/fan/unlocks'
+    | '/invite-grant/$code'
     | '/invite/$token'
     | '/legal/acceptable-use'
     | '/legal/ai-disclosure'
@@ -873,6 +885,7 @@ export interface RootRouteChildren {
   ApiGenerateImageRoute: typeof ApiGenerateImageRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   CreatorsHandleRoute: typeof CreatorsHandleRouteWithChildren
+  InviteGrantCodeRoute: typeof InviteGrantCodeRoute
   InviteTokenRoute: typeof InviteTokenRoute
   LegalAcceptableUseRoute: typeof LegalAcceptableUseRoute
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
@@ -1251,6 +1264,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invite-grant/$code': {
+      id: '/invite-grant/$code'
+      path: '/invite-grant/$code'
+      fullPath: '/invite-grant/$code'
+      preLoaderRoute: typeof InviteGrantCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/fan/unlocks': {
       id: '/fan/unlocks'
       path: '/unlocks'
@@ -1499,6 +1519,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGenerateImageRoute: ApiGenerateImageRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   CreatorsHandleRoute: CreatorsHandleRouteWithChildren,
+  InviteGrantCodeRoute: InviteGrantCodeRoute,
   InviteTokenRoute: InviteTokenRoute,
   LegalAcceptableUseRoute: LegalAcceptableUseRoute,
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,

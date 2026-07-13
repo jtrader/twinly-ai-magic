@@ -77,6 +77,7 @@ export const createPersona = createServerFn({ method: "POST" })
     heygenAvatarId?: string | null;
     heygenVoiceId?: string | null;
     elevenlabsVoiceId?: string | null;
+    requiresVerifiedSupporter?: boolean;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -167,6 +168,7 @@ export const createPersona = createServerFn({ method: "POST" })
         heygen_avatar_id: data.heygenAvatarId?.trim().slice(0, 120) || null,
         heygen_voice_id: data.heygenVoiceId?.trim().slice(0, 120) || null,
         elevenlabs_voice_id: data.elevenlabsVoiceId?.trim().slice(0, 120) || null,
+        requires_verified_supporter: !!data.requiresVerifiedSupporter,
         visibility: "draft" as Visibility,
         sort_order: nextOrder,
       } as any)
@@ -212,6 +214,7 @@ export const updatePersona = createServerFn({ method: "POST" })
     requireIdVerification?: boolean;
     veniceCharacterSlug?: string | null;
     elevenlabsVoiceId?: string | null;
+    requiresVerifiedSupporter?: boolean;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -244,6 +247,7 @@ export const updatePersona = createServerFn({ method: "POST" })
       voice_style?: number | null;
       require_id_verification?: boolean;
       venice_character_slug?: string | null;
+      requires_verified_supporter?: boolean;
     } = {};
     if (data.displayName !== undefined) {
       const v = data.displayName.trim();
@@ -314,6 +318,9 @@ export const updatePersona = createServerFn({ method: "POST" })
     if (data.elevenlabsVoiceId !== undefined) {
       const v = (data.elevenlabsVoiceId ?? "").trim();
       patch.elevenlabs_voice_id = v ? v.slice(0, 120) : null;
+    }
+    if (data.requiresVerifiedSupporter !== undefined) {
+      patch.requires_verified_supporter = !!data.requiresVerifiedSupporter;
     }
 
     // Per-persona save-time regression gate: re-check the freshly-merged

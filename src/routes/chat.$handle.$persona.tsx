@@ -55,7 +55,7 @@ const loadPersonaChat = createServerFn({ method: "GET" })
     const { data: creator } = await supabaseAdmin.from("creators").select("id, user_id, handle, stage_name").eq("handle", data.handle).maybeSingle();
     if (!creator) return null;
     const { data: persona } = await supabaseAdmin.from("personas")
-      .select("id, slug, display_name, description, kind, disclosure_label, visibility")
+      .select("id, slug, display_name, description, kind, disclosure_label, visibility, requires_verified_supporter")
       .eq("creator_id", creator.id).eq("slug", data.persona).maybeSingle();
     if (!persona) return null;
 
@@ -67,6 +67,16 @@ const loadPersonaChat = createServerFn({ method: "GET" })
       } else if (!["public", "subscribers", "vip"].includes(persona.visibility as string)) {
         // draft/hidden: only the owning creator may open this chat directly.
         return null;
+      }
+      if ((persona as any).requires_verified_supporter) {
+        const { data: hasLevel } = await supabase.rpc("has_id_level", { _user_id: userId, _level: 1 });
+        if (!hasLevel) {
+          const { checkInviteGrantAccess } = await import("@/lib/invite-grants.functions");
+          const invited = await checkInviteGrantAccess(supabaseAdmin, persona.id, userId);
+          if (!invited) {
+            return { supporterGateBlocked: true, creator, persona } as any;
+          }
+        }
       }
     }
     const { data: aiPersonas } = await supabaseAdmin.from("personas")
@@ -98,6 +108,23 @@ export const Route = createFileRoute("/chat/$handle/$persona")({
 function ChatPage() {
   const initial = Route.useLoaderData();
   const params = Route.useParams();
+  if (initial && (initial as any).supporterGateBlocked) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-lg py-16 text-center">
+          <h1 className="font-display text-2xl font-bold">Verified supporters only</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {(initial as any).creator?.stage_name || `@${(initial as any).creator?.handle}`} has set <span className="font-semibold">{(initial as any).persona?.display_name}</span> as verified-supporter only. Complete a ~3-minute Stripe identity check to unlock it — Twinly never sees or stores your ID.
+          </p>
+          <div className="mt-6 flex justify-center gap-2">
+            <Link to="/account"><Button>Verify identity</Button></Link>
+            <Link to="/creators/$handle" params={{ handle: (initial as any).creator?.handle }}><Button variant="ghost">Back to profile</Button></Link>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">Have a personal invite link from the creator? Open it to bypass verification for this persona.</p>
+        </div>
+      </AppShell>
+    );
+  }
   const [conversationId, setConversationId] = useState<string | null>(initial?.conversationId ?? null);
   const [messages, setMessages] = useState<any[]>(initial?.messages ?? []);
   const [input, setInput] = useState("");

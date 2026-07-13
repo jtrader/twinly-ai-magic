@@ -142,6 +142,18 @@ function PersonaFeedPage() {
           <Link to="/account" className="underline">Verify your identity →</Link>
         </div>
       )}
+      {(persona as any).requiresVerifiedSupporter && (viewer as any).supporterGateBlocked && (
+        <div className="mb-6 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
+          <div className="font-semibold text-amber-100">Verified supporters only for {persona.displayName}</div>
+          <p className="mt-1">
+            @{creator.handle} has restricted this persona to verified supporters. Complete a ~3-minute Stripe identity check — Twinly never sees or stores your ID — or open a personal invite link from the creator if you have one.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-3">
+            <Link to="/account" className="underline">Verify your identity →</Link>
+            <Link to="/legal/ai-disclosure" className="underline">Why we ask</Link>
+          </div>
+        </div>
+      )}
       {persona.visibility !== "public" && !viewer.subTier && (
         <div className="mb-6 rounded-xl border border-brand/30 bg-brand/10 p-3 text-xs text-brand-glow">
           {viewer.isAuthed ? "Subscribe to unlock this persona's feed." : "Sign in and subscribe to unlock this persona's feed."}

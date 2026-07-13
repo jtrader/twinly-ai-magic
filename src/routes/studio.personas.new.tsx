@@ -58,6 +58,7 @@ function NewPersonaPage() {
   const [voiceSimilarityBoost, setVoiceSimilarityBoost] = useState(0.75);
   const [voiceStyle, setVoiceStyle] = useState(0);
   const [requireIdVerification, setRequireIdVerification] = useState(false);
+  const [requiresVerifiedSupporter, setRequiresVerifiedSupporter] = useState(false);
   const [veniceCharacterSlug, setVeniceCharacterSlug] = useState("");
   const [heygenAvatarId, setHeygenAvatarId] = useState("");
   const [heygenVoiceId, setHeygenVoiceId] = useState("");
@@ -103,6 +104,7 @@ function NewPersonaPage() {
           voiceSimilarityBoost: kind === "ai" && useClonedVoice ? voiceSimilarityBoost : undefined,
           voiceStyle: kind === "ai" && useClonedVoice ? voiceStyle : undefined,
           requireIdVerification: kind === "ai" ? requireIdVerification : undefined,
+          requiresVerifiedSupporter: kind === "ai" ? requiresVerifiedSupporter : undefined,
           veniceCharacterSlug: kind === "ai" ? veniceCharacterSlug : undefined,
           heygenAvatarId: kind === "ai" ? heygenAvatarId : undefined,
           heygenVoiceId: kind === "ai" ? heygenVoiceId : undefined,
@@ -251,6 +253,15 @@ function NewPersonaPage() {
                   </p>
                 </div>
                 <Switch id="new-persona-require-id-verification" checked={requireIdVerification} onCheckedChange={setRequireIdVerification} />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <Label htmlFor="new-persona-requires-verified-supporter">Verified supporters only</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Only fans with an active Level 1 identity verification can enter this persona. Unverified visitors see a friendly prompt directing them to verify — or to redeem a supporter invite you've sent them.
+                  </p>
+                </div>
+                <Switch id="new-persona-requires-verified-supporter" checked={requiresVerifiedSupporter} onCheckedChange={setRequiresVerifiedSupporter} />
               </div>
               <div>
                 <Label>Content categories</Label>
