@@ -179,3 +179,71 @@ export const sendCreatorReply = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+/**
+ * Creator jumps into any private chat and takes over from the AI twin.
+ * Sets ai_suspended=true and posts a system note. Safe to call on Real Me
+ * threads (no-op effect since AI wouldn't reply there anyway).
+ */
+export const takeOverConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { conversationId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: convo, error } = await supabase
+      .from("conversations")
+      .select("id, ai_suspended, persona_id, creators!inner(id, user_id, handle), personas:persona_id(display_name, kind)")
+      .eq("id", data.conversationId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!convo) throw new Error("Conversation not found");
+    if ((convo as any).creators.user_id !== userId) throw new Error("Not authorized");
+    if ((convo as any).ai_suspended) return { ok: true, alreadySuspended: true };
+
+    const s = supabase as any;
+    await s.from("conversations").update({ ai_suspended: true }).eq("id", data.conversationId);
+    await s.from("messages").insert({
+      conversation_id: data.conversationId,
+      sender_type: "system",
+      body: `${(convo as any).creators.handle} has taken over this conversation directly. ${(convo as any).personas?.display_name ?? "The AI persona"} won't reply here until auto-pilot is resumed.`,
+      ai_generated: false,
+      persona_id: (convo as any).persona_id,
+    });
+    await logAudit(userId, "inbox.takeover", { type: "conversation", id: data.conversationId }, {});
+    return { ok: true };
+  });
+
+/**
+ * Creator hands the conversation back to the AI twin (auto-pilot).
+ * Only meaningful for AI personas; Real Me personas ignore the flag.
+ */
+export const resumeAutoPilot = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { conversationId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: convo, error } = await supabase
+      .from("conversations")
+      .select("id, ai_suspended, persona_id, creators!inner(id, user_id, handle), personas:persona_id(display_name, kind)")
+      .eq("id", data.conversationId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!convo) throw new Error("Conversation not found");
+    if ((convo as any).creators.user_id !== userId) throw new Error("Not authorized");
+    if ((convo as any).personas?.kind === "real_me") {
+      throw new Error("Real Me conversations don't have an AI auto-pilot to resume.");
+    }
+    if (!(convo as any).ai_suspended) return { ok: true, alreadyActive: true };
+
+    const s = supabase as any;
+    await s.from("conversations").update({ ai_suspended: false }).eq("id", data.conversationId);
+    await s.from("messages").insert({
+      conversation_id: data.conversationId,
+      sender_type: "system",
+      body: `${(convo as any).personas?.display_name ?? "The AI persona"} is back on auto-pilot in this conversation.`,
+      ai_generated: false,
+      persona_id: (convo as any).persona_id,
+    });
+    await logAudit(userId, "inbox.resume_autopilot", { type: "conversation", id: data.conversationId }, {});
+    return { ok: true };
+  });
