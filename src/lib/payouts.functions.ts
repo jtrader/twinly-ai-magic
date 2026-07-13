@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertIdLevel } from "./identity-verification.functions";
 
 export const getPayoutsSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -22,6 +23,12 @@ export const getPayoutsSummary = createServerFn({ method: "GET" })
         subscriptions: [] as any[],
       };
     }
+
+    // §4 point-of-action: receiving payouts requires Level 2 (verified
+    // adult + monetizing creator). Non-creator callers short-circuit above,
+    // so this only runs for the creator's own account. Fail closed if the
+    // verification lapsed, was redacted, or the level was never granted.
+    await assertIdLevel(context as any, 2);
 
     const [{ data: txs }, { data: subs }] = await Promise.all([
       supabase

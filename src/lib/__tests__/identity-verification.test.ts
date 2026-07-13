@@ -45,7 +45,10 @@ describe("Stripe never receives the platform's raw ID documents (structural)", (
     const end = identitySrc.indexOf("export const getMyIdentityVerificationStatus");
     const body = identitySrc.slice(start, end);
     expect(body).toContain('type: "document"');
-    expect(body).toContain('status: "pending"');
+    // Pass 1: the initial state was renamed to session_created as part of the
+    // formal state machine (§2). The invariant this test guards is that no
+    // document/selfie bytes ever cross this code path.
+    expect(body).toContain('status: "session_created"');
     expect(body).not.toMatch(/document_(front|back|image)|selfie_image|file_data/i);
   });
 
@@ -54,7 +57,9 @@ describe("Stripe never receives the platform's raw ID documents (structural)", (
     const end = identitySrc.indexOf("export const getMyIdentityVerificationStatus");
     const body = identitySrc.slice(start, end);
     expect(body).toContain("supabaseAdmin");
-    expect(body).toContain('supabaseAdmin.from("identity_verifications").insert(');
+    // Pass 1: switched from insert to upsert(onConflict: provider_session_id)
+    // so same-day idempotent retries don't duplicate rows.
+    expect(body).toMatch(/supabaseAdmin\.from\("identity_verifications"\) as any\)\.upsert\(/);
   });
 });
 
