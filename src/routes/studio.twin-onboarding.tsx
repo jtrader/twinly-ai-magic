@@ -37,6 +37,94 @@ const RECOMMENDED_SHOTS = [
   { key: "closeup-lips", label: "Close-up, lips" },
 ] as const;
 
+// ---- Bulk-upload helpers ---------------------------------------------------
+
+const BULK_MAX_BYTES = 15 * 1024 * 1024;      // per file
+const BULK_PERSIST_BUDGET = 4 * 1024 * 1024;  // total base64 payload cap
+const THUMB_MAX = 240;                        // px, longest edge
+
+type PendingStatus = "pending" | "uploading" | "done" | "error" | "canceled" | "needs_reattach";
+
+type PendingItem = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  thumb: string;               // small data-URL preview (persistable)
+  bodyDataUrl?: string;        // full base64 body, persisted opportunistically
+  assignedLabel: string;
+  status: PendingStatus;
+  error?: string;
+  hasBlob: boolean;            // true when a runtime File/Blob is available
+};
+
+/** Downscale an image to a preview data URL. Best-effort — falls back to
+ *  the original data URL if the canvas is unavailable. */
+async function makeThumb(file: File): Promise<string> {
+  const readAsDataUrl = () => new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+  const originalDataUrl = await readAsDataUrl();
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("decode failed"));
+      i.src = originalDataUrl;
+    });
+    const scale = Math.min(1, THUMB_MAX / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return originalDataUrl;
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", 0.72);
+  } catch {
+    return originalDataUrl;
+  }
+}
+
+/** Assign the next available slot label for each pending item. Reliably
+ *  skips labels already used by the server (`serverLabels`) or by earlier
+ *  items in the queue. Respects an existing valid assignment where possible
+ *  so user re-orderings/refresh don't churn the labels. */
+function computeAssignments(items: PendingItem[], serverLabels: Set<string>): PendingItem[] {
+  const taken = new Set(serverLabels);
+  // Existing "Additional N" numbers already on the server + already assigned.
+  const usedAdditional: number[] = [];
+  const reAdd = /^Additional (\d+)$/;
+  serverLabels.forEach((l) => { const m = reAdd.exec(l); if (m) usedAdditional.push(Number(m[1])); });
+  let nextAdditional = usedAdditional.length ? Math.max(...usedAdditional) + 1 : 1;
+
+  const recommendedOrder = RECOMMENDED_SHOTS.map((s) => s.label);
+
+  return items.map((item) => {
+    // Keep the item's current label if it's still valid and not colliding.
+    const current = item.assignedLabel;
+    const isRecommended = recommendedOrder.includes(current);
+    const isAdditional = reAdd.test(current);
+    const collides = taken.has(current);
+    if (current && !collides && (isRecommended || isAdditional)) {
+      taken.add(current);
+      if (isAdditional) {
+        const n = Number(reAdd.exec(current)![1]);
+        if (n >= nextAdditional) nextAdditional = n + 1;
+      }
+      return item;
+    }
+    // Fresh assignment: prefer next open recommended, else Additional N.
+    const nextRec = recommendedOrder.find((l) => !taken.has(l));
+    const label = nextRec ?? `Additional ${nextAdditional++}`;
+    taken.add(label);
+    return { ...item, assignedLabel: label };
+  });
+}
+
 type Profile = Awaited<ReturnType<typeof getTwinProfile>>;
 
 function TwinOnboardingWizard() {
