@@ -738,6 +738,15 @@ function PersonaEditForm({
                   </div>
                   <Switch id="edit-persona-require-id-verification" checked={requireIdVerification} onCheckedChange={setRequireIdVerification} />
                 </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <Label htmlFor="edit-persona-requires-verified-supporter">Verified supporters only</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      When on, this persona is only reachable by fans with an active Level 1 identity verification — or by anyone you personally invite via the <button type="button" className="text-brand-glow underline" onClick={() => setTab("invites")}>Invites</button> tab. If a supporter's verification later expires or is revoked, their invite-grant access is revoked automatically.
+                    </p>
+                  </div>
+                  <Switch id="edit-persona-requires-verified-supporter" checked={requiresVerifiedSupporter} onCheckedChange={setRequiresVerifiedSupporter} />
+                </div>
                 <div>
                   <Label>Content categories</Label>
                   <p className="mt-1 text-xs text-muted-foreground">
