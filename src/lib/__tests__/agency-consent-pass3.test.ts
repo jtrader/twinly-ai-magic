@@ -122,16 +122,17 @@ describe("Agency billing wiring (§4c — $25 base + $25 per client)", () => {
 });
 
 describe("Migration invariants — schema shape survives future edits", () => {
-  it("has the latest agency-consent migration file present with trigger + billing tables", () => {
+  it("some migration defines agency_client_consents + agency_subscriptions + suspend trigger", () => {
     const { readdirSync } = require("node:fs") as typeof import("node:fs");
     const files = readdirSync(resolve(process.cwd(), "supabase/migrations"));
-    const target = files.find((f) => /agency.*consent|agency_client_consent|client_consent/i.test(f));
-    expect(target, "expected an agency-consent migration file").toBeTruthy();
-    if (!target) return;
-    const body = readFileSync(resolve(process.cwd(), "supabase/migrations", target), "utf8");
-    expect(body).toMatch(/CREATE TABLE[\s\S]*agency_client_consents/);
-    expect(body).toMatch(/CREATE TABLE[\s\S]*agency_subscriptions/);
-    expect(body).toMatch(/suspend_agency_links_on_id_loss/);
-    expect(body).toMatch(/has_active_agency_consent/);
+    const bodies = files
+      .filter((f) => f.endsWith(".sql"))
+      .map((f) => readFileSync(resolve(process.cwd(), "supabase/migrations", f), "utf8"))
+      .join("\n---\n");
+    expect(bodies).toMatch(/CREATE TABLE[\s\S]*?agency_client_consents/);
+    expect(bodies).toMatch(/CREATE TABLE[\s\S]*?agency_subscriptions/);
+    expect(bodies).toMatch(/suspend_agency_links_on_id_loss/);
+    expect(bodies).toMatch(/has_active_agency_consent/);
+    expect(bodies).toMatch(/count_active_agency_clients/);
   });
 });
