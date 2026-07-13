@@ -697,10 +697,18 @@ function TwinOnboardingWizard() {
             <p className="text-sm text-muted-foreground">
               Fill in as many as you're comfortable with — more angles means more consistent results, but you can continue with just one and add the rest later from your Digital Twin Profile.
             </p>
-            <BulkPhotoDropzone
-              busyLabel={uploading}
+            <BulkPhotoStager
+              pending={pending}
+              serverLabels={serverLabels}
+              busy={bulkBusy}
+              progress={bulkProgress}
               disabled={!data?.creator}
-              onFiles={uploadShotsBulk}
+              onFiles={enqueueFiles}
+              onRemove={removePending}
+              onReassign={reassignPending}
+              onClear={clearBulkQueue}
+              onUpload={uploadBulkQueue}
+              onCancel={cancelBulkUpload}
             />
             <div className="grid gap-3 sm:grid-cols-2">
               {RECOMMENDED_SHOTS.map((shot) => {
