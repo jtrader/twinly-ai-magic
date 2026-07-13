@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { lovable } from "@/integrations/lovable/index";
+import { acceptLegal, LEGAL_ACCEPTANCE_VERSION } from "@/lib/legal-acceptance.functions";
+import { useServerFn } from "@tanstack/react-start";
 
 const POST_AUTH_REDIRECT_KEY = "twinly:postAuthRedirect";
 const CREATOR_PERSONA_SETUP_PATH = "/secure/personas";
@@ -36,6 +38,7 @@ export function RoleSignupForm() {
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const navigate = useNavigate();
   const postAuthPath = postAuthPathForRole(role);
+  const recordLegal = useServerFn(acceptLegal);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,6 +65,12 @@ export function RoleSignupForm() {
         // upgrade role if not fan (trigger seeded 'fan')
         if (role !== "fan" && data.user) {
           await supabase.from("user_roles").insert({ user_id: data.user.id, role });
+        }
+        // Server-authoritative legal acceptance record (audit-logged).
+        try {
+          await recordLegal({ data: { version: LEGAL_ACCEPTANCE_VERSION, context: "signup_form" } });
+        } catch (e) {
+          console.warn("[signup] legal acceptance record failed", e);
         }
         toast.success(isCreatorRole(role) ? "Welcome — let's create your AI personas" : "Welcome to Twinly.life");
       } else {
