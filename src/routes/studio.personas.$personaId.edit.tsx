@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Camera, Film, Plus, Trash2, X as XIcon } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
+import { useMediaUploadConsent } from "@/components/twinly/MediaUploadConsentGate";
 import { supabase } from "@/integrations/supabase/client";
 import { useAvatarUrl } from "@/lib/useAvatarUrl";
 import { Button } from "@/components/ui/button";
