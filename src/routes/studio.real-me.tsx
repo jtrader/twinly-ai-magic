@@ -11,6 +11,15 @@ import {
   listRealMeVersionHistory,
   saveRealMeAnswer,
 } from "@/lib/real-me.functions";
+import { generateRealMeProfile } from "@/lib/real-me-generate.functions";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   REAL_ME_QUESTIONNAIRE,
   computeOverallCompletionPercentage,
@@ -27,7 +36,7 @@ import {
   SingleSelectInput,
   YesNoInput,
 } from "@/components/twinly/RealMeInputs";
-import { ArrowLeft, CheckCircle2, Circle, History } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, History, Sparkles, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/studio/real-me")({
   component: RealMePage,
@@ -51,12 +60,14 @@ function RealMePage() {
   const navigate = useNavigate();
   const getProfile = useServerFn(getRealMeProfile);
   const saveAnswer = useServerFn(saveRealMeAnswer);
+  const generateProfile = useServerFn(generateRealMeProfile);
 
   const [ready, setReady] = useState(false);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Answers>({});
   const [activeSectionId, setActiveSectionId] = useState(REAL_ME_QUESTIONNAIRE[0].id);
   const [showHistory, setShowHistory] = useState(false);
+  const [showGenerate, setShowGenerate] = useState(false);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
@@ -117,6 +128,9 @@ function RealMePage() {
         <Button size="sm" variant="outline" onClick={() => setShowHistory((s) => !s)}>
           <History className="mr-1.5 size-4" /> Version history
         </Button>
+        <Button size="sm" onClick={() => setShowGenerate(true)}>
+          <Sparkles className="mr-1.5 size-4" /> Generate random profile
+        </Button>
       </div>
       <p className="mb-3 text-sm text-muted-foreground">
         The foundational profile every persona is built from. Answers autosave as you go — jump between sections in any order.
@@ -163,6 +177,17 @@ function RealMePage() {
           </div>
         </div>
       )}
+
+      <GenerateProfileDialog
+        open={showGenerate}
+        onOpenChange={setShowGenerate}
+        onGenerate={async (seed) => {
+          const result = await generateProfile({ data: seed });
+          setVersionId(result.version.id);
+          setAnswers((result.answers ?? {}) as Answers);
+          toast.success("Generated a fresh AI profile draft — review and edit below.");
+        }}
+      />
     </AppShell>
   );
 }
