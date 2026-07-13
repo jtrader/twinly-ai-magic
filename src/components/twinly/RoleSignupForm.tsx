@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { lovable } from "@/integrations/lovable/index";
@@ -32,11 +33,16 @@ export function RoleSignupForm() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<SignupRole>("fan");
   const [loading, setLoading] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const navigate = useNavigate();
   const postAuthPath = postAuthPathForRole(role);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (mode === "signup" && !acceptedLegal) {
+      toast.error("Please accept the Terms, Privacy Policy, and Acceptable Use policy to continue.");
+      return;
+    }
     setLoading(true);
     rememberPostAuthRedirect(postAuthPath);
     try {
@@ -44,7 +50,13 @@ export function RoleSignupForm() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin + "/auth/callback" },
+          options: {
+            emailRedirectTo: window.location.origin + "/auth/callback",
+            data: {
+              legal_accepted_at: new Date().toISOString(),
+              legal_accepted_version: "2026-07-13",
+            },
+          },
         });
         if (error) throw error;
         // upgrade role if not fan (trigger seeded 'fan')
@@ -63,12 +75,20 @@ export function RoleSignupForm() {
   }
 
   async function google() {
+    if (mode === "signup" && !acceptedLegal) {
+      toast.error("Please accept the Terms, Privacy Policy, and Acceptable Use policy to continue.");
+      return;
+    }
     rememberPostAuthRedirect(postAuthPath);
     const res = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/auth/callback" });
     if (res.error) toast.error(res.error.message);
   }
 
   async function apple() {
+    if (mode === "signup" && !acceptedLegal) {
+      toast.error("Please accept the Terms, Privacy Policy, and Acceptable Use policy to continue.");
+      return;
+    }
     rememberPostAuthRedirect(postAuthPath);
     const res = await lovable.auth.signInWithOAuth("apple", { redirect_uri: window.location.origin + "/auth/callback" });
     if (res.error) toast.error(res.error.message);
@@ -122,6 +142,23 @@ export function RoleSignupForm() {
               Preview secure persona setup
             </Link>
           </div>
+        )}
+        {mode === "signup" && (
+          <label className="flex items-start gap-2 rounded-lg border border-border bg-surface/60 p-3 text-xs text-muted-foreground">
+            <Checkbox
+              checked={acceptedLegal}
+              onCheckedChange={(v) => setAcceptedLegal(v === true)}
+              className="mt-0.5"
+              aria-label="Accept legal policies"
+            />
+            <span>
+              I am 18+ and I agree to the{" "}
+              <Link to="/legal/terms" target="_blank" className="underline">Terms</Link>,{" "}
+              <Link to="/legal/privacy" target="_blank" className="underline">Privacy Policy</Link>,{" "}
+              <Link to="/legal/acceptable-use" target="_blank" className="underline">Acceptable Use</Link>, and{" "}
+              <Link to="/legal/ai-disclosure" target="_blank" className="underline">AI Disclosure</Link>.
+            </span>
+          </label>
         )}
         <Button type="submit" disabled={loading} className="w-full">
           {loading ? "..." : mode === "signup" ? isCreatorRole(role) ? "Create account & build personas" : "Create account" : "Sign in"}
