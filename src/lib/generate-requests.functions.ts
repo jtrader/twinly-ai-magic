@@ -416,7 +416,8 @@ export const publishRequestPlaceholders = createServerFn({ method: "POST" })
     let spendCapCents: number | null = null;
     let spentBeforeCents = 0;
     if (isVeniceSpend) {
-      const { data: creatorCap } = await supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: creatorCap } = await supabaseAdmin
         .from("creators")
         .select("generation_spend_cap_cents")
         .eq("id", creator.id)
