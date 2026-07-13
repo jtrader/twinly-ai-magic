@@ -60,6 +60,7 @@ import { Route as CreatorsHandlePersonaRouteImport } from './routes/creators.$ha
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
 import { Route as ApiPublicBootstrapSupportAdminRouteImport } from './routes/api/public/bootstrap-support-admin'
 import { Route as ApiPublicBootstrapDemoCreatorsRouteImport } from './routes/api/public/bootstrap-demo-creators'
+import { Route as StudioPersonasPersonaIdEditRouteImport } from './routes/studio.personas.$personaId.edit'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicIdentityWebhookRouteImport } from './routes/api/public/identity/webhook'
 import { Route as ApiPublicHooksHeygenRouteImport } from './routes/api/public/hooks/heygen'
@@ -324,6 +325,12 @@ const ApiPublicBootstrapDemoCreatorsRoute =
     path: '/api/public/bootstrap-demo-creators',
     getParentRoute: () => rootRouteImport,
   } as any)
+const StudioPersonasPersonaIdEditRoute =
+  StudioPersonasPersonaIdEditRouteImport.update({
+    id: '/$personaId/edit',
+    path: '/$personaId/edit',
+    getParentRoute: () => StudioPersonasRoute,
+  } as any)
 const ApiPublicPaymentsWebhookRoute =
   ApiPublicPaymentsWebhookRouteImport.update({
     id: '/api/public/payments/webhook',
@@ -416,6 +423,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
   '/api/public/identity/webhook': typeof ApiPublicIdentityWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/studio/personas/$personaId/edit': typeof StudioPersonasPersonaIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -474,6 +482,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
   '/api/public/identity/webhook': typeof ApiPublicIdentityWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/studio/personas/$personaId/edit': typeof StudioPersonasPersonaIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -534,6 +543,7 @@ export interface FileRoutesById {
   '/api/public/hooks/heygen': typeof ApiPublicHooksHeygenRoute
   '/api/public/identity/webhook': typeof ApiPublicIdentityWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/studio/personas/$personaId/edit': typeof StudioPersonasPersonaIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -595,6 +605,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/heygen'
     | '/api/public/identity/webhook'
     | '/api/public/payments/webhook'
+    | '/studio/personas/$personaId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -653,6 +664,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/heygen'
     | '/api/public/identity/webhook'
     | '/api/public/payments/webhook'
+    | '/studio/personas/$personaId/edit'
   id:
     | '__root__'
     | '/'
@@ -712,6 +724,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/heygen'
     | '/api/public/identity/webhook'
     | '/api/public/payments/webhook'
+    | '/studio/personas/$personaId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1123,6 +1136,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBootstrapDemoCreatorsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/personas/$personaId/edit': {
+      id: '/studio/personas/$personaId/edit'
+      path: '/$personaId/edit'
+      fullPath: '/studio/personas/$personaId/edit'
+      preLoaderRoute: typeof StudioPersonasPersonaIdEditRouteImport
+      parentRoute: typeof StudioPersonasRoute
+    }
     '/api/public/payments/webhook': {
       id: '/api/public/payments/webhook'
       path: '/api/public/payments/webhook'
@@ -1233,10 +1253,12 @@ const StudioPacksRouteWithChildren = StudioPacksRoute._addFileChildren(
 
 interface StudioPersonasRouteChildren {
   StudioPersonasNewRoute: typeof StudioPersonasNewRoute
+  StudioPersonasPersonaIdEditRoute: typeof StudioPersonasPersonaIdEditRoute
 }
 
 const StudioPersonasRouteChildren: StudioPersonasRouteChildren = {
   StudioPersonasNewRoute: StudioPersonasNewRoute,
+  StudioPersonasPersonaIdEditRoute: StudioPersonasPersonaIdEditRoute,
 }
 
 const StudioPersonasRouteWithChildren = StudioPersonasRoute._addFileChildren(
