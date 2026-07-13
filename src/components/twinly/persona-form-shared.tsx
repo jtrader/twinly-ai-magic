@@ -269,6 +269,15 @@ export function VeniceCharacterField({
         >
           {busy ? "Checking…" : "Preview"}
         </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowManual(true)}
+          aria-label="Paste or upload character JSON"
+        >
+          Upload JSON
+        </Button>
       </div>
       <div id={`${idPrefix}-venice-status`} className="sr-only" aria-live="polite">
         {busy ? "Checking Venice…"
@@ -361,6 +370,65 @@ export function VeniceCharacterField({
             <Button type="button" size="sm" onClick={parseManual} disabled={!manualJson.trim()}>
               Parse & preview
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => document.getElementById(`${idPrefix}-venice-json-file`)?.click()}
+            >
+              Upload JSON file
+            </Button>
+            <input
+              id={`${idPrefix}-venice-json-file`}
+              type="file"
+              accept="application/json,.json"
+              className="sr-only"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                if (file.size > 512 * 1024) {
+                  setManualError("File is larger than 512 KB — please upload a Character JSON export.");
+                  return;
+                }
+                try {
+                  const text = await file.text();
+                  setManualJson(text);
+                  setManualError(null);
+                  // Auto-parse after loading so the preview appears immediately.
+                  setTimeout(() => {
+                    // parseManual reads from state; wait a tick for setManualJson to apply.
+                    // Use a direct parse against the fresh text to avoid the stale-state race.
+                    try {
+                      const raw = JSON.parse(text);
+                      const parsed = manualSchema.parse(raw);
+                      const character = {
+                        slug: parsed.slug,
+                        name: parsed.name,
+                        description: parsed.description ?? null,
+                        photoUrl: parsed.photoUrl ?? null,
+                        author: parsed.author ?? "unknown",
+                        adult: !!parsed.adult,
+                      };
+                      onChange(character.slug);
+                      setResult({ found: true, character });
+                      setCheckedSlug(character.slug);
+                      setManualVerified(true);
+                      onPreview?.({ ...character, source: "manual" });
+                      toast.success(`Loaded ${file.name}`);
+                    } catch (err: any) {
+                      if (err?.issues?.length) {
+                        setManualError(err.issues.map((i: any) => `${i.path.join(".") || "value"}: ${i.message}`).join("; "));
+                      } else {
+                        setManualError(err?.message ?? "Could not parse JSON file");
+                      }
+                    }
+                  }, 0);
+                } catch (err: any) {
+                  setManualError(err?.message ?? "Could not read file");
+                }
+              }}
+            />
             <Button type="button" variant="ghost" size="sm" onClick={() => { setManualJson(""); setManualError(null); }}>
               Clear
             </Button>
