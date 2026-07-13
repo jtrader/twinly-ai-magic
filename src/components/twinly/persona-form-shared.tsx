@@ -269,6 +269,15 @@ export function VeniceCharacterField({
         >
           {busy ? "Checking…" : "Preview"}
         </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowManual(true)}
+          aria-label="Paste or upload character JSON"
+        >
+          Upload JSON
+        </Button>
       </div>
       <div id={`${idPrefix}-venice-status`} className="sr-only" aria-live="polite">
         {busy ? "Checking Venice…"
