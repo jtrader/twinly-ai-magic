@@ -484,3 +484,41 @@ export const impersonateManagedCreator = createServerFn({ method: "POST" })
       creator: { handle: creator.handle, stage_name: creator.stage_name },
     };
   });
+
+// List every "pure supporter" (fan role, no creator record, no owned agency)
+// on the platform for the admin console's Supporters tab. Mirrors the shape
+// of adminListAllCreators / adminListAllAgencies so the UI can render + page
+// them identically.
+export const adminListAllSupporters = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Exclude anyone who is a creator or owns an agency — the admin already
+    // has separate tabs for those two audiences.
+    const [{ data: creatorLinks }, { data: agencyLinks }, { data: fanRoles }] = await Promise.all([
+      supabaseAdmin.from("creators").select("user_id"),
+      supabaseAdmin.from("agencies").select("owner_user_id"),
+      supabaseAdmin.from("user_roles").select("user_id").eq("role", "fan").limit(2000),
+    ]);
+    const exclude = new Set<string>();
+    for (const c of creatorLinks ?? []) if ((c as any).user_id) exclude.add((c as any).user_id);
+    for (const a of agencyLinks ?? []) if ((a as any).owner_user_id) exclude.add((a as any).owner_user_id);
+
+    const fanIds = Array.from(new Set(((fanRoles ?? []) as any[]).map((r) => r.user_id).filter((id: string) => id && !exclude.has(id))));
+    if (fanIds.length === 0) return { supporters: [], emails: {} as Record<string, string | null> };
+
+    const { data: profiles } = await supabaseAdmin
+      .from("profiles")
+      .select("id, display_name, handle, avatar_url, created_at, age_verified_at, strike_count")
+      .in("id", fanIds.slice(0, 500))
+      .order("created_at", { ascending: false });
+
+    const emails: Record<string, string | null> = {};
+    for (const p of profiles ?? []) {
+      const { data: u } = await supabaseAdmin.auth.admin.getUserById((p as any).id);
+      emails[(p as any).id] = u?.user?.email ?? null;
+    }
+    return { supporters: profiles ?? [], emails };
+  });

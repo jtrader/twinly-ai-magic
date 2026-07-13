@@ -7,6 +7,7 @@ import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ImpersonationBanner } from "@/components/twinly/ImpersonationBanner";
+import { AdminViewSwitcher } from "@/components/twinly/AdminViewSwitcher";
 import { NotificationBell } from "@/components/twinly/NotificationBell";
 import { PaymentTestModeBanner } from "@/components/twinly/PaymentTestModeBanner";
 import { DashboardNav } from "@/components/twinly/DashboardNav";
@@ -28,6 +29,7 @@ export function AppShell({ children, mobileNav = true }: { children: ReactNode; 
       <PaymentTestModeBanner />
       <TopBar />
       <ImpersonationBanner />
+      <AdminViewSwitcher />
       <DashboardNav />
       <main className={cn("mx-auto max-w-6xl px-4 pb-24 pt-4 md:pt-8", mobileNav && "pb-24")}>{children}</main>
       {mobileNav && <BottomNav />}
