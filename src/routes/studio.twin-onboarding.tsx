@@ -89,6 +89,25 @@ async function makeThumb(file: File): Promise<string> {
   }
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [meta, b64] = dataUrl.split(",");
+  const mimeMatch = /data:([^;]+)/.exec(meta ?? "");
+  const mime = mimeMatch?.[1] ?? "application/octet-stream";
+  const bin = atob(b64 ?? "");
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
 /** Assign the next available slot label for each pending item. Reliably
  *  skips labels already used by the server (`serverLabels`) or by earlier
  *  items in the queue. Respects an existing valid assignment where possible
