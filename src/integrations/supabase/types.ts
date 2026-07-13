@@ -232,6 +232,7 @@ export type Database = {
           provider: string | null
           provider_error: string | null
           provider_job_id: string | null
+          provider_model: string | null
           provider_status: string | null
           render_completed_at: string | null
           render_started_at: string | null
@@ -264,6 +265,7 @@ export type Database = {
           provider?: string | null
           provider_error?: string | null
           provider_job_id?: string | null
+          provider_model?: string | null
           provider_status?: string | null
           render_completed_at?: string | null
           render_started_at?: string | null
@@ -296,6 +298,7 @@ export type Database = {
           provider?: string | null
           provider_error?: string | null
           provider_job_id?: string | null
+          provider_model?: string | null
           provider_status?: string | null
           render_completed_at?: string | null
           render_started_at?: string | null
@@ -554,6 +557,7 @@ export type Database = {
           resolution_note: string | null
           resolved_at: string | null
           resolved_by: string | null
+          severity: string | null
           status: Database["public"]["Enums"]["conversation_flag_status"]
           updated_at: string
         }
@@ -571,6 +575,7 @@ export type Database = {
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
+          severity?: string | null
           status?: Database["public"]["Enums"]["conversation_flag_status"]
           updated_at?: string
         }
@@ -588,6 +593,7 @@ export type Database = {
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
+          severity?: string | null
           status?: Database["public"]["Enums"]["conversation_flag_status"]
           updated_at?: string
         }
@@ -638,6 +644,7 @@ export type Database = {
       }
       conversations: {
         Row: {
+          ai_suspended: boolean
           creator_id: string
           fan_id: string
           id: string
@@ -646,6 +653,7 @@ export type Database = {
           started_at: string
         }
         Insert: {
+          ai_suspended?: boolean
           creator_id: string
           fan_id: string
           id?: string
@@ -654,6 +662,7 @@ export type Database = {
           started_at?: string
         }
         Update: {
+          ai_suspended?: boolean
           creator_id?: string
           fan_id?: string
           id?: string
@@ -740,6 +749,7 @@ export type Database = {
           like_count: number
           linked_pack_id: string | null
           linked_persona_id: string | null
+          linked_poll_id: string | null
           removed_reason: string | null
           unlock_price_cents: number | null
           updated_at: string
@@ -756,6 +766,7 @@ export type Database = {
           like_count?: number
           linked_pack_id?: string | null
           linked_persona_id?: string | null
+          linked_poll_id?: string | null
           removed_reason?: string | null
           unlock_price_cents?: number | null
           updated_at?: string
@@ -772,6 +783,7 @@ export type Database = {
           like_count?: number
           linked_pack_id?: string | null
           linked_persona_id?: string | null
+          linked_poll_id?: string | null
           removed_reason?: string | null
           unlock_price_cents?: number | null
           updated_at?: string
@@ -803,6 +815,13 @@ export type Database = {
             columns: ["linked_persona_id"]
             isOneToOne: false
             referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_posts_linked_poll_id_fkey"
+            columns: ["linked_poll_id"]
+            isOneToOne: false
+            referencedRelation: "polls"
             referencedColumns: ["id"]
           },
         ]
@@ -917,6 +936,9 @@ export type Database = {
           cover_url: string | null
           created_at: string
           digital_twin_status: Database["public"]["Enums"]["twin_status"]
+          elevenlabs_voice_cloned_at: string | null
+          elevenlabs_voice_id: string | null
+          elevenlabs_voice_requires_verification: boolean | null
           generation_spend_cap_cents: number | null
           handle: string
           id: string
@@ -943,6 +965,9 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           digital_twin_status?: Database["public"]["Enums"]["twin_status"]
+          elevenlabs_voice_cloned_at?: string | null
+          elevenlabs_voice_id?: string | null
+          elevenlabs_voice_requires_verification?: boolean | null
           generation_spend_cap_cents?: number | null
           handle: string
           id?: string
@@ -969,6 +994,9 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           digital_twin_status?: Database["public"]["Enums"]["twin_status"]
+          elevenlabs_voice_cloned_at?: string | null
+          elevenlabs_voice_id?: string | null
+          elevenlabs_voice_requires_verification?: boolean | null
           generation_spend_cap_cents?: number | null
           handle?: string
           id?: string
@@ -1113,6 +1141,106 @@ export type Database = {
           },
         ]
       }
+      feed_item_visibility_overrides: {
+        Row: {
+          feed_post_id: string
+          id: string
+          overrides_default: boolean
+          updated_at: string
+          updated_by: string | null
+          visibility: Database["public"]["Enums"]["feed_visibility_tier"]
+        }
+        Insert: {
+          feed_post_id: string
+          id?: string
+          overrides_default?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          visibility: Database["public"]["Enums"]["feed_visibility_tier"]
+        }
+        Update: {
+          feed_post_id?: string
+          id?: string
+          overrides_default?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          visibility?: Database["public"]["Enums"]["feed_visibility_tier"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_item_visibility_overrides_feed_post_id_fkey"
+            columns: ["feed_post_id"]
+            isOneToOne: true
+            referencedRelation: "creator_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feed_visibility_audit_log: {
+        Row: {
+          actor_id: string
+          actor_role: Database["public"]["Enums"]["app_role"]
+          after_value: Json | null
+          before_value: Json | null
+          changed_at: string
+          id: string
+          target_id: string
+          target_type: Database["public"]["Enums"]["feed_visibility_target_type"]
+        }
+        Insert: {
+          actor_id: string
+          actor_role: Database["public"]["Enums"]["app_role"]
+          after_value?: Json | null
+          before_value?: Json | null
+          changed_at?: string
+          id?: string
+          target_id: string
+          target_type: Database["public"]["Enums"]["feed_visibility_target_type"]
+        }
+        Update: {
+          actor_id?: string
+          actor_role?: Database["public"]["Enums"]["app_role"]
+          after_value?: Json | null
+          before_value?: Json | null
+          changed_at?: string
+          id?: string
+          target_id?: string
+          target_type?: Database["public"]["Enums"]["feed_visibility_target_type"]
+        }
+        Relationships: []
+      }
+      feed_visibility_policies: {
+        Row: {
+          default_visibility: Database["public"]["Enums"]["feed_visibility_tier"]
+          id: string
+          persona_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          default_visibility?: Database["public"]["Enums"]["feed_visibility_tier"]
+          id?: string
+          persona_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          default_visibility?: Database["public"]["Enums"]["feed_visibility_tier"]
+          id?: string
+          persona_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_visibility_policies_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: true
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generation_requests: {
         Row: {
           created_at: string
@@ -1214,6 +1342,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      identity_verifications: {
+        Row: {
+          created_at: string
+          environment: string
+          id: string
+          provider: string
+          provider_session_id: string
+          status: string
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          environment: string
+          id?: string
+          provider?: string
+          provider_session_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          environment?: string
+          id?: string
+          provider?: string
+          provider_session_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
       }
       messages: {
         Row: {
@@ -1433,6 +1597,67 @@ export type Database = {
           },
         ]
       }
+      persona_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          creator_id: string
+          id: string
+          invited_fan_id: string | null
+          note: string | null
+          persona_id: string
+          revoked_at: string | null
+          status: Database["public"]["Enums"]["persona_invite_status"]
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          creator_id: string
+          id?: string
+          invited_fan_id?: string | null
+          note?: string | null
+          persona_id: string
+          revoked_at?: string | null
+          status?: Database["public"]["Enums"]["persona_invite_status"]
+          token: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          creator_id?: string
+          id?: string
+          invited_fan_id?: string | null
+          note?: string | null
+          persona_id?: string
+          revoked_at?: string | null
+          status?: Database["public"]["Enums"]["persona_invite_status"]
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "persona_invites_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "persona_invites_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "persona_invites_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       persona_memory: {
         Row: {
           created_at: string
@@ -1467,6 +1692,131 @@ export type Database = {
             columns: ["persona_id"]
             isOneToOne: false
             referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      persona_onboarding_configs: {
+        Row: {
+          content_framework_choices: Json
+          id: string
+          opener_templates: string[]
+          persona_id: string
+          questionnaire_response_id: string | null
+          status: Database["public"]["Enums"]["persona_onboarding_status"]
+          tone_guidelines: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          content_framework_choices?: Json
+          id?: string
+          opener_templates?: string[]
+          persona_id: string
+          questionnaire_response_id?: string | null
+          status?: Database["public"]["Enums"]["persona_onboarding_status"]
+          tone_guidelines?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          content_framework_choices?: Json
+          id?: string
+          opener_templates?: string[]
+          persona_id?: string
+          questionnaire_response_id?: string | null
+          status?: Database["public"]["Enums"]["persona_onboarding_status"]
+          tone_guidelines?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "persona_onboarding_configs_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: true
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "persona_onboarding_configs_questionnaire_response_id_fkey"
+            columns: ["questionnaire_response_id"]
+            isOneToOne: false
+            referencedRelation: "persona_questionnaire_responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      persona_questionnaire_responses: {
+        Row: {
+          answers: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          persona_id: string
+          version: number
+        }
+        Insert: {
+          answers?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          persona_id: string
+          version: number
+        }
+        Update: {
+          answers?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          persona_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "persona_questionnaire_responses_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      persona_real_me_references: {
+        Row: {
+          created_at: string
+          id: string
+          persona_id: string
+          real_me_profile_version_id: string
+          synced_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          persona_id: string
+          real_me_profile_version_id: string
+          synced_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          persona_id?: string
+          real_me_profile_version_id?: string
+          synced_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "persona_real_me_references_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: true
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "persona_real_me_references_real_me_profile_version_id_fkey"
+            columns: ["real_me_profile_version_id"]
+            isOneToOne: false
+            referencedRelation: "real_me_profile_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -1542,6 +1892,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           boundary_rules: Json
+          content_theme_overrides: Json
           cover_url: string | null
           created_at: string
           creator_id: string
@@ -1553,12 +1904,17 @@ export type Database = {
           heygen_avatar_id: string | null
           heygen_voice_id: string | null
           id: string
+          intro_video_asset_id: string | null
+          intro_video_uploaded_at: string | null
+          intro_video_url: string | null
           is_default_seed: boolean
           is_explicit: boolean
           kind: Database["public"]["Enums"]["persona_kind"]
           linked_twin_ref_ids: string[]
           memory_enabled: boolean
+          persona_type: Database["public"]["Enums"]["persona_type"]
           price_cents: number
+          require_id_verification: boolean
           slug: string
           sort_order: number
           starts_at: string | null
@@ -1568,12 +1924,19 @@ export type Database = {
           tts_voice: string | null
           twin_link_mode: string
           updated_at: string
+          use_cloned_voice: boolean
+          venice_character_slug: string | null
+          venice_chat_opt_in: boolean
           visibility: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled: boolean
+          voice_similarity_boost: number | null
+          voice_stability: number | null
+          voice_style: number | null
         }
         Insert: {
           avatar_url?: string | null
           boundary_rules?: Json
+          content_theme_overrides?: Json
           cover_url?: string | null
           created_at?: string
           creator_id: string
@@ -1585,12 +1948,17 @@ export type Database = {
           heygen_avatar_id?: string | null
           heygen_voice_id?: string | null
           id?: string
+          intro_video_asset_id?: string | null
+          intro_video_uploaded_at?: string | null
+          intro_video_url?: string | null
           is_default_seed?: boolean
           is_explicit?: boolean
           kind: Database["public"]["Enums"]["persona_kind"]
           linked_twin_ref_ids?: string[]
           memory_enabled?: boolean
+          persona_type?: Database["public"]["Enums"]["persona_type"]
           price_cents?: number
+          require_id_verification?: boolean
           slug: string
           sort_order?: number
           starts_at?: string | null
@@ -1600,12 +1968,19 @@ export type Database = {
           tts_voice?: string | null
           twin_link_mode?: string
           updated_at?: string
+          use_cloned_voice?: boolean
+          venice_character_slug?: string | null
+          venice_chat_opt_in?: boolean
           visibility?: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled?: boolean
+          voice_similarity_boost?: number | null
+          voice_stability?: number | null
+          voice_style?: number | null
         }
         Update: {
           avatar_url?: string | null
           boundary_rules?: Json
+          content_theme_overrides?: Json
           cover_url?: string | null
           created_at?: string
           creator_id?: string
@@ -1617,12 +1992,17 @@ export type Database = {
           heygen_avatar_id?: string | null
           heygen_voice_id?: string | null
           id?: string
+          intro_video_asset_id?: string | null
+          intro_video_uploaded_at?: string | null
+          intro_video_url?: string | null
           is_default_seed?: boolean
           is_explicit?: boolean
           kind?: Database["public"]["Enums"]["persona_kind"]
           linked_twin_ref_ids?: string[]
           memory_enabled?: boolean
+          persona_type?: Database["public"]["Enums"]["persona_type"]
           price_cents?: number
+          require_id_verification?: boolean
           slug?: string
           sort_order?: number
           starts_at?: string | null
@@ -1632,8 +2012,14 @@ export type Database = {
           tts_voice?: string | null
           twin_link_mode?: string
           updated_at?: string
+          use_cloned_voice?: boolean
+          venice_character_slug?: string | null
+          venice_chat_opt_in?: boolean
           visibility?: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled?: boolean
+          voice_similarity_boost?: number | null
+          voice_stability?: number | null
+          voice_style?: number | null
         }
         Relationships: [
           {
@@ -1648,6 +2034,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personas_intro_video_asset_id_fkey"
+            columns: ["intro_video_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_assets"
             referencedColumns: ["id"]
           },
         ]
@@ -1727,6 +2120,157 @@ export type Database = {
         }
         Relationships: []
       }
+      poll_options: {
+        Row: {
+          display_order: number
+          id: string
+          label: string
+          linked_tip_amount_usd: number | null
+          poll_id: string
+        }
+        Insert: {
+          display_order?: number
+          id?: string
+          label: string
+          linked_tip_amount_usd?: number | null
+          poll_id: string
+        }
+        Update: {
+          display_order?: number
+          id?: string
+          label?: string
+          linked_tip_amount_usd?: number | null
+          poll_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poll_options_poll_id_fkey"
+            columns: ["poll_id"]
+            isOneToOne: false
+            referencedRelation: "polls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poll_responses: {
+        Row: {
+          created_at: string
+          id: string
+          poll_id: string
+          poll_option_id: string
+          poll_type: Database["public"]["Enums"]["poll_type"]
+          supporter_id: string
+          tip_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          poll_id: string
+          poll_option_id: string
+          poll_type: Database["public"]["Enums"]["poll_type"]
+          supporter_id: string
+          tip_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          poll_id?: string
+          poll_option_id?: string
+          poll_type?: Database["public"]["Enums"]["poll_type"]
+          supporter_id?: string
+          tip_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poll_responses_poll_id_fkey"
+            columns: ["poll_id"]
+            isOneToOne: false
+            referencedRelation: "polls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poll_responses_poll_option_id_fkey"
+            columns: ["poll_option_id"]
+            isOneToOne: false
+            referencedRelation: "poll_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poll_responses_tip_id_fkey"
+            columns: ["tip_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      polls: {
+        Row: {
+          anonymous: boolean
+          closes_at: string | null
+          created_at: string
+          creator_id: string
+          id: string
+          persona_id: string | null
+          poll_type: Database["public"]["Enums"]["poll_type"]
+          question: string
+          results_visible_after_close: boolean
+          status: Database["public"]["Enums"]["poll_status"]
+          updated_at: string
+          visibility: Database["public"]["Enums"]["feed_visibility_tier"]
+        }
+        Insert: {
+          anonymous?: boolean
+          closes_at?: string | null
+          created_at?: string
+          creator_id: string
+          id?: string
+          persona_id?: string | null
+          poll_type: Database["public"]["Enums"]["poll_type"]
+          question: string
+          results_visible_after_close?: boolean
+          status?: Database["public"]["Enums"]["poll_status"]
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["feed_visibility_tier"]
+        }
+        Update: {
+          anonymous?: boolean
+          closes_at?: string | null
+          created_at?: string
+          creator_id?: string
+          id?: string
+          persona_id?: string | null
+          poll_type?: Database["public"]["Enums"]["poll_type"]
+          question?: string
+          results_visible_after_close?: boolean
+          status?: Database["public"]["Enums"]["poll_status"]
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["feed_visibility_tier"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "polls_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "polls_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "polls_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_comments: {
         Row: {
           author_user_id: string
@@ -1802,6 +2346,7 @@ export type Database = {
           full_name: string | null
           handle: string | null
           id: string
+          id_verified_at: string | null
           profile_completed_at: string | null
           strike_count: number
           updated_at: string
@@ -1819,6 +2364,7 @@ export type Database = {
           full_name?: string | null
           handle?: string | null
           id: string
+          id_verified_at?: string | null
           profile_completed_at?: string | null
           strike_count?: number
           updated_at?: string
@@ -1836,8 +2382,117 @@ export type Database = {
           full_name?: string | null
           handle?: string | null
           id?: string
+          id_verified_at?: string | null
           profile_completed_at?: string | null
           strike_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      provider_data_handling_records: {
+        Row: {
+          contract_reference: string | null
+          covers_creator_data: boolean | null
+          covers_supporter_data: boolean | null
+          created_at: string
+          id: string
+          next_review_due: string
+          notes: string | null
+          provider_name: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          updated_at: string
+          used_for_training: boolean | null
+          zero_data_retention: boolean | null
+        }
+        Insert: {
+          contract_reference?: string | null
+          covers_creator_data?: boolean | null
+          covers_supporter_data?: boolean | null
+          created_at?: string
+          id?: string
+          next_review_due?: string
+          notes?: string | null
+          provider_name: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          updated_at?: string
+          used_for_training?: boolean | null
+          zero_data_retention?: boolean | null
+        }
+        Update: {
+          contract_reference?: string | null
+          covers_creator_data?: boolean | null
+          covers_supporter_data?: boolean | null
+          created_at?: string
+          id?: string
+          next_review_due?: string
+          notes?: string | null
+          provider_name?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          updated_at?: string
+          used_for_training?: boolean | null
+          zero_data_retention?: boolean | null
+        }
+        Relationships: []
+      }
+      questionnaire_metatag_mappings: {
+        Row: {
+          confidence: number
+          created_at: string
+          field_path: string
+          hard_policy_effect: Json
+          id: string
+          mapping_version: string
+          output_namespace: string
+          output_tag_id: string | null
+          questionnaire_schema_version: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_range_max: number | null
+          source_range_min: number | null
+          source_value: string | null
+          state_contribution_json: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          confidence: number
+          created_at?: string
+          field_path: string
+          hard_policy_effect?: Json
+          id?: string
+          mapping_version: string
+          output_namespace: string
+          output_tag_id?: string | null
+          questionnaire_schema_version: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_range_max?: number | null
+          source_range_min?: number | null
+          source_value?: string | null
+          state_contribution_json?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          field_path?: string
+          hard_policy_effect?: Json
+          id?: string
+          mapping_version?: string
+          output_namespace?: string
+          output_tag_id?: string | null
+          questionnaire_schema_version?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_range_max?: number | null
+          source_range_min?: number | null
+          source_value?: string | null
+          state_contribution_json?: Json
+          status?: string
           updated_at?: string
         }
         Relationships: []
@@ -1862,6 +2517,699 @@ export type Database = {
           window_start?: string
         }
         Relationships: []
+      }
+      real_me_profile_versions: {
+        Row: {
+          completion_percentage: number
+          created_at: string
+          id: string
+          real_me_profile_id: string
+          responses: Json
+          updated_at: string
+          version_number: number
+        }
+        Insert: {
+          completion_percentage?: number
+          created_at?: string
+          id?: string
+          real_me_profile_id: string
+          responses?: Json
+          updated_at?: string
+          version_number: number
+        }
+        Update: {
+          completion_percentage?: number
+          created_at?: string
+          id?: string
+          real_me_profile_id?: string
+          responses?: Json
+          updated_at?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "real_me_profile_versions_real_me_profile_id_fkey"
+            columns: ["real_me_profile_id"]
+            isOneToOne: false
+            referencedRelation: "real_me_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      real_me_profiles: {
+        Row: {
+          created_at: string
+          creator_id: string
+          current_version: number
+          current_version_id: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          current_version?: number
+          current_version_id?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          current_version?: number
+          current_version_id?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "real_me_profiles_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "real_me_profiles_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "real_me_profiles_current_version_id_fkey"
+            columns: ["current_version_id"]
+            isOneToOne: false
+            referencedRelation: "real_me_profile_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rsp_audit_events: {
+        Row: {
+          actor_id: string | null
+          category_metadata: Json
+          creator_id: string
+          event_type: string
+          id: string
+          occurred_at: string
+          purpose: string
+          submission_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          category_metadata?: Json
+          creator_id: string
+          event_type: string
+          id?: string
+          occurred_at?: string
+          purpose: string
+          submission_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          category_metadata?: Json
+          creator_id?: string
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          purpose?: string
+          submission_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rsp_audit_events_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsp_audit_events_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsp_audit_events_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "rsp_questionnaire_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rsp_consent_receipts: {
+        Row: {
+          accepted_at: string
+          adult_confirmed: boolean
+          consent_version: string
+          created_at: string
+          id: string
+          personalisation_allowed: boolean
+          preferences_may_be_saved: boolean
+          receipt_hash: string
+          respectful_use_accepted: boolean
+          submission_id: string
+        }
+        Insert: {
+          accepted_at: string
+          adult_confirmed: boolean
+          consent_version: string
+          created_at?: string
+          id?: string
+          personalisation_allowed: boolean
+          preferences_may_be_saved: boolean
+          receipt_hash: string
+          respectful_use_accepted: boolean
+          submission_id: string
+        }
+        Update: {
+          accepted_at?: string
+          adult_confirmed?: boolean
+          consent_version?: string
+          created_at?: string
+          id?: string
+          personalisation_allowed?: boolean
+          preferences_may_be_saved?: boolean
+          receipt_hash?: string
+          respectful_use_accepted?: boolean
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rsp_consent_receipts_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "rsp_questionnaire_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rsp_curated_sequence_steps: {
+        Row: {
+          asset_id: string
+          asset_version: number
+          fallback_asset_id: string | null
+          id: string
+          journey_stage: string
+          match_explanation: Json
+          match_score: number
+          position: number
+          sequence_id: string
+          transition_rules: Json
+        }
+        Insert: {
+          asset_id: string
+          asset_version: number
+          fallback_asset_id?: string | null
+          id?: string
+          journey_stage: string
+          match_explanation: Json
+          match_score: number
+          position: number
+          sequence_id: string
+          transition_rules: Json
+        }
+        Update: {
+          asset_id?: string
+          asset_version?: number
+          fallback_asset_id?: string | null
+          id?: string
+          journey_stage?: string
+          match_explanation?: Json
+          match_score?: number
+          position?: number
+          sequence_id?: string
+          transition_rules?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rsp_curated_sequence_steps_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "rsp_curated_sequences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rsp_curated_sequences: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          creator_id: string
+          expires_at: string
+          id: string
+          objective: string
+          persona: string
+          policy_hash: string
+          profile_id: string
+          relationship_stage: string
+          runtime_rules: Json
+          sequence_version: string
+          status: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          creator_id: string
+          expires_at: string
+          id?: string
+          objective: string
+          persona: string
+          policy_hash: string
+          profile_id: string
+          relationship_stage: string
+          runtime_rules: Json
+          sequence_version: string
+          status?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          creator_id?: string
+          expires_at?: string
+          id?: string
+          objective?: string
+          persona?: string
+          policy_hash?: string
+          profile_id?: string
+          relationship_stage?: string
+          runtime_rules?: Json
+          sequence_version?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rsp_curated_sequences_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsp_curated_sequences_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsp_curated_sequences_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "rsp_privacy_safe_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rsp_generated_briefs: {
+        Row: {
+          brief: Json
+          brief_type: string
+          created_at: string
+          id: string
+          schema_version: string
+          sequence_id: string
+          status: string
+        }
+        Insert: {
+          brief: Json
+          brief_type: string
+          created_at?: string
+          id?: string
+          schema_version: string
+          sequence_id: string
+          status?: string
+        }
+        Update: {
+          brief?: Json
+          brief_type?: string
+          created_at?: string
+          id?: string
+          schema_version?: string
+          sequence_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rsp_generated_briefs_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "rsp_curated_sequences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rsp_policy_envelopes: {
+        Row: {
+          active: boolean
+          created_at: string
+          creator_id: string
+          envelope: Json
+          expires_at: string
+          id: string
+          policy_hash: string
+          policy_version: string
+          submission_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          creator_id: string
+          envelope: Json
+          expires_at: string
+          id?: string
+          policy_hash: string
+          policy_version: string
+          submission_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          creator_id?: string
+          envelope?: Json
+          expires_at?: string
+          id?: string
+          policy_hash?: string
+          policy_version?: string
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rsp_policy_envelopes_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsp_policy_envelopes_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsp_policy_envelopes_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "rsp_questionnaire_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rsp_privacy_safe_profiles: {
+        Row: {
+          created_at: string
+          creator_id: string
+          deleted_at: string | null
+          expires_at: string
+          id: string
+          profile: Json
+          profile_token: string | null
+          profile_version: string
+          submission_id: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          deleted_at?: string | null
+          expires_at: string
+          id?: string
+          profile: Json
+          profile_token?: string | null
+          profile_version: string
+          submission_id: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          deleted_at?: string | null
+          expires_at?: string
+          id?: string
+          profile?: Json
+          profile_token?: string | null
+          profile_version?: string
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rsp_privacy_safe_profiles_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsp_privacy_safe_profiles_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsp_privacy_safe_profiles_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "rsp_questionnaire_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rsp_questionnaire_submissions: {
+        Row: {
+          associated_data_hash: string
+          authentication_tag: string
+          ciphertext: string
+          created_at: string
+          creator_id: string
+          deleted_at: string | null
+          encryption_algorithm: string
+          expires_at: string
+          id: string
+          key_version: string
+          locale: string
+          nonce: string
+          processed_at: string | null
+          questionnaire_version: string
+          schema_version: string
+          source: string
+          status: string
+          supporter_id: string
+          wrap_authentication_tag: string
+          wrap_nonce: string
+          wrapped_data_key: string
+        }
+        Insert: {
+          associated_data_hash: string
+          authentication_tag: string
+          ciphertext: string
+          created_at?: string
+          creator_id: string
+          deleted_at?: string | null
+          encryption_algorithm: string
+          expires_at: string
+          id?: string
+          key_version: string
+          locale: string
+          nonce: string
+          processed_at?: string | null
+          questionnaire_version: string
+          schema_version: string
+          source: string
+          status?: string
+          supporter_id: string
+          wrap_authentication_tag: string
+          wrap_nonce: string
+          wrapped_data_key: string
+        }
+        Update: {
+          associated_data_hash?: string
+          authentication_tag?: string
+          ciphertext?: string
+          created_at?: string
+          creator_id?: string
+          deleted_at?: string | null
+          encryption_algorithm?: string
+          expires_at?: string
+          id?: string
+          key_version?: string
+          locale?: string
+          nonce?: string
+          processed_at?: string | null
+          questionnaire_version?: string
+          schema_version?: string
+          source?: string
+          status?: string
+          supporter_id?: string
+          wrap_authentication_tag?: string
+          wrap_nonce?: string
+          wrapped_data_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rsp_questionnaire_submissions_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsp_questionnaire_submissions_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rsp_retention_deletion_jobs: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          error_class: string | null
+          id: string
+          idempotency_key: string
+          run_after: string
+          status: string
+          submission_id: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          error_class?: string | null
+          id?: string
+          idempotency_key: string
+          run_after: string
+          status?: string
+          submission_id: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          error_class?: string | null
+          id?: string
+          idempotency_key?: string
+          run_after?: string
+          status?: string
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rsp_retention_deletion_jobs_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "rsp_questionnaire_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rsp_state_profiles: {
+        Row: {
+          cluster_summaries: Json
+          created_at: string
+          id: string
+          profile_id: string
+          quality: Json
+          state_version: string
+          states: Json
+        }
+        Insert: {
+          cluster_summaries: Json
+          created_at?: string
+          id?: string
+          profile_id: string
+          quality: Json
+          state_version: string
+          states: Json
+        }
+        Update: {
+          cluster_summaries?: Json
+          created_at?: string
+          id?: string
+          profile_id?: string
+          quality?: Json
+          state_version?: string
+          states?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rsp_state_profiles_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "rsp_privacy_safe_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rsp_vault_retrieval_requests: {
+        Row: {
+          created_at: string
+          creator_id: string
+          expires_at: string
+          id: string
+          policy_hash: string
+          profile_id: string
+          request_id: string
+          request_projection: Json
+          retrieval_version: string
+          tag_schema_version: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          expires_at: string
+          id?: string
+          policy_hash: string
+          profile_id: string
+          request_id: string
+          request_projection: Json
+          retrieval_version: string
+          tag_schema_version: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          expires_at?: string
+          id?: string
+          policy_hash?: string
+          profile_id?: string
+          request_id?: string
+          request_projection?: Json
+          retrieval_version?: string
+          tag_schema_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rsp_vault_retrieval_requests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsp_vault_retrieval_requests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rsp_vault_retrieval_requests_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "rsp_privacy_safe_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -1928,6 +3276,72 @@ export type Database = {
           },
           {
             foreignKeyName: "subscriptions_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supporter_journey_profiles: {
+        Row: {
+          answers: Json
+          chat_experience_brief: Json
+          created_at: string
+          creator_id: string
+          creator_visible: boolean
+          expires_at: string | null
+          fan_id: string
+          id: string
+          persona_template: string
+          status: string
+          submitted_at: string | null
+          tailored_content_brief: Json
+          tier: Database["public"]["Enums"]["sub_tier"]
+          updated_at: string
+        }
+        Insert: {
+          answers?: Json
+          chat_experience_brief?: Json
+          created_at?: string
+          creator_id: string
+          creator_visible?: boolean
+          expires_at?: string | null
+          fan_id: string
+          id?: string
+          persona_template: string
+          status?: string
+          submitted_at?: string | null
+          tailored_content_brief?: Json
+          tier?: Database["public"]["Enums"]["sub_tier"]
+          updated_at?: string
+        }
+        Update: {
+          answers?: Json
+          chat_experience_brief?: Json
+          created_at?: string
+          creator_id?: string
+          creator_visible?: boolean
+          expires_at?: string | null
+          fan_id?: string
+          id?: string
+          persona_template?: string
+          status?: string
+          submitted_at?: string | null
+          tailored_content_brief?: Json
+          tier?: Database["public"]["Enums"]["sub_tier"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supporter_journey_profiles_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supporter_journey_profiles_creator_id_fkey"
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators_public"
@@ -2105,6 +3519,86 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_source_recordings: {
+        Row: {
+          consent_record_id: string | null
+          created_at: string
+          creator_id: string
+          duration_seconds: number
+          file_ref: string
+          format: string
+          id: string
+          persona_id: string
+          rejection_reason: string | null
+          sample_rate: number
+          source_type: Database["public"]["Enums"]["voice_source_type"]
+          status: Database["public"]["Enums"]["voice_source_status"]
+          submitted_for_clone_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          consent_record_id?: string | null
+          created_at?: string
+          creator_id: string
+          duration_seconds?: number
+          file_ref: string
+          format: string
+          id?: string
+          persona_id: string
+          rejection_reason?: string | null
+          sample_rate?: number
+          source_type: Database["public"]["Enums"]["voice_source_type"]
+          status?: Database["public"]["Enums"]["voice_source_status"]
+          submitted_for_clone_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          consent_record_id?: string | null
+          created_at?: string
+          creator_id?: string
+          duration_seconds?: number
+          file_ref?: string
+          format?: string
+          id?: string
+          persona_id?: string
+          rejection_reason?: string | null
+          sample_rate?: number
+          source_type?: Database["public"]["Enums"]["voice_source_type"]
+          status?: Database["public"]["Enums"]["voice_source_status"]
+          submitted_for_clone_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_source_recordings_consent_record_id_fkey"
+            columns: ["consent_record_id"]
+            isOneToOne: false
+            referencedRelation: "consent_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_source_recordings_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_source_recordings_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_source_recordings_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       creators_public: {
@@ -2189,6 +3683,7 @@ export type Database = {
           full_name: string | null
           handle: string | null
           id: string
+          id_verified_at: string | null
           profile_completed_at: string | null
           strike_count: number
           updated_at: string
@@ -2254,12 +3749,23 @@ export type Database = {
       asset_type: "image" | "video" | "audio" | "text"
       asset_visibility: "private" | "subscribers" | "vip" | "ppv" | "public"
       consent_status: "n_a" | "on_file" | "missing"
+      content_theme:
+        | "romantic_affection"
+        | "flirtation_teasing"
+        | "roleplay_fantasy"
+        | "power_exchange"
+        | "fetish_general"
+        | "group_dynamics"
+        | "exhibitionism_voyeurism"
+        | "sensory_focus"
       conversation_flag_reason:
         | "off_tone"
         | "inaccurate"
         | "uncomfortable"
         | "wants_human"
         | "other"
+        | "auto_high_severity"
+        | "auto_prompt_leak"
       conversation_flag_status:
         | "open"
         | "acknowledged"
@@ -2267,6 +3773,8 @@ export type Database = {
         | "dismissed"
       escalation_status: "requested" | "accepted" | "declined" | "expired"
       explicitness_level: "sfw" | "suggestive" | "explicit"
+      feed_visibility_target_type: "persona_default" | "feed_item_override"
+      feed_visibility_tier: "public" | "logged_in" | "subscribers_only"
       generation_output_type:
         | "image"
         | "audio"
@@ -2302,9 +3810,16 @@ export type Database = {
         | "content_unlocked"
         | "twinly_plus_active"
         | "twinly_plus_ended"
+        | "poll_response"
+        | "poll_closed"
       payout_status: "none" | "pending" | "active"
       permission_type: "included" | "ppv" | "restricted"
+      persona_invite_status: "pending" | "accepted" | "revoked"
       persona_kind: "real_me" | "ai"
+      persona_onboarding_status: "draft" | "published"
+      persona_type: "real_me" | "nice" | "naughty" | "wicked" | "custom"
+      poll_status: "draft" | "active" | "closed"
+      poll_type: "single_choice" | "multi_choice" | "tip_to_vote"
       sender_type: "fan" | "ai" | "creator" | "system"
       sub_status: "active" | "canceled" | "paused"
       sub_tier: "free" | "base" | "plus" | "naughty" | "wicked" | "vip"
@@ -2318,7 +3833,19 @@ export type Database = {
         | "verified"
         | "rejected"
         | "revoked"
-      visibility: "draft" | "public" | "subscribers" | "vip" | "hidden"
+      visibility:
+        | "draft"
+        | "public"
+        | "subscribers"
+        | "vip"
+        | "hidden"
+        | "invite_only"
+      voice_source_status:
+        | "pending_validation"
+        | "validated"
+        | "rejected"
+        | "cloned"
+      voice_source_type: "uploaded" | "recorded_in_app"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2459,12 +3986,24 @@ export const Constants = {
       asset_type: ["image", "video", "audio", "text"],
       asset_visibility: ["private", "subscribers", "vip", "ppv", "public"],
       consent_status: ["n_a", "on_file", "missing"],
+      content_theme: [
+        "romantic_affection",
+        "flirtation_teasing",
+        "roleplay_fantasy",
+        "power_exchange",
+        "fetish_general",
+        "group_dynamics",
+        "exhibitionism_voyeurism",
+        "sensory_focus",
+      ],
       conversation_flag_reason: [
         "off_tone",
         "inaccurate",
         "uncomfortable",
         "wants_human",
         "other",
+        "auto_high_severity",
+        "auto_prompt_leak",
       ],
       conversation_flag_status: [
         "open",
@@ -2474,6 +4013,8 @@ export const Constants = {
       ],
       escalation_status: ["requested", "accepted", "declined", "expired"],
       explicitness_level: ["sfw", "suggestive", "explicit"],
+      feed_visibility_target_type: ["persona_default", "feed_item_override"],
+      feed_visibility_tier: ["public", "logged_in", "subscribers_only"],
       generation_output_type: [
         "image",
         "audio",
@@ -2511,10 +4052,17 @@ export const Constants = {
         "content_unlocked",
         "twinly_plus_active",
         "twinly_plus_ended",
+        "poll_response",
+        "poll_closed",
       ],
       payout_status: ["none", "pending", "active"],
       permission_type: ["included", "ppv", "restricted"],
+      persona_invite_status: ["pending", "accepted", "revoked"],
       persona_kind: ["real_me", "ai"],
+      persona_onboarding_status: ["draft", "published"],
+      persona_type: ["real_me", "nice", "naughty", "wicked", "custom"],
+      poll_status: ["draft", "active", "closed"],
+      poll_type: ["single_choice", "multi_choice", "tip_to_vote"],
       sender_type: ["fan", "ai", "creator", "system"],
       sub_status: ["active", "canceled", "paused"],
       sub_tier: ["free", "base", "plus", "naughty", "wicked", "vip"],
@@ -2529,7 +4077,21 @@ export const Constants = {
         "rejected",
         "revoked",
       ],
-      visibility: ["draft", "public", "subscribers", "vip", "hidden"],
+      visibility: [
+        "draft",
+        "public",
+        "subscribers",
+        "vip",
+        "hidden",
+        "invite_only",
+      ],
+      voice_source_status: [
+        "pending_validation",
+        "validated",
+        "rejected",
+        "cloned",
+      ],
+      voice_source_type: ["uploaded", "recorded_in_app"],
     },
   },
 } as const
