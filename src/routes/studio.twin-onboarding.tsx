@@ -420,6 +420,11 @@ function TwinOnboardingWizard() {
             <p className="text-sm text-muted-foreground">
               Fill in as many as you're comfortable with — more angles means more consistent results, but you can continue with just one and add the rest later from your Digital Twin Profile.
             </p>
+            <BulkPhotoDropzone
+              busyLabel={uploading}
+              disabled={!data?.creator}
+              onFiles={uploadShotsBulk}
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               {RECOMMENDED_SHOTS.map((shot) => {
                 const filled = filledShots.some((s) => s.key === shot.key);
