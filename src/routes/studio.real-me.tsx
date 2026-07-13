@@ -114,6 +114,7 @@ function RealMePage() {
   } | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmClearLocks, setConfirmClearLocks] = useState(false);
   // Per-question locks — locked ids are preserved by the AI on generate and
   // become read-only in the editor until unlocked.
   const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
@@ -156,6 +157,33 @@ function RealMePage() {
       return new Set();
     });
   }, [persistLocks]);
+
+  // Collect every question id in the questionnaire (respecting current answers'
+  // conditional visibility) so bulk lock/unlock only targets relevant fields.
+  const allEffectiveQuestionIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const section of REAL_ME_QUESTIONNAIRE) {
+      for (const q of effectiveQuestions(section, (draft?.answers ?? answers) as Answers)) {
+        ids.push(q.id);
+      }
+    }
+    return ids;
+  }, [answers, draft]);
+
+  const lockAll = useCallback(() => {
+    const next = new Set(allEffectiveQuestionIds);
+    persistLocks(next);
+    setLockedIds(next);
+    toast.success(`Locked ${next.size} answer${next.size === 1 ? "" : "s"}.`);
+  }, [allEffectiveQuestionIds, persistLocks]);
+
+  const confirmedClearAllLocks = useCallback(() => {
+    const count = lockedIds.size;
+    persistLocks(new Set());
+    setLockedIds(new Set());
+    setConfirmClearLocks(false);
+    toast.message(`Cleared ${count} lock${count === 1 ? "" : "s"}.`);
+  }, [lockedIds.size, persistLocks]);
 
   useEffect(() => {
     if (!user) return;
