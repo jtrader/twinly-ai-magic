@@ -11,7 +11,10 @@ import {
   listRealMeVersionHistory,
   saveRealMeAnswer,
 } from "@/lib/real-me.functions";
-import { generateRealMeProfile } from "@/lib/real-me-generate.functions";
+import {
+  generateRealMeVariants,
+  saveGeneratedRealMe,
+} from "@/lib/real-me-generate.functions";
 import {
   Dialog,
   DialogContent,
@@ -36,8 +39,7 @@ import {
   SingleSelectInput,
   YesNoInput,
 } from "@/components/twinly/RealMeInputs";
-import { ArrowLeft, CheckCircle2, Circle, History, Sparkles, Loader2 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, CheckCircle2, Circle, History, Sparkles, Loader2, RefreshCw, X, Save } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -70,7 +72,8 @@ function RealMePage() {
   const navigate = useNavigate();
   const getProfile = useServerFn(getRealMeProfile);
   const saveAnswer = useServerFn(saveRealMeAnswer);
-  const generateProfile = useServerFn(generateRealMeProfile);
+  const generateVariants = useServerFn(generateRealMeVariants);
+  const saveGenerated = useServerFn(saveGeneratedRealMe);
 
   const [ready, setReady] = useState(false);
   const [versionId, setVersionId] = useState<string | null>(null);
@@ -78,6 +81,10 @@ function RealMePage() {
   const [activeSectionId, setActiveSectionId] = useState(REAL_ME_QUESTIONNAIRE[0].id);
   const [showHistory, setShowHistory] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
+  // When set, we're reviewing an AI-generated draft that has NOT been saved yet.
+  // Autosave is suppressed and Save/Regenerate/Discard controls take over.
+  const [draft, setDraft] = useState<{ answers: Answers; seed: SeedInput } | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
@@ -112,13 +119,39 @@ function RealMePage() {
   }, [saveAnswer]);
 
   function onAnswer(questionId: string, value: unknown) {
+    if (draft) {
+      setDraft((d) => (d ? { ...d, answers: { ...d.answers, [questionId]: value } } : d));
+      return;
+    }
     setAnswers((a) => ({ ...a, [questionId]: value }));
     scheduleSave(questionId, value);
   }
 
-  const overallPct = useMemo(() => computeOverallCompletionPercentage(REAL_ME_QUESTIONNAIRE, answers), [answers]);
+  const displayedAnswers = draft?.answers ?? answers;
+  const overallPct = useMemo(() => computeOverallCompletionPercentage(REAL_ME_QUESTIONNAIRE, displayedAnswers), [displayedAnswers]);
   const activeSection = REAL_ME_QUESTIONNAIRE.find((s) => s.id === activeSectionId)!;
-  const activeQuestions = useMemo(() => effectiveQuestions(activeSection, answers), [activeSection, answers]);
+  const activeQuestions = useMemo(() => effectiveQuestions(activeSection, displayedAnswers), [activeSection, displayedAnswers]);
+
+  async function commitDraft() {
+    if (!draft) return;
+    setSavingDraft(true);
+    try {
+      const result = await saveGenerated({ data: { answers: draft.answers as any, seed: draft.seed } });
+      setVersionId(result.version.id);
+      setAnswers((result.answers ?? {}) as Answers);
+      setDraft(null);
+      toast.success(`Saved as Version ${result.version.version_number}.`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save version. Try again.");
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
+  function discardDraft() {
+    setDraft(null);
+    toast.message("Discarded AI draft — original answers restored.");
+  }
 
   if (loading || !ready) {
     return <AppShell><div className="py-16 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
@@ -135,20 +168,30 @@ function RealMePage() {
           <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Creator studio</div>
           <h1 className="font-display text-2xl font-bold">Real Me baseline</h1>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setShowHistory((s) => !s)}>
+        <Button size="sm" variant="outline" onClick={() => setShowHistory((s) => !s)} disabled={!!draft}>
           <History className="mr-1.5 size-4" /> Version history
         </Button>
-        <Button size="sm" onClick={() => setShowGenerate(true)}>
+        <Button size="sm" onClick={() => setShowGenerate(true)} disabled={!!draft}>
           <Sparkles className="mr-1.5 size-4" /> Generate random profile
         </Button>
       </div>
-      <p className="mb-3 text-sm text-muted-foreground">
-        The foundational profile every persona is built from. Answers autosave as you go — jump between sections in any order.
-      </p>
+      {draft ? (
+        <DraftReviewBanner
+          seed={draft.seed}
+          saving={savingDraft}
+          onSave={commitDraft}
+          onDiscard={discardDraft}
+          onRegenerate={() => setShowGenerate(true)}
+        />
+      ) : (
+        <p className="mb-3 text-sm text-muted-foreground">
+          The foundational profile every persona is built from. Answers autosave as you go — jump between sections in any order.
+        </p>
+      )}
 
       <div className="sticky top-0 z-10 mb-4 rounded-xl border border-border bg-surface/95 p-3 backdrop-blur">
         <div className="mb-1 flex items-center justify-between text-xs">
-          <span className="font-semibold">Overall progress</span>
+          <span className="font-semibold">{draft ? "Draft completeness" : "Overall progress"}</span>
           <span className="tabular-nums text-muted-foreground">{overallPct}%</span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-surface-elevated">
@@ -162,7 +205,7 @@ function RealMePage() {
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
           <nav className="flex gap-1.5 overflow-x-auto pb-2 md:flex-col md:overflow-visible md:pb-0">
             {REAL_ME_QUESTIONNAIRE.map((section) => {
-              const status = computeSectionStatus(section, answers);
+              const status = computeSectionStatus(section, displayedAnswers);
               const Icon = STATUS_ICON[status];
               return (
                 <button
@@ -182,7 +225,7 @@ function RealMePage() {
           <div className="space-y-4">
             <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{activeSection.title}</div>
             {activeQuestions.map((q) => (
-              <QuestionField key={q.id} question={q} value={answers[q.id]} onChange={(v) => onAnswer(q.id, v)} />
+              <QuestionField key={q.id} question={q} value={displayedAnswers[q.id]} onChange={(v) => onAnswer(q.id, v)} />
             ))}
           </div>
         </div>
@@ -191,11 +234,14 @@ function RealMePage() {
       <GenerateProfileDialog
         open={showGenerate}
         onOpenChange={setShowGenerate}
-        onGenerate={async (seed) => {
-          const result = await generateProfile({ data: seed });
-          setVersionId(result.version.id);
-          setAnswers((result.answers ?? {}) as Answers);
-          toast.success("Generated a fresh AI profile draft — review and edit below.");
+        initialSeed={draft?.seed ?? null}
+        generate={(input) => generateVariants({ data: input })}
+        onPick={(seed, answers) => {
+          setDraft({ seed, answers });
+          setShowGenerate(false);
+          setShowHistory(false);
+          setActiveSectionId(REAL_ME_QUESTIONNAIRE[0].id);
+          toast.success("Draft loaded — review, edit, then Save as a new version.");
         }}
       />
     </AppShell>
