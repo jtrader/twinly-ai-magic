@@ -175,6 +175,64 @@ function TwinOnboardingWizard() {
     }
   }
 
+  // Bulk upload — assign each dropped/selected file to the next unfilled
+  // recommended shot slot in order; overflow goes into "Additional N".
+  async function uploadShotsBulk(files: File[]) {
+    if (!data?.creator || files.length === 0) return;
+    if (!(await ensureConsent({ context: "twin.onboarding.reference" }))) return;
+
+    const MAX_BYTES = 15 * 1024 * 1024;
+    const eligible = files.filter((f) => {
+      if (!f.type.startsWith("image/")) {
+        toast.error(`Skipped "${f.name}" — not an image.`);
+        return false;
+      }
+      if (f.size > MAX_BYTES) {
+        toast.error(`Skipped "${f.name}" — larger than 15 MB.`);
+        return false;
+      }
+      return true;
+    });
+    if (eligible.length === 0) return;
+
+    // Snapshot which recommended labels are already filled so we don't reuse
+    // them across this batch even before the server round-trip refreshes.
+    const takenLabels = new Set(identityRefs.map((r: any) => r.slot_label as string));
+    const openSlots = RECOMMENDED_SHOTS.filter((s) => !takenLabels.has(s.label)).map((s) => s.label);
+    const existingAdditional = identityRefs
+      .map((r: any) => r.slot_label as string)
+      .filter((l) => /^Additional \d+$/.test(l))
+      .map((l) => Number(l.replace(/^Additional /, "")));
+    let nextAdditional = existingAdditional.length ? Math.max(...existingAdditional) + 1 : 1;
+
+    let ok = 0;
+    let failed = 0;
+    for (const file of eligible) {
+      const label = openSlots.shift() ?? `Additional ${nextAdditional++}`;
+      setUploading(`${label} (${ok + failed + 1}/${eligible.length})`);
+      try {
+        const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
+        const key = `${data.creator.id}/twin/identity_ref/${crypto.randomUUID()}${ext}`;
+        const { error } = await supabase.storage
+          .from("content-assets")
+          .upload(key, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
+        if (error) { failed++; toast.error(`${file.name}: ${error.message}`); continue; }
+        await add({ data: { kind: "identity_ref", storagePath: key, mimeType: file.type || undefined, slotLabel: label } });
+        ok++;
+      } catch (e: any) {
+        failed++;
+        toast.error(`${file.name}: ${e?.message ?? "Upload failed"}`);
+      }
+    }
+    setUploading(null);
+    await refresh();
+    if (ok > 0) {
+      toast.success(
+        `Uploaded ${ok} photo${ok === 1 ? "" : "s"}${failed ? ` (${failed} failed)` : ""}.`,
+      );
+    }
+  }
+
   async function saveConsentAndContinue() {
     if (!likenessOk) return toast.error("Likeness consent is required to generate any synthetic content.");
     try {
