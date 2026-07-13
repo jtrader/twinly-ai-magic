@@ -34,11 +34,12 @@ function schemaHintForQuestion(q: QuestionDefinition): string {
   }
 }
 
-function buildQuestionSpec(): string {
+function buildQuestionSpec(lockedIds: Set<string> = new Set()): string {
   const lines: string[] = [];
   for (const section of REAL_ME_QUESTIONNAIRE) {
     lines.push(`# Section ${section.id}: ${section.title}`);
     for (const q of section.questions) {
+      if (lockedIds.has(q.id)) continue;
       lines.push(`- "${q.id}" (${q.type}): ${q.promptText}`);
       lines.push(`   -> ${schemaHintForQuestion(q)}`);
       if (q.conditionalOn) {
@@ -159,7 +160,21 @@ const VARIANT_STYLES = [
   "Lean introspective, quietly confident, and creative. Values depth over spectacle.",
 ];
 
-function buildPrompt(seed: SeedInput, styleHint: string): string {
+function buildPrompt(
+  seed: SeedInput,
+  styleHint: string,
+  lockedAnswers: SavedAnswers = {},
+): string {
+  const lockedIds = new Set(Object.keys(lockedAnswers));
+  const lockedBlock =
+    lockedIds.size > 0
+      ? [
+          "",
+          "LOCKED answers (MUST be treated as fixed context; DO NOT return these keys, DO NOT rewrite them, and keep everything else consistent with them):",
+          JSON.stringify(lockedAnswers, null, 2),
+          "",
+        ].join("\n")
+      : "";
   return [
     "Create a believable, internally consistent fictional creator persona.",
     "",
@@ -170,11 +185,11 @@ function buildPrompt(seed: SeedInput, styleHint: string): string {
     `- Character traits: ${seed.traits.join(", ") || "(none)"}`,
     "",
     `Style direction for THIS variant: ${styleHint}`,
-    "",
+    lockedBlock,
     "Fill EVERY question below. Multi/single-select answers MUST be picked from the given options exactly (copy the strings verbatim).",
     "Keep custom_prompt answers concise (1-3 sentences).",
     "",
-    buildQuestionSpec(),
+    buildQuestionSpec(lockedIds),
     "",
     'Return a single JSON object. Example shape: {"1.1":"Alex","1.2":"she/her","2.1":["Warm","Playful"],"2.2":6,"3.5":true,"3.5b":"NBA — Lakers"}',
   ].join("\n");
@@ -184,9 +199,12 @@ async function generateOneVariant(
   seed: SeedInput,
   styleHint: string,
   apiKey: string,
+  lockedAnswers: SavedAnswers = {},
 ): Promise<SavedAnswers> {
-  const raw = await callLovableAi(buildPrompt(seed, styleHint), apiKey);
-  return sanitizeAnswers(raw);
+  const raw = await callLovableAi(buildPrompt(seed, styleHint, lockedAnswers), apiKey);
+  const cleaned = sanitizeAnswers(raw);
+  // Locked answers are authoritative — merge them in, overriding anything the model returned.
+  return { ...cleaned, ...lockedAnswers };
 }
 
 /**
@@ -195,7 +213,7 @@ async function generateOneVariant(
  */
 export const generateRealMeVariants = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { seed: SeedInput; count?: number }) => d)
+  .validator((d: { seed: SeedInput; count?: number; lockedAnswers?: SavedAnswers }) => d)
   .handler(async ({ data, context }) => {
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured for this project.");
@@ -204,9 +222,15 @@ export const generateRealMeVariants = createServerFn({ method: "POST" })
     const count = Math.min(Math.max(data.count ?? 3, 1), 3);
     const styles = VARIANT_STYLES.slice(0, count);
 
+    // Sanitize locked answers server-side so we never trust raw client shapes,
+    // then only keep the ones that survived sanitization.
+    const lockedAnswers = data.lockedAnswers
+      ? sanitizeAnswers(data.lockedAnswers as Record<string, unknown>)
+      : {};
+
     // Run in parallel. If ALL fail, surface the first error; otherwise return the successes.
     const results = await Promise.allSettled(
-      styles.map((style) => generateOneVariant(data.seed, style, apiKey)),
+      styles.map((style) => generateOneVariant(data.seed, style, apiKey, lockedAnswers)),
     );
     const variants = results
       .map((r, i) => (r.status === "fulfilled" ? { style: styles[i], answers: r.value } : null))
@@ -218,6 +242,7 @@ export const generateRealMeVariants = createServerFn({ method: "POST" })
     }
 
     return {
+      lockedIds: Object.keys(lockedAnswers),
       variants: variants.map((v, i) => ({
         id: `v${i + 1}`,
         style: v.style,

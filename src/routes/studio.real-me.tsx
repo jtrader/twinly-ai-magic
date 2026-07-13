@@ -39,7 +39,7 @@ import {
   SingleSelectInput,
   YesNoInput,
 } from "@/components/twinly/RealMeInputs";
-import { ArrowLeft, CheckCircle2, Circle, History, Sparkles, Loader2, RefreshCw, X, Save } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, History, Sparkles, Loader2, RefreshCw, X, Save, Lock, Unlock } from "lucide-react";
 import { Download, RotateCcw, FileJson, FileText, Rows, LayoutGrid } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import {
@@ -99,6 +99,11 @@ function RealMePage() {
   const [activeSectionId, setActiveSectionId] = useState(REAL_ME_QUESTIONNAIRE[0].id);
   const [showHistory, setShowHistory] = useState(false);
   const [showGenerate, setShowGenerate] = useState(false);
+  // Auto-kick generation the next time the dialog opens (used by Regenerate).
+  const [autoRunGenerate, setAutoRunGenerate] = useState(false);
+  // Snapshot of the picked/edited answers before a Regenerate, so we can diff
+  // the new variants against what the creator had.
+  const [previousPickAnswers, setPreviousPickAnswers] = useState<Record<string, unknown> | null>(null);
   // When set, we're reviewing an unsaved draft (from AI generation OR from
   // restoring an older version). Autosave is suppressed and Save/Discard
   // controls take over.
@@ -109,9 +114,48 @@ function RealMePage() {
   } | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // Per-question locks — locked ids are preserved by the AI on generate and
+  // become read-only in the editor until unlocked.
+  const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
+
+  // Load persisted locks per user.
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const raw = localStorage.getItem(`real-me:locks:${user.id}`);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setLockedIds(new Set(arr.filter((x) => typeof x === "string")));
+      }
+    } catch {}
+  }, [user]);
+
+  const persistLocks = useCallback((next: Set<string>) => {
+    if (!user) return;
+    try {
+      localStorage.setItem(`real-me:locks:${user.id}`, JSON.stringify([...next]));
+    } catch {}
+  }, [user]);
+
+  const toggleLock = useCallback((questionId: string) => {
+    setLockedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      persistLocks(next);
+      return next;
+    });
+  }, [persistLocks]);
+
+  const clearAllLocks = useCallback(() => {
+    setLockedIds(() => {
+      persistLocks(new Set());
+      return new Set();
+    });
+  }, [persistLocks]);
 
   useEffect(() => {
     if (!user) return;
@@ -143,6 +187,10 @@ function RealMePage() {
   }, [saveAnswer]);
 
   function onAnswer(questionId: string, value: unknown) {
+    if (lockedIds.has(questionId)) {
+      toast.message("This answer is locked. Unlock it to edit.");
+      return;
+    }
     if (draft) {
       setDraft((d) => (d ? { ...d, answers: { ...d.answers, [questionId]: value } } : d));
       return;
@@ -226,6 +274,18 @@ function RealMePage() {
           <h1 className="font-display text-2xl font-bold">Real Me baseline</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          {lockedIds.size > 0 && (
+            <Badge variant="outline" className="gap-1 border-amber-400/50 text-amber-400">
+              <Lock className="size-3" /> {lockedIds.size} locked
+              <button
+                type="button"
+                onClick={clearAllLocks}
+                className="ml-1 underline hover:text-amber-300"
+              >
+                clear
+              </button>
+            </Badge>
+          )}
           <Button size="sm" variant="outline" onClick={() => setShowHistory((s) => !s)} disabled={!!draft}>
             <History className="mr-1.5 size-4" />
             <span className="hidden sm:inline">Version history</span>
@@ -251,7 +311,14 @@ function RealMePage() {
           saving={savingDraft}
           onSave={commitDraft}
           onDiscard={() => setConfirmDiscard(true)}
-          onRegenerate={draft.seed ? () => setShowGenerate(true) : undefined}
+          onRegenerate={draft.seed ? () => {
+            // Snapshot the current draft answers so the compare view can show
+            // the "Previous pick" column alongside the new variants.
+            setPreviousPickAnswers({ ...draft.answers });
+            setAutoRunGenerate(true);
+            setShowGenerate(true);
+          } : undefined}
+          lockCount={lockedIds.size}
           onExport={handleExportDraft}
         />
       ) : (
@@ -308,7 +375,14 @@ function RealMePage() {
           <div className="space-y-4">
             <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{activeSection.title}</div>
             {activeQuestions.map((q) => (
-              <QuestionField key={q.id} question={q} value={displayedAnswers[q.id]} onChange={(v) => onAnswer(q.id, v)} />
+              <QuestionField
+                key={q.id}
+                question={q}
+                value={displayedAnswers[q.id]}
+                onChange={(v) => onAnswer(q.id, v)}
+                locked={lockedIds.has(q.id)}
+                onToggleLock={() => toggleLock(q.id)}
+              />
             ))}
           </div>
         </div>
@@ -318,9 +392,24 @@ function RealMePage() {
         open={showGenerate}
         onOpenChange={setShowGenerate}
         initialSeed={draft?.seed ?? null}
-        generate={(input) => generateVariants(input) as unknown as Promise<{ variants: Variant[] }>}
+        autoRun={autoRunGenerate}
+        lockedIds={[...lockedIds]}
+        lockedAnswers={Object.fromEntries(
+          [...lockedIds]
+            .filter((id) => displayedAnswers[id] !== undefined)
+            .map((id) => [id, displayedAnswers[id] as any]),
+        )}
+        previousAnswers={previousPickAnswers}
+        generate={(input) => generateVariants(input as any) as unknown as Promise<{ variants: Variant[] }>}
         onPick={(seed, answers) => {
-          setDraft({ seed, answers });
+          // Preserve any locked answers on top of the AI output as a final safety net.
+          const merged: Answers = { ...(answers as Answers) };
+          for (const id of lockedIds) {
+            if (displayedAnswers[id] !== undefined) merged[id] = displayedAnswers[id] as any;
+          }
+          setDraft({ seed, answers: merged });
+          setPreviousPickAnswers(null);
+          setAutoRunGenerate(false);
           setShowGenerate(false);
           setShowHistory(false);
           setActiveSectionId(REAL_ME_QUESTIONNAIRE[0].id);
@@ -347,25 +436,58 @@ function RealMePage() {
   );
 }
 
-function QuestionField({ question, value, onChange }: { question: QuestionDefinition; value: unknown; onChange: (v: unknown) => void }) {
+function QuestionField({
+  question,
+  value,
+  onChange,
+  locked,
+  onToggleLock,
+}: {
+  question: QuestionDefinition;
+  value: unknown;
+  onChange: (v: unknown) => void;
+  locked: boolean;
+  onToggleLock: () => void;
+}) {
+  const handleChange = (v: unknown) => {
+    if (locked) return;
+    onChange(v);
+  };
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4">
-      <div className="mb-2 text-sm font-medium">{question.promptText}{question.optional && <span className="ml-1 text-xs font-normal text-muted-foreground">(optional)</span>}</div>
-      {question.type === "multi_select" && (
-        <MultiSelectInput options={question.options ?? []} value={(value as string[]) ?? []} onChange={onChange} />
-      )}
-      {question.type === "single_select" && (
-        <SingleSelectInput options={question.options ?? []} value={(value as string) ?? ""} onChange={onChange} allowCustomOption={question.allowCustomOption} />
-      )}
-      {question.type === "yes_no" && (
-        <YesNoInput value={value === undefined ? null : (value as boolean)} onChange={onChange} />
-      )}
-      {question.type === "rating" && (
-        <RatingInput value={(value as number) ?? 5} onChange={onChange} />
-      )}
-      {question.type === "custom_prompt" && (
-        <CustomPromptInput value={(value as string) ?? ""} onChange={onChange} maxLength={question.maxLength} />
-      )}
+    <div className={"rounded-2xl border p-4 transition " + (locked ? "border-amber-400/40 bg-amber-500/5" : "border-border bg-surface")}>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="text-sm font-medium">
+          {question.promptText}
+          {question.optional && <span className="ml-1 text-xs font-normal text-muted-foreground">(optional)</span>}
+          {locked && <span className="ml-2 text-[10px] font-semibold uppercase tracking-widest text-amber-400">Locked</span>}
+        </div>
+        <button
+          type="button"
+          onClick={onToggleLock}
+          className={"shrink-0 rounded-md p-1 transition " + (locked ? "text-amber-400 hover:bg-amber-500/10" : "text-muted-foreground hover:bg-surface-elevated hover:text-foreground")}
+          title={locked ? "Unlock — AI can update this answer" : "Lock — AI will preserve this answer"}
+          aria-label={locked ? "Unlock answer" : "Lock answer"}
+        >
+          {locked ? <Lock className="size-4" /> : <Unlock className="size-4" />}
+        </button>
+      </div>
+      <div className={locked ? "pointer-events-none opacity-70" : ""} aria-disabled={locked}>
+        {question.type === "multi_select" && (
+          <MultiSelectInput options={question.options ?? []} value={(value as string[]) ?? []} onChange={handleChange} />
+        )}
+        {question.type === "single_select" && (
+          <SingleSelectInput options={question.options ?? []} value={(value as string) ?? ""} onChange={handleChange} allowCustomOption={question.allowCustomOption} />
+        )}
+        {question.type === "yes_no" && (
+          <YesNoInput value={value === undefined ? null : (value as boolean)} onChange={handleChange} />
+        )}
+        {question.type === "rating" && (
+          <RatingInput value={(value as number) ?? 5} onChange={handleChange} />
+        )}
+        {question.type === "custom_prompt" && (
+          <CustomPromptInput value={(value as string) ?? ""} onChange={handleChange} maxLength={question.maxLength} />
+        )}
+      </div>
     </div>
   );
 }
@@ -486,6 +608,7 @@ function DraftReviewBanner({
   onSave,
   onDiscard,
   onRegenerate,
+  lockCount,
   onExport,
 }: {
   seed: SeedInput | null;
@@ -494,6 +617,7 @@ function DraftReviewBanner({
   onSave: () => void;
   onDiscard: () => void;
   onRegenerate?: () => void;
+  lockCount?: number;
   onExport: (kind: "json" | "pdf") => void;
 }) {
   const isRestore = !!restoredFrom;
@@ -510,6 +634,11 @@ function DraftReviewBanner({
           <p className="text-xs text-muted-foreground">
             Edit anything below, then Save to create a new version. Nothing is stored until you save.
           </p>
+          {lockCount && lockCount > 0 ? (
+            <p className="mt-1 text-[11px] text-amber-400">
+              <Lock className="mr-1 inline size-3" /> {lockCount} locked answer{lockCount === 1 ? "" : "s"} — Regenerate will keep these fixed.
+            </p>
+          ) : null}
           {seed ? (
             <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
               <Badge variant="outline">{seed.gender}</Badge>
@@ -556,13 +685,21 @@ function GenerateProfileDialog({
   open,
   onOpenChange,
   initialSeed,
+  autoRun,
+  lockedIds,
+  lockedAnswers,
+  previousAnswers,
   generate,
   onPick,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initialSeed: SeedInput | null;
-  generate: (input: { data: { seed: SeedInput; count: number } }) => Promise<{ variants: Variant[] }>;
+  autoRun?: boolean;
+  lockedIds?: string[];
+  lockedAnswers?: Record<string, unknown>;
+  previousAnswers?: Record<string, unknown> | null;
+  generate: (input: { data: { seed: SeedInput; count: number; lockedAnswers?: Record<string, unknown> } }) => Promise<{ variants: Variant[] }>;
   onPick: (seed: SeedInput, answers: Record<string, unknown>) => void;
 }) {
   const [step, setStep] = useState<"seeds" | "loading" | "pick" | "error">("seeds");
@@ -574,6 +711,8 @@ function GenerateProfileDialog({
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [attempt, setAttempt] = useState(0);
   const [pickView, setPickView] = useState<"cards" | "compare">("cards");
+  const lockedAnswersRef = useRef<Record<string, unknown>>({});
+  useEffect(() => { lockedAnswersRef.current = lockedAnswers ?? {}; }, [lockedAnswers]);
 
   // Rehydrate previous seeds when dialog re-opens (e.g. Regenerate from draft banner)
   useEffect(() => {
@@ -584,10 +723,17 @@ function GenerateProfileDialog({
       setLifestyle(initialSeed.lifestyle);
       setTraits(initialSeed.traits);
     }
-    setStep("seeds");
     setVariants([]);
     setErrorMsg("");
-    setPickView("cards");
+    setPickView(previousAnswers ? "compare" : "cards");
+    if (autoRun && initialSeed) {
+      setStep("loading");
+      // Kick off generation once state is set.
+      void runGenerateWith(initialSeed);
+    } else {
+      setStep("seeds");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialSeed]);
 
   function toggle(list: string[], value: string, setter: (v: string[]) => void, limit: number) {
@@ -598,14 +744,12 @@ function GenerateProfileDialog({
   const busy = step === "loading";
   const canGenerate = !!gender && !!age && lifestyle.length > 0 && traits.length > 0 && !busy;
 
-  async function runGenerate() {
-    if (!canGenerate) return;
-    const seed: SeedInput = { gender, ageBracket: age, lifestyle, traits };
+  async function runGenerateWith(seed: SeedInput) {
     setStep("loading");
     setErrorMsg("");
     setAttempt((a) => a + 1);
     try {
-      const res = await generate({ data: { seed, count: 3 } });
+      const res = await generate({ data: { seed, count: 3, lockedAnswers: lockedAnswersRef.current as any } });
       if (!res.variants.length) {
         setStep("error");
         setErrorMsg("AI returned no usable variants. Try again.");
@@ -619,6 +763,11 @@ function GenerateProfileDialog({
     }
   }
 
+  async function runGenerate() {
+    if (!canGenerate) return;
+    await runGenerateWith({ gender, ageBracket: age, lifestyle, traits });
+  }
+
   function pickVariant(v: Variant) {
     onPick({ gender, ageBracket: age, lifestyle, traits }, v.answers);
   }
@@ -629,11 +778,18 @@ function GenerateProfileDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="size-4 text-brand" /> Generate random AI profile
+            {lockedIds && lockedIds.length > 0 && (
+              <Badge variant="outline" className="ml-1 gap-1 border-amber-400/50 text-amber-400">
+                <Lock className="size-3" /> {lockedIds.length} locked
+              </Badge>
+            )}
           </DialogTitle>
           <DialogDescription>
             {step === "pick"
               ? "Pick your favorite variant. You'll be able to edit every field before saving."
-              : "Answer a few quick seeds — AI drafts 3 alternate profiles so you can pick the best one."}
+              : lockedIds && lockedIds.length > 0
+                ? "Locked answers stay fixed. AI drafts 3 alternate profiles for the rest."
+                : "Answer a few quick seeds — AI drafts 3 alternate profiles so you can pick the best one."}
           </DialogDescription>
         </DialogHeader>
 
@@ -737,7 +893,7 @@ function GenerateProfileDialog({
                 ))}
               </div>
             ) : (
-              <VariantCompareTable variants={variants} onPick={pickVariant} />
+              <VariantCompareTable variants={variants} previousAnswers={previousAnswers ?? null} onPick={pickVariant} />
             )}
           </div>
         )}
@@ -815,7 +971,7 @@ const COMPARE_QUESTION_IDS: string[] = [
   "6.1", // Humor
 ];
 
-function VariantCompareTable({ variants, onPick }: { variants: Variant[]; onPick: (v: Variant) => void }) {
+function VariantCompareTable({ variants, previousAnswers, onPick }: { variants: Variant[]; previousAnswers?: Record<string, unknown> | null; onPick: (v: Variant) => void }) {
   const byId = new Map<string, QuestionDefinition>();
   for (const s of REAL_ME_QUESTIONNAIRE) for (const q of s.questions) byId.set(q.id, q);
   const rows = COMPARE_QUESTION_IDS.map((id) => byId.get(id)).filter((q): q is QuestionDefinition => !!q);
@@ -827,12 +983,24 @@ function VariantCompareTable({ variants, onPick }: { variants: Variant[]; onPick
     return String(v);
   }
 
+  function same(a: unknown, b: unknown): boolean {
+    if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, i) => x === b[i]);
+    return a === b;
+  }
+
+  const showPrev = !!previousAnswers && Object.keys(previousAnswers).length > 0;
+
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
       <table className="w-full min-w-[560px] border-collapse text-xs">
         <thead className="bg-surface-elevated/60 text-[10px] uppercase tracking-widest text-muted-foreground">
           <tr>
             <th className="sticky left-0 z-10 bg-surface-elevated/60 px-3 py-2 text-left font-semibold">Field</th>
+            {showPrev && (
+              <th className="border-l border-border px-3 py-2 text-left font-semibold text-muted-foreground/80">
+                Previous pick
+              </th>
+            )}
             {variants.map((v, i) => (
               <th key={v.id} className="border-l border-border px-3 py-2 text-left font-semibold">
                 <div className="flex items-center justify-between gap-2">
@@ -847,8 +1015,19 @@ function VariantCompareTable({ variants, onPick }: { variants: Variant[]; onPick
           {rows.map((q) => (
             <tr key={q.id} className="border-t border-border align-top">
               <td className="sticky left-0 z-10 bg-surface px-3 py-2 font-medium text-muted-foreground">{q.promptText}</td>
+              {showPrev && (
+                <td className="border-l border-border px-3 py-2 text-muted-foreground/80">
+                  {fmt(previousAnswers![q.id])}
+                </td>
+              )}
               {variants.map((v) => (
-                <td key={v.id + q.id} className="border-l border-border px-3 py-2">
+                <td
+                  key={v.id + q.id}
+                  className={
+                    "border-l border-border px-3 py-2 " +
+                    (showPrev && !same(v.answers[q.id], previousAnswers![q.id]) ? "bg-brand/5 text-foreground" : "")
+                  }
+                >
                   {fmt(v.answers[q.id])}
                 </td>
               ))}
@@ -856,6 +1035,7 @@ function VariantCompareTable({ variants, onPick }: { variants: Variant[]; onPick
           ))}
           <tr className="border-t border-border bg-surface-elevated/40">
             <td className="sticky left-0 z-10 bg-surface-elevated/40 px-3 py-2" />
+            {showPrev && <td className="border-l border-border px-3 py-2" />}
             {variants.map((v) => (
               <td key={"pick-" + v.id} className="border-l border-border px-3 py-2">
                 <Button size="sm" className="w-full" onClick={() => onPick(v)}>
