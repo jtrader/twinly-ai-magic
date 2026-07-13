@@ -20,10 +20,14 @@ vi.mock("@/lib/session", () => ({
 }));
 
 // Silence toast side-effects — the guard shows one when access is denied.
-const toastErrorMock = vi.fn();
-vi.mock("sonner", () => ({
-  toast: { error: toastErrorMock, success: vi.fn(), message: vi.fn() },
-}));
+// vi.mock is hoisted, so the mock lives on a module-level holder to avoid
+// TDZ against local consts.
+vi.mock("sonner", () => {
+  const h = { error: vi.fn(), success: vi.fn(), message: vi.fn() };
+  (globalThis as any).__toastHolder = h;
+  return { toast: h };
+});
+const toastErrorMock = (globalThis as any).__toastHolder.error as ReturnType<typeof vi.fn>;
 
 // AppShell pulls in a lot of unrelated chrome (billing portal, notification
 // bell, impersonation banner, dashboard nav, ...). Stub them so the test
