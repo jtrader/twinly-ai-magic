@@ -126,6 +126,11 @@ export const sendCreatorReply = createServerFn({ method: "POST" })
     if (convoErr) throw convoErr;
     if (!convo) throw new Error("Conversation not found");
 
+    const { data: canManage } = await supabase.rpc("can_manage_creator", {
+      _creator_id: (convo as any).creator_id,
+    });
+    if (!canManage) throw new Error("Not authorized to reply to this conversation.");
+
     const { data: blocked } = await supabase.rpc("is_blocked", { _a: userId, _b: (convo as any).fan_id });
     if (blocked) throw new Error("Messaging is blocked between you and this fan.");
 
@@ -192,16 +197,25 @@ export const takeOverConversation = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: convo, error } = await supabase
       .from("conversations")
-      .select("id, ai_suspended, persona_id, creators!inner(id, user_id, handle), personas:persona_id(display_name, kind)")
+      .select("id, ai_suspended, persona_id, creator_id, creators!inner(id, user_id, handle), personas:persona_id(display_name, kind)")
       .eq("id", data.conversationId)
       .maybeSingle();
     if (error) throw error;
     if (!convo) throw new Error("Conversation not found");
-    if ((convo as any).creators.user_id !== userId) throw new Error("Not authorized");
+    const { data: canManage } = await supabase.rpc("can_manage_creator", {
+      _creator_id: (convo as any).creator_id,
+    });
+    if (!canManage) throw new Error("Only the creator of this conversation can take it over.");
     if ((convo as any).ai_suspended) return { ok: true, alreadySuspended: true };
 
     const s = supabase as any;
-    await s.from("conversations").update({ ai_suspended: true }).eq("id", data.conversationId);
+    const { data: updated, error: upErr } = await s
+      .from("conversations")
+      .update({ ai_suspended: true })
+      .eq("id", data.conversationId)
+      .select("id");
+    if (upErr) throw upErr;
+    if (!updated || updated.length === 0) throw new Error("Not authorized to update this conversation.");
     await s.from("messages").insert({
       conversation_id: data.conversationId,
       sender_type: "system",
@@ -224,19 +238,28 @@ export const resumeAutoPilot = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: convo, error } = await supabase
       .from("conversations")
-      .select("id, ai_suspended, persona_id, creators!inner(id, user_id, handle), personas:persona_id(display_name, kind)")
+      .select("id, ai_suspended, persona_id, creator_id, creators!inner(id, user_id, handle), personas:persona_id(display_name, kind)")
       .eq("id", data.conversationId)
       .maybeSingle();
     if (error) throw error;
     if (!convo) throw new Error("Conversation not found");
-    if ((convo as any).creators.user_id !== userId) throw new Error("Not authorized");
+    const { data: canManage } = await supabase.rpc("can_manage_creator", {
+      _creator_id: (convo as any).creator_id,
+    });
+    if (!canManage) throw new Error("Only the creator of this conversation can resume auto-pilot.");
     if ((convo as any).personas?.kind === "real_me") {
       throw new Error("Real Me conversations don't have an AI auto-pilot to resume.");
     }
     if (!(convo as any).ai_suspended) return { ok: true, alreadyActive: true };
 
     const s = supabase as any;
-    await s.from("conversations").update({ ai_suspended: false }).eq("id", data.conversationId);
+    const { data: updated, error: upErr } = await s
+      .from("conversations")
+      .update({ ai_suspended: false })
+      .eq("id", data.conversationId)
+      .select("id");
+    if (upErr) throw upErr;
+    if (!updated || updated.length === 0) throw new Error("Not authorized to update this conversation.");
     await s.from("messages").insert({
       conversation_id: data.conversationId,
       sender_type: "system",
