@@ -20,6 +20,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
+import { Route as LegalIndexRouteImport } from './routes/legal.index'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as StudioTwinOnboardingRouteImport } from './routes/studio.twin-onboarding'
 import { Route as StudioTwinRouteImport } from './routes/studio.twin'
@@ -121,6 +122,11 @@ const IndexRoute = IndexRouteImport.update({
 const StudioIndexRoute = StudioIndexRouteImport.update({
   id: '/studio/',
   path: '/studio/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalIndexRoute = LegalIndexRouteImport.update({
+  id: '/legal/',
+  path: '/legal/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountIndexRoute = AccountIndexRouteImport.update({
@@ -410,6 +416,7 @@ export interface FileRoutesByFullPath {
   '/studio/twin': typeof StudioTwinRoute
   '/studio/twin-onboarding': typeof StudioTwinOnboardingRoute
   '/account/': typeof AccountIndexRoute
+  '/legal/': typeof LegalIndexRoute
   '/studio/': typeof StudioIndexRoute
   '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
@@ -469,6 +476,7 @@ export interface FileRoutesByTo {
   '/studio/twin': typeof StudioTwinRoute
   '/studio/twin-onboarding': typeof StudioTwinOnboardingRoute
   '/account': typeof AccountIndexRoute
+  '/legal': typeof LegalIndexRoute
   '/studio': typeof StudioIndexRoute
   '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
@@ -530,6 +538,7 @@ export interface FileRoutesById {
   '/studio/twin': typeof StudioTwinRoute
   '/studio/twin-onboarding': typeof StudioTwinOnboardingRoute
   '/account/': typeof AccountIndexRoute
+  '/legal/': typeof LegalIndexRoute
   '/studio/': typeof StudioIndexRoute
   '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
@@ -592,6 +601,7 @@ export interface FileRouteTypes {
     | '/studio/twin'
     | '/studio/twin-onboarding'
     | '/account/'
+    | '/legal/'
     | '/studio/'
     | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
@@ -651,6 +661,7 @@ export interface FileRouteTypes {
     | '/studio/twin'
     | '/studio/twin-onboarding'
     | '/account'
+    | '/legal'
     | '/studio'
     | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
@@ -711,6 +722,7 @@ export interface FileRouteTypes {
     | '/studio/twin'
     | '/studio/twin-onboarding'
     | '/account/'
+    | '/legal/'
     | '/studio/'
     | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
@@ -765,6 +777,7 @@ export interface RootRouteChildren {
   StudioRealMeRoute: typeof StudioRealMeRoute
   StudioTwinRoute: typeof StudioTwinRoute
   StudioTwinOnboardingRoute: typeof StudioTwinOnboardingRoute
+  LegalIndexRoute: typeof LegalIndexRoute
   StudioIndexRoute: typeof StudioIndexRoute
   ApiPublicBootstrapDemoCreatorsRoute: typeof ApiPublicBootstrapDemoCreatorsRoute
   ApiPublicBootstrapSupportAdminRoute: typeof ApiPublicBootstrapSupportAdminRoute
@@ -854,6 +867,13 @@ declare module '@tanstack/react-router' {
       path: '/studio'
       fullPath: '/studio/'
       preLoaderRoute: typeof StudioIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/': {
+      id: '/legal/'
+      path: '/legal'
+      fullPath: '/legal/'
+      preLoaderRoute: typeof LegalIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account/': {
@@ -1303,6 +1323,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioRealMeRoute: StudioRealMeRoute,
   StudioTwinRoute: StudioTwinRoute,
   StudioTwinOnboardingRoute: StudioTwinOnboardingRoute,
+  LegalIndexRoute: LegalIndexRoute,
   StudioIndexRoute: StudioIndexRoute,
   ApiPublicBootstrapDemoCreatorsRoute: ApiPublicBootstrapDemoCreatorsRoute,
   ApiPublicBootstrapSupportAdminRoute: ApiPublicBootstrapSupportAdminRoute,
