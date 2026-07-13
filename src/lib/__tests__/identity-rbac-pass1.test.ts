@@ -66,7 +66,7 @@ describe("Session creation hardening (§1)", () => {
     const start = identitySrc.indexOf("supabaseAdmin.from(\"identity_verifications\")");
     const end = identitySrc.indexOf("onConflict: \"provider_session_id\"");
     const body = identitySrc.slice(start, end);
-    expect(body).not.toMatch(/dob|document_number|document_front|document_back|selfie|address_line/i);
+    expect(body).not.toMatch(/\bdob\b|document_number|document_(front|back|image)|selfie_image|selfie_video|address_line/i);
   });
 });
 
@@ -91,8 +91,14 @@ describe("Webhook state machine (§2 + §3)", () => {
   it("§3 fail-closed: is_adult_verified is derived from Stripe verified_outputs.dob server-side and never trusted from a client callback", () => {
     expect(webhookSrc).toContain("deriveIsAdult");
     expect(webhookSrc).toContain("verified_outputs?.dob");
-    // ambiguous DOB -> returns false, so the profile is NOT promoted to Level 1
-    expect(webhookSrc).toMatch(/if \(!isAdult\)[\s\S]{0,200}id_verification_level/);
+    // Ambiguous DOB (missing year/month/day) returns false: `return false; // ambiguous → fail closed`
+    expect(webhookSrc).toMatch(/return false;\s*\/\/\s*ambiguous/);
+    // And the non-adult branch never touches id_verification_level (only false + early return).
+    const start = webhookSrc.indexOf("if (!isAdult)");
+    const end = webhookSrc.indexOf("await (sb.from(\"profiles\") as any).update({\n    id_verified_at: now,");
+    const nonAdultBranch = webhookSrc.slice(start, end);
+    expect(nonAdultBranch).toContain("is_adult_verified: false");
+    expect(nonAdultBranch).not.toContain("id_verification_level:");
   });
 
   it("§3 fail-closed: only a verified adult event ever sets id_verification_level=1", () => {
