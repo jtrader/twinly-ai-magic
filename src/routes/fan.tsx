@@ -153,12 +153,12 @@ function FanDashboard() {
       optional: true,
       loading: idLoading,
       statusReason: idVerified
-        ? "Verified — you can join every creator's audience."
+        ? "Verified — you can join every creator, including verified-only ones."
         : idPending
           ? "Pending — Stripe is reviewing your submission."
-          : "Some creators restrict content to verified supporters. Verify once here to unlock all of them.",
+          : "Not required to use Twinly. Some creators do restrict their persona to verified supporters — verifying once here unlocks all of them.",
       statusTone: idVerified ? "ok" : idPending ? "warn" : "info",
-      why: "Creators can restrict chats or posts to verified supporters only. Verifying once here unlocks any creator who requires it.",
+      why: "ID verification isn't mandatory on Twinly. Individual creators can choose to restrict their persona to verified supporters only — verifying once here unlocks every such creator platform-wide.",
       who: "Stripe Identity handles the ID + selfie — Twinly never sees or stores your document.",
       what: "Snap your ID and a selfie in Stripe's hosted flow.",
       how: "Around 2–3 minutes. Result comes back automatically.",
