@@ -625,7 +625,14 @@ function PersonaEditForm({
 
             {persona.kind === "ai" && (
               <>
-                <VeniceCharacterField idPrefix="edit-persona" value={veniceCharacterSlug} onChange={setVeniceCharacterSlug} />
+                <ExternalModelIdsPanel
+                  idPrefix="edit-persona"
+                  venice={veniceCharacterSlug} onVenice={setVeniceCharacterSlug}
+                  heygenAvatar={heygenAvatarId} onHeygenAvatar={setHeygenAvatarId}
+                  heygenVoice={heygenVoiceId} onHeygenVoice={setHeygenVoiceId}
+                  elevenlabsVoice={elevenlabsVoiceIdOverride} onElevenlabsVoice={setElevenlabsVoiceIdOverride}
+                  baselineVeniceSlug={creator.baselineVeniceSlug}
+                />
                 <div>
                   <Label htmlFor="edit-persona-system-prompt">System prompt</Label>
                   <Textarea id="edit-persona-system-prompt" className="mt-1.5" rows={5} maxLength={4000} value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} />
