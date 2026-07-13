@@ -97,15 +97,22 @@ function TwinOnboardingWizard() {
 
   async function saveBaselineAndContinue() {
     const next = baselineSlug.trim() || null;
-    if (next === (baselineInitial?.trim() || null)) {
+    const currentSaved = baselineInitial?.trim() || null;
+    if (next === currentSaved) {
       setStep(3);
       return;
+    }
+    if (currentSaved && !next) {
+      const ok = typeof window !== "undefined"
+        ? window.confirm(`Clear your saved baseline Character ID "${currentSaved}"? Personas already using it keep the value; only the workspace default is removed.`)
+        : true;
+      if (!ok) return;
     }
     setSavingBaseline(true);
     try {
       const r = await saveBaseline({ data: { slug: next } });
       setBaselineInitial(r.slug);
-      if (r.slug) toast.success("Baseline Character ID saved");
+      toast.success(r.slug ? "Baseline Character ID saved" : "Baseline Character ID cleared");
       setStep(3);
     } catch (e: any) {
       toast.error(e?.message ?? "Could not save Character ID");
