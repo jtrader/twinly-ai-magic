@@ -14,6 +14,7 @@ import personaNiceAi from "@/assets/persona-nice-ai.png.asset.json";
 import personaNaughtyAi from "@/assets/persona-naughty-ai.png.asset.json";
 import personaWickedAi from "@/assets/persona-wicked-ai.png.asset.json";
 import personaCustom from "@/assets/persona-custom.png.asset.json";
+import lovekeyMark from "@/assets/lovekey-mark.png.asset.json";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -321,8 +322,34 @@ function ForCreators() {
 
 function Footer() {
   return (
-    <footer className="border-t border-border/60 py-8 text-center text-xs text-muted-foreground">
-      <div>© {new Date().getFullYear()} Twinly.life · 18+ · <Link to="/legal" className="underline">Legal &amp; policies</Link> · <Link to="/legal/terms" className="underline">Terms</Link> · <Link to="/legal/privacy" className="underline">Privacy</Link> · <Link to="/legal/ai-disclosure" className="underline">AI disclosure</Link> · <Link to="/legal/takedown" className="underline">Report deepfake</Link></div>
+    <footer className="border-t border-border/60 py-10 text-center text-xs text-muted-foreground">
+      <div className="mx-auto flex max-w-3xl flex-col items-center gap-4 px-4">
+        <img
+          src={lovekeyMark.url}
+          alt="Love Key Respectful Synchronised Protocol mark"
+          className="h-16 w-16"
+          loading="lazy"
+        />
+        <p className="text-sm text-muted-foreground">
+          <a
+            href="https://lovekey.com.au"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand underline underline-offset-4"
+          >
+            Love Key RSP-aligned
+          </a>{" "}
+          — Ethical, privacy-conscious help routing under the Respectful Synchronised Protocol.
+        </p>
+        <div>
+          © 2026 Twinly.life. All rights reserved. · 18+ ·{" "}
+          <Link to="/legal" className="underline">Legal &amp; policies</Link> ·{" "}
+          <Link to="/legal/terms" className="underline">Terms</Link> ·{" "}
+          <Link to="/legal/privacy" className="underline">Privacy</Link> ·{" "}
+          <Link to="/legal/ai-disclosure" className="underline">AI disclosure</Link> ·{" "}
+          <Link to="/legal/takedown" className="underline">Report deepfake</Link>
+        </div>
+      </div>
     </footer>
   );
 }
