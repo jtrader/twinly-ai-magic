@@ -15,7 +15,7 @@ import { createPersona } from "@/lib/persona-studio.functions";
 import { listMyPersonas } from "@/lib/onboarding.functions";
 import { matchesRealName } from "@/lib/persona-name-privacy";
 import {
-  CONTENT_THEME_KEYS, CONTENT_THEME_LABELS, VeniceCharacterField, VoiceSettingSlider,
+  CONTENT_THEME_KEYS, CONTENT_THEME_LABELS, ExternalModelIdsPanel, VoiceSettingSlider,
   dollarsInputToCents,
 } from "@/components/twinly/persona-form-shared";
 
@@ -39,6 +39,7 @@ function NewPersonaPage() {
     fullName: string | null;
     elevenlabsVoiceId: string | null;
     hasRealMeProfile: boolean;
+    baselineVeniceSlug: string | null;
   } | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -58,6 +59,9 @@ function NewPersonaPage() {
   const [voiceStyle, setVoiceStyle] = useState(0);
   const [requireIdVerification, setRequireIdVerification] = useState(false);
   const [veniceCharacterSlug, setVeniceCharacterSlug] = useState("");
+  const [heygenAvatarId, setHeygenAvatarId] = useState("");
+  const [heygenVoiceId, setHeygenVoiceId] = useState("");
+  const [elevenlabsVoiceId, setElevenlabsVoiceId] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
@@ -71,6 +75,7 @@ function NewPersonaPage() {
           fullName: (r.creator as any).fullName ?? null,
           elevenlabsVoiceId: (r.creator as any).elevenlabs_voice_id ?? null,
           hasRealMeProfile: !!(r.creator as any).hasRealMeProfile,
+          baselineVeniceSlug: (r.creator as any).venice_character_slug ?? null,
         });
         setReady(true);
       })
@@ -99,6 +104,9 @@ function NewPersonaPage() {
           voiceStyle: kind === "ai" && useClonedVoice ? voiceStyle : undefined,
           requireIdVerification: kind === "ai" ? requireIdVerification : undefined,
           veniceCharacterSlug: kind === "ai" ? veniceCharacterSlug : undefined,
+          heygenAvatarId: kind === "ai" ? heygenAvatarId : undefined,
+          heygenVoiceId: kind === "ai" ? heygenVoiceId : undefined,
+          elevenlabsVoiceId: kind === "ai" ? elevenlabsVoiceId : undefined,
         },
       });
       toast.success("Persona created — it's in draft.");
@@ -175,7 +183,14 @@ function NewPersonaPage() {
             <section aria-labelledby="ai-heading" className="space-y-4 border-t border-border pt-6">
               <h2 id="ai-heading" className="font-display text-xl font-semibold">AI persona</h2>
 
-              <VeniceCharacterField idPrefix="new-persona" value={veniceCharacterSlug} onChange={setVeniceCharacterSlug} />
+              <ExternalModelIdsPanel
+                idPrefix="new-persona"
+                venice={veniceCharacterSlug} onVenice={setVeniceCharacterSlug}
+                heygenAvatar={heygenAvatarId} onHeygenAvatar={setHeygenAvatarId}
+                heygenVoice={heygenVoiceId} onHeygenVoice={setHeygenVoiceId}
+                elevenlabsVoice={elevenlabsVoiceId} onElevenlabsVoice={setElevenlabsVoiceId}
+                baselineVeniceSlug={creator?.baselineVeniceSlug ?? null}
+              />
 
               <div>
                 <Label htmlFor="new-persona-system-prompt">System prompt</Label>
