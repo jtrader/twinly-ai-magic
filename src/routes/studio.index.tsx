@@ -7,6 +7,7 @@ import { useSession } from "@/lib/session";
 import { Sparkles, Library, ShieldCheck, MessageCircle, Wallet, BadgeCheck, Package, User, Wand2, BarChart3, Moon, Flag, UserCheck, DollarSign, Eye, ClipboardList, ListChecks, UserCircle } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { countOpenCreatorFlags } from "@/lib/conversation-flags.functions";
+import { SetupChecklist, type ChecklistStep } from "@/components/twinly/SetupChecklist";
 
 export const Route = createFileRoute("/studio/")({
   component: StudioHome,
@@ -25,20 +26,26 @@ function StudioHome() {
   const [counts, setCounts] = useState({ personas: 0, assets: 0 });
   const [openFlags, setOpenFlags] = useState(0);
   const [realMeCompletion, setRealMeCompletion] = useState<number | null>(null);
+  const [baselineSlug, setBaselineSlug] = useState<string | null>(null);
+  const [hasPricing, setHasPricing] = useState<boolean>(false);
+  const [veniceSkipped, setVeniceSkipped] = useState<boolean>(false);
   const countFlags = useServerFn(countOpenCreatorFlags);
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data: c } = await supabase.from("creators").select("id, handle, stage_name, verification_status, digital_twin_status").eq("user_id", user.id).maybeSingle();
+      const { data: c } = await supabase.from("creators").select("id, handle, stage_name, verification_status, digital_twin_status, venice_character_slug").eq("user_id", user.id).maybeSingle();
       setCreator(c);
       if (c) {
-        const [{ count: personas }, { count: assets }] = await Promise.all([
+        setBaselineSlug(((c as any).venice_character_slug as string | null) ?? null);
+        const [{ count: personas }, { count: assets }, { count: pricing }] = await Promise.all([
           supabase.from("personas").select("id", { count: "exact", head: true }).eq("creator_id", c.id),
           supabase.from("content_assets").select("id", { count: "exact", head: true }).eq("creator_id", c.id),
+          supabase.from("creator_tier_prices").select("id", { count: "exact", head: true }).eq("creator_id", c.id),
         ]);
         setCounts({ personas: personas ?? 0, assets: assets ?? 0 });
+        setHasPricing((pricing ?? 0) > 0);
         countFlags({}).then((r) => setOpenFlags(r.count)).catch(() => {});
 
         // Read-only — never call getRealMeProfile here, it lazily creates
@@ -58,6 +65,12 @@ function StudioHome() {
     })();
   }, [user, countFlags]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try { setVeniceSkipped(window.localStorage.getItem("twinly:setup:skip-venice") === "1"); }
+    catch { /* ignore */ }
+  }, []);
+
   if (!creator) {
     return (
       <AppShell>
@@ -69,6 +82,91 @@ function StudioHome() {
       </AppShell>
     );
   }
+
+  const setupSteps: ChecklistStep[] = [
+    {
+      key: "profile",
+      title: "Create your creator profile",
+      to: "/onboarding",
+      done: true, // If we render this page, the creator row exists.
+      why: "Your handle, stage name and creator record are the anchor everything else attaches to.",
+      who: "Just you — this is the account behind the scenes; fans never see the raw record.",
+      what: "Pick a handle and stage name so your studio has an identity.",
+      how: "Already done — took a couple of minutes on signup.",
+    },
+    {
+      key: "real-me",
+      title: "Fill your Real Me baseline",
+      to: "/studio/real-me",
+      done: (realMeCompletion ?? 0) >= 100,
+      why: "Your tone, voice and baseline answers — every AI persona auto-generates its style from this.",
+      who: "You. Nothing here goes to fans directly; it seeds the AI personas you'll create.",
+      what: "Answer a short questionnaire about how you talk, what you like, what's off-limits.",
+      how: "10–15 minutes; you can save and come back any time.",
+    },
+    {
+      key: "twin",
+      title: "Set up your AI Twin baseline",
+      to: "/studio/twin-onboarding",
+      done: !!creator.digital_twin_status && creator.digital_twin_status !== "none",
+      why: "Reference photos + consent form the shared baseline every persona draws from. No baseline, no generation.",
+      who: "You upload; a Twinly admin reviews before anything can be generated.",
+      what: "1–8 non-explicit angles (front, 3/4, profile) and granular consent toggles.",
+      how: "~5 minutes to upload; review usually same-day.",
+    },
+    {
+      key: "venice",
+      title: "Import a Venice Character ID",
+      to: "/studio/twin",
+      toHash: "baseline-character",
+      optional: true,
+      done: !!baselineSlug || veniceSkipped,
+      why: "Optional. If you already have a Venice Character, pinning it here makes every new persona use it as the default.",
+      who: "Only relevant if you've published a Character on venice.ai already.",
+      what: "Paste the ID (last segment of venice.ai/c/<id>) and confirm the live preview.",
+      how: "~30 seconds — or skip it and set per-persona later.",
+    },
+    {
+      key: "persona",
+      title: "Create your first AI persona",
+      to: "/studio/personas/new",
+      done: counts.personas > 0,
+      why: "Personas are the actual characters fans chat with — Nice, Naughty, Wicked or fully custom.",
+      who: "You configure; fans interact with the finished persona.",
+      what: "Name, disclosure label, tone, boundaries, price tier, optional external model IDs.",
+      how: "5–10 minutes; the form pre-fills from your Real Me and Twin baselines.",
+    },
+    {
+      key: "content",
+      title: "Upload content to your vault",
+      to: "/studio/content",
+      done: counts.assets > 0,
+      why: "The vault is where images, clips and voice notes live before you attach them to packs or posts.",
+      who: "You upload; the moderation pipeline scans before assets go live.",
+      what: "Drop in the media you want personas to be able to share.",
+      how: "As long or short as you like — start with a handful and grow it.",
+    },
+    {
+      key: "pricing",
+      title: "Set your subscription pricing",
+      to: "/studio/pricing",
+      done: hasPricing,
+      why: "Monthly Base / Plus / VIP tiers gate premium chats, packs and posts.",
+      who: "You decide; fans pay in your chosen currency at checkout.",
+      what: "Three monthly prices, or free-for-all if you leave a tier unset.",
+      how: "~2 minutes; you can change prices later without kicking existing subscribers.",
+    },
+    {
+      key: "verify",
+      title: "Get verified (ID + likeness)",
+      to: "/studio/twin",
+      done: creator.verification_status === "verified",
+      why: "Verification unlocks payouts, higher trust badges and adult-content generation.",
+      who: "Twinly's compliance reviewers, one-time.",
+      what: "Photo ID + a matching selfie against your Twin baseline.",
+      how: "5 minutes to submit; usually reviewed within a business day.",
+    },
+  ];
 
   return (
     <AppShell>
@@ -84,31 +182,7 @@ function StudioHome() {
         </div>
       </div>
 
-      {realMeCompletion !== null && realMeCompletion < 100 && (
-        <Link to="/studio/real-me" className="mb-4 flex items-center justify-between gap-4 rounded-2xl border border-brand/30 bg-brand/10 p-5 hover:border-brand/50">
-          <div>
-            <div className="font-display text-lg font-semibold text-brand-glow">
-              {realMeCompletion === 0 ? "Set up your Real Me baseline first" : "Finish your Real Me baseline"}
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Your tone, voice, and baseline answers — every AI persona you create can auto-generate its tone and opening lines from this. {realMeCompletion}% complete.
-            </p>
-          </div>
-          <Button>{realMeCompletion === 0 ? "Get started" : "Continue"}</Button>
-        </Link>
-      )}
-
-      {creator.digital_twin_status === "none" && (
-        <Link to="/studio/twin-onboarding" className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-brand/30 bg-brand/10 p-5 hover:border-brand/50">
-          <div>
-            <div className="font-display text-lg font-semibold text-brand-glow">Set up your AI Twin baseline</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              A quick guided setup — reference photos and consent — that every persona you create afterward can draw from.
-            </p>
-          </div>
-          <Button>Get started</Button>
-        </Link>
-      )}
+      <SetupChecklist steps={setupSteps} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Personas" value={counts.personas} />
