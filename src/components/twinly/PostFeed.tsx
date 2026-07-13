@@ -18,6 +18,7 @@ import {
 import { Heart, MessageCircle, Image as ImageIcon, X, Trash2, Package, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { PollCard } from "@/components/twinly/PollCard";
+import { useMediaUploadConsent } from "@/components/twinly/MediaUploadConsentGate";
 
 type Post = {
   id: string;
@@ -333,15 +334,20 @@ export function PostComposer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const create = useServerFn(createPost);
   const loadOptions = useServerFn(getComposerOptions);
+  const { ensureConsent } = useMediaUploadConsent();
 
   useEffect(() => {
     if (!user) return;
     loadOptions({ data: { creatorId } }).then(setOptions).catch(() => {});
   }, [user, creatorId, loadOptions]);
 
-  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    if (!(await ensureConsent({ context: "post.image" }))) {
+      e.target.value = "";
+      return;
+    }
     if (f.size > 8 * 1024 * 1024) {
       setError("Image must be under 8 MB");
       return;

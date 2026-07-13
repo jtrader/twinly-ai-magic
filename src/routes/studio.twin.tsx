@@ -26,6 +26,7 @@ import {
 } from "@/lib/twin.functions";
 import { getBaselineVeniceCharacter, setBaselineVeniceCharacter } from "@/lib/venice-character.functions";
 import { VeniceCharacterField } from "@/components/twinly/persona-form-shared";
+import { useMediaUploadConsent } from "@/components/twinly/MediaUploadConsentGate";
 
 export const Route = createFileRoute("/studio/twin")({
   component: TwinProfilePage,
@@ -192,9 +193,11 @@ function ReferencesSection({
 }) {
   const [busy, setBusy] = useState(false);
   const add = useServerFn(addTwinReference);
+  const { ensureConsent } = useMediaUploadConsent();
 
   async function onFiles(list: FileList | null) {
     if (!list?.length) return;
+    if (!(await ensureConsent({ context: `twin.${kind}` }))) return;
     setBusy(true);
     try {
       const files = Array.from(list).slice(0, 20);

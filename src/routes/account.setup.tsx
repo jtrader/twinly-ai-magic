@@ -15,6 +15,7 @@ import { useAvatarUrl } from "@/lib/useAvatarUrl";
 import { getMyProfile, updateMyProfile } from "@/lib/profile.functions";
 import { createBillingPortal, createSetupIntentCheckout, listSavedPaymentMethods, setDefaultPaymentMethod, type SavedCard } from "@/lib/checkout.functions";
 import { getStripe, getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
+import { useMediaUploadConsent } from "@/components/twinly/MediaUploadConsentGate";
 
 export const Route = createFileRoute("/account/setup")({ component: AccountSetupPage });
 
@@ -25,6 +26,7 @@ function AccountSetupPage() {
   const navigate = useNavigate();
   const load = useServerFn(getMyProfile);
   const save = useServerFn(updateMyProfile);
+  const { ensureConsent } = useMediaUploadConsent();
 
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -82,6 +84,7 @@ function AccountSetupPage() {
 
   async function handleAvatarPick(file: File) {
     if (!user) return;
+    if (!(await ensureConsent({ context: "account.avatar" }))) return;
     const allowed = ["image/png", "image/jpeg", "image/webp", "image/gif"];
     if (!allowed.includes(file.type)) {
       toast.error("Please choose a PNG, JPG, WebP or GIF image");

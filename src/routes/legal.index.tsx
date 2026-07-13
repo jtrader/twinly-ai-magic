@@ -16,6 +16,7 @@ const DOCS = [
   { to: "/legal/child-safety", title: "10. Child-Safety & Age-Verification Rules", desc: "Zero-tolerance rules and how age assurance is applied." },
   { to: "/legal/ai-disclosure", title: "11. AI Disclosure, Labelling & Watermarking Terms", desc: "How AI-generated content is labelled and why disclosure cannot be disabled." },
   { to: "/legal/moderation", title: "12. Moderation, Suspension & Account-Termination Procedures", desc: "How content is reviewed, how appeals work, and what happens on termination." },
+  { to: "/legal/media-upload-consent", title: "13. Media Upload Consent Notice", desc: "What you're confirming when you upload photos, audio, or video for AI interpretation." },
 ] as const;
 
 export const Route = createFileRoute("/legal/")({

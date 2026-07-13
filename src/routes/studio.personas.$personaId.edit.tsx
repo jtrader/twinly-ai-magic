@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Camera, Film, Plus, Trash2, X as XIcon } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
+import { useMediaUploadConsent } from "@/components/twinly/MediaUploadConsentGate";
 import { supabase } from "@/integrations/supabase/client";
 import { useAvatarUrl } from "@/lib/useAvatarUrl";
 import { Button } from "@/components/ui/button";
@@ -107,6 +108,7 @@ function PersonaEditForm({
   refresh: () => Promise<void>;
 }) {
   const { user } = useSession();
+  const { ensureConsent } = useMediaUploadConsent();
   const getFeedPolicy = useServerFn(getPersonaVisibilityPolicy);
   const setFeedPolicy = useServerFn(setPersonaDefaultVisibility);
   const [feedTier, setFeedTier] = useState<FeedVisibilityTier>("subscribers_only");
@@ -277,6 +279,7 @@ function PersonaEditForm({
   useEffect(() => { refreshIntroStatus(); }, [refreshIntroStatus]);
 
   async function handleIntroVideoPick(file: File) {
+    if (!(await ensureConsent({ context: "persona.intro_video" }))) return;
     const allowed = ["video/mp4", "video/webm", "video/quicktime"];
     if (!allowed.includes(file.type)) { toast.error("Use an MP4, WebM, or MOV video."); return; }
     if (file.size > 50 * 1024 * 1024) { toast.error("Video must be under 50MB."); return; }
@@ -391,6 +394,7 @@ function PersonaEditForm({
 
   async function handleAvatarPick(file: File) {
     if (!user) return;
+    if (!(await ensureConsent({ context: "persona.avatar" }))) return;
     const allowed = ["image/png", "image/jpeg", "image/webp"];
     if (!allowed.includes(file.type)) { toast.error("Use a PNG, JPG, or WebP image."); return; }
     if (file.size > 8 * 1024 * 1024) { toast.error("Image must be under 8MB."); return; }

@@ -46,6 +46,7 @@ import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalTakedownRouteImport } from './routes/legal.takedown'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalModerationRouteImport } from './routes/legal.moderation'
+import { Route as LegalMediaUploadConsentRouteImport } from './routes/legal.media-upload-consent'
 import { Route as LegalLikenessRouteImport } from './routes/legal.likeness'
 import { Route as LegalDeepfakePolicyRouteImport } from './routes/legal.deepfake-policy'
 import { Route as LegalCreatorLicenceRouteImport } from './routes/legal.creator-licence'
@@ -263,6 +264,11 @@ const LegalModerationRoute = LegalModerationRouteImport.update({
   path: '/legal/moderation',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LegalMediaUploadConsentRoute = LegalMediaUploadConsentRouteImport.update({
+  id: '/legal/media-upload-consent',
+  path: '/legal/media-upload-consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LegalLikenessRoute = LegalLikenessRouteImport.update({
   id: '/legal/likeness',
   path: '/legal/likeness',
@@ -454,6 +460,7 @@ export interface FileRoutesByFullPath {
   '/legal/creator-licence': typeof LegalCreatorLicenceRoute
   '/legal/deepfake-policy': typeof LegalDeepfakePolicyRoute
   '/legal/likeness': typeof LegalLikenessRoute
+  '/legal/media-upload-consent': typeof LegalMediaUploadConsentRoute
   '/legal/moderation': typeof LegalModerationRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/takedown': typeof LegalTakedownRoute
@@ -523,6 +530,7 @@ export interface FileRoutesByTo {
   '/legal/creator-licence': typeof LegalCreatorLicenceRoute
   '/legal/deepfake-policy': typeof LegalDeepfakePolicyRoute
   '/legal/likeness': typeof LegalLikenessRoute
+  '/legal/media-upload-consent': typeof LegalMediaUploadConsentRoute
   '/legal/moderation': typeof LegalModerationRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/takedown': typeof LegalTakedownRoute
@@ -594,6 +602,7 @@ export interface FileRoutesById {
   '/legal/creator-licence': typeof LegalCreatorLicenceRoute
   '/legal/deepfake-policy': typeof LegalDeepfakePolicyRoute
   '/legal/likeness': typeof LegalLikenessRoute
+  '/legal/media-upload-consent': typeof LegalMediaUploadConsentRoute
   '/legal/moderation': typeof LegalModerationRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/takedown': typeof LegalTakedownRoute
@@ -666,6 +675,7 @@ export interface FileRouteTypes {
     | '/legal/creator-licence'
     | '/legal/deepfake-policy'
     | '/legal/likeness'
+    | '/legal/media-upload-consent'
     | '/legal/moderation'
     | '/legal/privacy'
     | '/legal/takedown'
@@ -735,6 +745,7 @@ export interface FileRouteTypes {
     | '/legal/creator-licence'
     | '/legal/deepfake-policy'
     | '/legal/likeness'
+    | '/legal/media-upload-consent'
     | '/legal/moderation'
     | '/legal/privacy'
     | '/legal/takedown'
@@ -805,6 +816,7 @@ export interface FileRouteTypes {
     | '/legal/creator-licence'
     | '/legal/deepfake-policy'
     | '/legal/likeness'
+    | '/legal/media-upload-consent'
     | '/legal/moderation'
     | '/legal/privacy'
     | '/legal/takedown'
@@ -870,6 +882,7 @@ export interface RootRouteChildren {
   LegalCreatorLicenceRoute: typeof LegalCreatorLicenceRoute
   LegalDeepfakePolicyRoute: typeof LegalDeepfakePolicyRoute
   LegalLikenessRoute: typeof LegalLikenessRoute
+  LegalMediaUploadConsentRoute: typeof LegalMediaUploadConsentRoute
   LegalModerationRoute: typeof LegalModerationRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTakedownRoute: typeof LegalTakedownRoute
@@ -1166,6 +1179,13 @@ declare module '@tanstack/react-router' {
       path: '/legal/moderation'
       fullPath: '/legal/moderation'
       preLoaderRoute: typeof LegalModerationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/media-upload-consent': {
+      id: '/legal/media-upload-consent'
+      path: '/legal/media-upload-consent'
+      fullPath: '/legal/media-upload-consent'
+      preLoaderRoute: typeof LegalMediaUploadConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/legal/likeness': {
@@ -1488,6 +1508,7 @@ const rootRouteChildren: RootRouteChildren = {
   LegalCreatorLicenceRoute: LegalCreatorLicenceRoute,
   LegalDeepfakePolicyRoute: LegalDeepfakePolicyRoute,
   LegalLikenessRoute: LegalLikenessRoute,
+  LegalMediaUploadConsentRoute: LegalMediaUploadConsentRoute,
   LegalModerationRoute: LegalModerationRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTakedownRoute: LegalTakedownRoute,
