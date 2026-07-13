@@ -1,11 +1,25 @@
 # Twinly AI Magic
 
-Creator analytics foundation for Twinly AI Magic.
+Creator analytics and generation planning foundation for Twinly AI Magic.
 
-This repository currently contains the implementation plan and starter analytics module for creator metrics:
+This repository currently contains implementation plans and starter modules for:
 
-- Generation volume
-- Approval rate
-- Per-pack engagement
+- Creator analytics
+  - Generation volume
+  - Approval rate
+  - Per-pack engagement
+- Generation planning
+  - Rate-limit checks
+  - Cost estimation
+  - Budget-aware pre-flight UI
 
-See [`docs/creator-analytics.md`](docs/creator-analytics.md) for the product and technical design.
+Docs:
+
+- [`docs/creator-analytics.md`](docs/creator-analytics.md)
+- [`docs/rate-limits-cost-estimation-ui.md`](docs/rate-limits-cost-estimation-ui.md)
+
+Starter modules:
+
+- [`src/creator-analytics.ts`](src/creator-analytics.ts)
+- [`src/rate-limits-cost-estimation.ts`](src/rate-limits-cost-estimation.ts)
+- [`src/rate-limits-cost-estimation-ui.tsx`](src/rate-limits-cost-estimation-ui.tsx)
