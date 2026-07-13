@@ -1553,7 +1553,6 @@ export type Database = {
           heygen_avatar_id: string | null
           heygen_voice_id: string | null
           id: string
-          intro_video_asset_id: string | null
           is_default_seed: boolean
           is_explicit: boolean
           kind: Database["public"]["Enums"]["persona_kind"]
@@ -1586,7 +1585,6 @@ export type Database = {
           heygen_avatar_id?: string | null
           heygen_voice_id?: string | null
           id?: string
-          intro_video_asset_id?: string | null
           is_default_seed?: boolean
           is_explicit?: boolean
           kind: Database["public"]["Enums"]["persona_kind"]
@@ -1619,7 +1617,6 @@ export type Database = {
           heygen_avatar_id?: string | null
           heygen_voice_id?: string | null
           id?: string
-          intro_video_asset_id?: string | null
           is_default_seed?: boolean
           is_explicit?: boolean
           kind?: Database["public"]["Enums"]["persona_kind"]
