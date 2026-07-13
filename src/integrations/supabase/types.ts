@@ -4041,6 +4041,13 @@ export type Database = {
       is_adult: { Args: { _user_id?: string }; Returns: boolean }
       is_blocked: { Args: { _a: string; _b: string }; Returns: boolean }
       is_creator_owner: { Args: { _creator_id: string }; Returns: boolean }
+      list_selectable_agencies: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+        }[]
+      }
       log_audit: {
         Args: {
           _action: string

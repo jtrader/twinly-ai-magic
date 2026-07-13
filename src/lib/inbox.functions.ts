@@ -37,7 +37,7 @@ export const listInboxConversations = createServerFn({ method: "GET" })
 
     const fanIds = [...new Set(convos.map((c: any) => c.fan_id))];
     const { data: fans } = await supabase
-      .from("profiles")
+      .from("profiles_public" as any)
       .select("id, display_name, avatar_url")
       .in("id", fanIds);
     const fanMap = new Map((fans ?? []).map((f: any) => [f.id, f]));
@@ -94,7 +94,7 @@ export const loadInboxThread = createServerFn({ method: "GET" })
 
     const [{ data: messages }, { data: fan }] = await Promise.all([
       supabase.from("messages").select("*").eq("conversation_id", data.conversationId).order("created_at", { ascending: true }),
-      supabase.from("profiles").select("id, display_name, avatar_url").eq("id", (convo as any).fan_id).maybeSingle(),
+      supabase.from("profiles_public" as any).select("id, display_name, avatar_url").eq("id", (convo as any).fan_id).maybeSingle(),
     ]);
     return { convo, messages: messages ?? [], fan };
   });

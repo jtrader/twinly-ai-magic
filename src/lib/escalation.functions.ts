@@ -114,7 +114,7 @@ export const listCreatorEscalationRequests = createServerFn({ method: "GET" })
     const supporterIds = [...new Set((data ?? []).map((r: any) => r.supporter_id))];
     let profiles: any[] = [];
     if (supporterIds.length) {
-      const { data: p } = await supabase.from("profiles").select("id, display_name, avatar_url").in("id", supporterIds);
+      const { data: p } = await supabase.from("profiles_public" as any).select("id, display_name, avatar_url").in("id", supporterIds);
       profiles = p ?? [];
     }
     const profileMap = new Map(profiles.map((p) => [p.id, p]));

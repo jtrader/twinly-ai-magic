@@ -214,7 +214,7 @@ export const listCreatorFlags = createServerFn({ method: "GET" })
 
     const [{ data: profiles }, { data: personas }, { data: messages }] = await Promise.all([
       supporterIds.length
-        ? s.from("profiles").select("id, display_name, avatar_url").in("id", supporterIds)
+        ? s.from("profiles_public" as any).select("id, display_name, avatar_url").in("id", supporterIds)
         : Promise.resolve({ data: [] }),
       personaIds.length
         ? s.from("personas").select("id, slug, display_name").in("id", personaIds)
@@ -263,7 +263,7 @@ export const loadFlagContext = createServerFn({ method: "GET" })
       s.from("messages").select("id, sender_type, body, created_at, ai_generated, moderation_status")
         .eq("conversation_id", flag.conversation_id)
         .order("created_at", { ascending: true }),
-      s.from("profiles").select("id, display_name, avatar_url").eq("id", flag.flagged_by).maybeSingle(),
+      s.from("profiles_public" as any).select("id, display_name, avatar_url").eq("id", flag.flagged_by).maybeSingle(),
       s.from("personas").select("id, slug, display_name, kind").eq("id", flag.persona_id).maybeSingle(),
     ]);
     return { flag, messages: messages ?? [], supporter, persona };

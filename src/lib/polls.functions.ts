@@ -248,7 +248,7 @@ export const getPollResults = createServerFn({ method: "POST" })
 
     const supporterIds = [...new Set((responses ?? []).map((r: any) => r.supporter_id))];
     const { data: profiles } = supporterIds.length
-      ? await supabase.from("profiles").select("id, display_name").in("id", supporterIds)
+      ? await supabase.from("profiles_public" as any).select("id, display_name").in("id", supporterIds)
       : { data: [] as any[] };
     const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p.display_name]));
 

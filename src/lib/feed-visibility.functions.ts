@@ -413,7 +413,7 @@ export const listFeedVisibilityAuditLog = createServerFn({ method: "POST" })
 
     const actorIds = [...new Set((rows ?? []).map((r: any) => r.actor_id))];
     const { data: actors } = actorIds.length
-      ? await supabaseAdmin.from("profiles").select("id, display_name").in("id", actorIds)
+      ? await supabaseAdmin.from("profiles_public" as any).select("id, display_name").in("id", actorIds)
       : { data: [] as any[] };
     const actorMap = new Map((actors ?? []).map((a: any) => [a.id, a.display_name]));
 

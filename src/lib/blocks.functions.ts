@@ -110,7 +110,7 @@ export const listMyBlocks = createServerFn({ method: "GET" })
     if (!rows || rows.length === 0) return { blocks: [] };
     const blockedIds = rows.map((r: any) => r.blocked_id);
     const { data: profiles } = await supabase
-      .from("profiles")
+      .from("profiles_public" as any)
       .select("id, display_name, avatar_url")
       .in("id", blockedIds);
     const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
