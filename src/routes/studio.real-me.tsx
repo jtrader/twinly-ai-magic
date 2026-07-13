@@ -274,6 +274,18 @@ function RealMePage() {
           <h1 className="font-display text-2xl font-bold">Real Me baseline</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          {lockedIds.size > 0 && (
+            <Badge variant="outline" className="gap-1 border-amber-400/50 text-amber-400">
+              <Lock className="size-3" /> {lockedIds.size} locked
+              <button
+                type="button"
+                onClick={clearAllLocks}
+                className="ml-1 underline hover:text-amber-300"
+              >
+                clear
+              </button>
+            </Badge>
+          )}
           <Button size="sm" variant="outline" onClick={() => setShowHistory((s) => !s)} disabled={!!draft}>
             <History className="mr-1.5 size-4" />
             <span className="hidden sm:inline">Version history</span>
@@ -299,7 +311,14 @@ function RealMePage() {
           saving={savingDraft}
           onSave={commitDraft}
           onDiscard={() => setConfirmDiscard(true)}
-          onRegenerate={draft.seed ? () => setShowGenerate(true) : undefined}
+          onRegenerate={draft.seed ? () => {
+            // Snapshot the current draft answers so the compare view can show
+            // the "Previous pick" column alongside the new variants.
+            setPreviousPickAnswers({ ...draft.answers });
+            setAutoRunGenerate(true);
+            setShowGenerate(true);
+          } : undefined}
+          lockCount={lockedIds.size}
           onExport={handleExportDraft}
         />
       ) : (
