@@ -180,6 +180,10 @@ describe("SetupChecklist", () => {
           statusReason: "Verified — you can join every creator, including verified-only ones.",
           statusTone: "ok",
         }),
+        // A second incomplete step keeps the checklist expanded — otherwise
+        // a solo-complete list auto-collapses to the "setup complete"
+        // banner and the per-step markup we're asserting on isn't rendered.
+        baseStep({ key: "follow", title: "Follow a creator", done: false }),
       ];
       await renderWithRouter(<SetupChecklist steps={steps} />);
       const step = screen.getByTestId("checklist-step-identity");
