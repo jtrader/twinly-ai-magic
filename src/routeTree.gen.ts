@@ -45,6 +45,7 @@ import { Route as SecurePersonasRouteImport } from './routes/secure.personas'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
+import { Route as LegalAcceptableUseRouteImport } from './routes/legal.acceptable-use'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as FanUnlocksRouteImport } from './routes/fan.unlocks'
 import { Route as FanFlagsRouteImport } from './routes/fan.flags'
@@ -249,6 +250,11 @@ const LegalAiDisclosureRoute = LegalAiDisclosureRouteImport.update({
   path: '/legal/ai-disclosure',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LegalAcceptableUseRoute = LegalAcceptableUseRouteImport.update({
+  id: '/legal/acceptable-use',
+  path: '/legal/acceptable-use',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
@@ -392,6 +398,7 @@ export interface FileRoutesByFullPath {
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/legal/acceptable-use': typeof LegalAcceptableUseRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
@@ -452,6 +459,7 @@ export interface FileRoutesByTo {
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/legal/acceptable-use': typeof LegalAcceptableUseRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
@@ -514,6 +522,7 @@ export interface FileRoutesById {
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/legal/acceptable-use': typeof LegalAcceptableUseRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
   '/legal/privacy': typeof LegalPrivacyRoute
   '/legal/terms': typeof LegalTermsRoute
@@ -577,6 +586,7 @@ export interface FileRouteTypes {
     | '/fan/flags'
     | '/fan/unlocks'
     | '/invite/$token'
+    | '/legal/acceptable-use'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
@@ -637,6 +647,7 @@ export interface FileRouteTypes {
     | '/fan/flags'
     | '/fan/unlocks'
     | '/invite/$token'
+    | '/legal/acceptable-use'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
@@ -698,6 +709,7 @@ export interface FileRouteTypes {
     | '/fan/flags'
     | '/fan/unlocks'
     | '/invite/$token'
+    | '/legal/acceptable-use'
     | '/legal/ai-disclosure'
     | '/legal/privacy'
     | '/legal/terms'
@@ -754,6 +766,7 @@ export interface RootRouteChildren {
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   CreatorsHandleRoute: typeof CreatorsHandleRouteWithChildren
   InviteTokenRoute: typeof InviteTokenRoute
+  LegalAcceptableUseRoute: typeof LegalAcceptableUseRoute
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
   LegalTermsRoute: typeof LegalTermsRoute
@@ -1044,6 +1057,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LegalAiDisclosureRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/legal/acceptable-use': {
+      id: '/legal/acceptable-use'
+      path: '/legal/acceptable-use'
+      fullPath: '/legal/acceptable-use'
+      preLoaderRoute: typeof LegalAcceptableUseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/invite/$token': {
       id: '/invite/$token'
       path: '/invite/$token'
@@ -1300,6 +1320,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutReturnRoute: CheckoutReturnRoute,
   CreatorsHandleRoute: CreatorsHandleRouteWithChildren,
   InviteTokenRoute: InviteTokenRoute,
+  LegalAcceptableUseRoute: LegalAcceptableUseRoute,
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
   LegalTermsRoute: LegalTermsRoute,
