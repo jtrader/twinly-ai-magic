@@ -123,7 +123,11 @@ export function VeniceCharacterField({
   const [manualJson, setManualJson] = useState("");
   const [manualError, setManualError] = useState<string | null>(null);
   const [manualVerified, setManualVerified] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [draftFilename, setDraftFilename] = useState<string | null>(null);
   const reqIdRef = useRef(0);
+  const draftKey = `venice-character-draft:${idPrefix}`;
+  const hydratedRef = useRef(false);
 
   async function check(slugArg?: string, opts: { silent?: boolean } = {}) {
     const slug = (slugArg ?? value).trim();
@@ -157,40 +161,163 @@ export function VeniceCharacterField({
     }
   }
 
+  // Strict schema with human-readable messages. Accepts a couple of common
+  // shape variants exported by Venice (photoUrl vs photo_url, id vs slug).
   const manualSchema = z.object({
-    slug: z.string().trim().min(1),
-    name: z.string().trim().min(1),
-    description: z.string().nullable().optional(),
-    photoUrl: z.string().url().nullable().optional(),
-    author: z.string().optional(),
+    slug: z.string({ required_error: "`slug` is required", invalid_type_error: "`slug` must be a string" })
+      .trim().min(1, "`slug` cannot be empty")
+      .regex(/^[a-z0-9][a-z0-9-]*$/i, "`slug` must be a URL-safe id (letters, numbers, hyphens)")
+      .max(120, "`slug` must be 120 characters or fewer"),
+    name: z.string({ required_error: "`name` is required", invalid_type_error: "`name` must be a string" })
+      .trim().min(1, "`name` cannot be empty").max(200, "`name` is too long"),
+    description: z.string().max(4000, "`description` is too long").nullable().optional(),
+    photoUrl: z.string().url("`photoUrl` must be a valid URL").nullable().optional(),
+    author: z.string().max(200, "`author` is too long").optional(),
     adult: z.boolean().optional(),
   });
 
-  function parseManual() {
+  function normalizeRaw(raw: unknown): unknown {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+    const r = raw as Record<string, unknown>;
+    // Unwrap `{ character: {...} }` or `{ data: {...} }` exports.
+    if (r.character && typeof r.character === "object") return normalizeRaw(r.character);
+    if (r.data && typeof r.data === "object" && !("slug" in r)) return normalizeRaw(r.data);
+    return {
+      slug: r.slug ?? r.id ?? r.publicId ?? r.public_id,
+      name: r.name ?? r.displayName ?? r.display_name ?? r.title,
+      description: r.description ?? r.bio ?? r.summary ?? null,
+      photoUrl: r.photoUrl ?? r.photo_url ?? r.avatar ?? r.avatarUrl ?? r.image ?? null,
+      author: r.author ?? r.createdBy ?? r.owner,
+      adult: r.adult ?? r.isAdult ?? r.nsfw,
+    };
+  }
+
+  function parseAndApply(text: string, opts: { filename?: string; announce?: boolean } = {}) {
     setManualError(null);
+    if (!text.trim()) {
+      setManualError("The file appears to be empty.");
+      return false;
+    }
+    let raw: unknown;
     try {
-      const raw = JSON.parse(manualJson);
-      const parsed = manualSchema.parse(raw);
-      const character = {
-        slug: parsed.slug,
-        name: parsed.name,
-        description: parsed.description ?? null,
-        photoUrl: parsed.photoUrl ?? null,
-        author: parsed.author ?? "unknown",
-        adult: !!parsed.adult,
-      };
-      onChange(character.slug);
-      setResult({ found: true, character });
-      setCheckedSlug(character.slug);
-      setManualVerified(true);
-      onPreview?.({ ...character, source: "manual" });
-      toast.success("Manual preview loaded");
+      raw = JSON.parse(text);
     } catch (e: any) {
-      if (e?.issues?.length) {
-        setManualError(e.issues.map((i: any) => `${i.path.join(".") || "value"}: ${i.message}`).join("; "));
-      } else {
-        setManualError(e?.message ?? "Could not parse JSON");
+      setManualError(`Not valid JSON — ${e?.message ?? "could not parse"}. Check for trailing commas or unescaped quotes.`);
+      return false;
+    }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      setManualError("Expected a JSON object at the top level, not an array or primitive.");
+      return false;
+    }
+    const result = manualSchema.safeParse(normalizeRaw(raw));
+    if (!result.success) {
+      const issues = result.error.issues;
+      const missing = issues.filter((i) => i.code === "invalid_type" && i.message.includes("required"))
+        .map((i) => i.path.join(".") || "value");
+      const detail = issues.map((i) => `${i.path.join(".") || "value"}: ${i.message}`).join("; ");
+      setManualError(
+        missing.length
+          ? `Missing required field${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}. ${detail}`
+          : detail,
+      );
+      return false;
+    }
+    const parsed = result.data;
+    const character = {
+      slug: parsed.slug,
+      name: parsed.name,
+      description: parsed.description ?? null,
+      photoUrl: parsed.photoUrl ?? null,
+      author: parsed.author ?? "unknown",
+      adult: !!parsed.adult,
+    };
+    onChange(character.slug);
+    setResult({ found: true, character });
+    setCheckedSlug(character.slug);
+    setManualVerified(true);
+    setManualJson(text);
+    if (opts.filename) setDraftFilename(opts.filename);
+    onPreview?.({ ...character, source: "manual" });
+    if (opts.announce !== false) {
+      toast.success(opts.filename ? `Loaded ${opts.filename}` : "Manual preview loaded");
+    }
+    return true;
+  }
+
+  function parseManual() { parseAndApply(manualJson); }
+
+  async function ingestFile(file: File) {
+    if (!/\.json$/i.test(file.name) && file.type && !/json/i.test(file.type)) {
+      setManualError(`"${file.name}" is not a .json file.`);
+      setShowManual(true);
+      return;
+    }
+    if (file.size > 512 * 1024) {
+      setManualError("File is larger than 512 KB — please upload a Character JSON export.");
+      setShowManual(true);
+      return;
+    }
+    try {
+      const text = await file.text();
+      setShowManual(true);
+      setManualJson(text);
+      parseAndApply(text, { filename: file.name });
+    } catch (err: any) {
+      setManualError(err?.message ?? "Could not read file");
+      setShowManual(true);
+    }
+  }
+
+  // ---- Draft persistence (Creator Studio survives refresh & nav) ----
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as {
+        manualJson?: string; showManual?: boolean; filename?: string | null;
+        verifiedCharacter?: { slug: string; name: string; description: string | null;
+          photoUrl: string | null; author: string; adult: boolean } | null;
+      };
+      if (draft.manualJson) setManualJson(draft.manualJson);
+      if (draft.showManual) setShowManual(true);
+      if (draft.filename) setDraftFilename(draft.filename);
+      if (draft.verifiedCharacter) {
+        setResult({ found: true, character: draft.verifiedCharacter });
+        setCheckedSlug(draft.verifiedCharacter.slug);
+        setManualVerified(true);
+        onPreview?.({ ...draft.verifiedCharacter, source: "manual" });
       }
+    } catch {
+      // Corrupt draft — ignore and let the user re-upload.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!hydratedRef.current || typeof window === "undefined") return;
+    const verifiedCharacter =
+      manualVerified && result && "found" in result && result.found ? result.character : null;
+    const empty = !manualJson && !showManual && !verifiedCharacter;
+    try {
+      if (empty) window.localStorage.removeItem(draftKey);
+      else window.localStorage.setItem(draftKey, JSON.stringify({
+        manualJson, showManual, filename: draftFilename, verifiedCharacter,
+      }));
+    } catch {
+      // Quota or private mode — best-effort only.
+    }
+  }, [manualJson, showManual, manualVerified, result, draftFilename, draftKey]);
+
+  function clearDraft() {
+    setManualJson("");
+    setManualError(null);
+    setDraftFilename(null);
+    setManualVerified(false);
+    if (typeof window !== "undefined") {
+      try { window.localStorage.removeItem(draftKey); } catch { /* ignore */ }
     }
   }
 
@@ -355,16 +482,53 @@ export function VeniceCharacterField({
             Optional: <span className="font-mono">description</span>, <span className="font-mono">photoUrl</span>,
             <span className="font-mono"> author</span>, <span className="font-mono">adult</span>.
           </p>
-          <Textarea
-            className="mt-2 min-h-28 font-mono text-xs"
-            value={manualJson}
-            onChange={(e) => { setManualJson(e.target.value); setManualError(null); }}
-            placeholder='{"slug":"alan-watts","name":"Alan Watts","description":"…","photoUrl":"https://…","author":"you","adult":false}'
-            aria-label="Character JSON"
-            spellCheck={false}
-          />
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Drop a character JSON file here or paste JSON below"
+            onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); }}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); }}
+            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); }}
+            onDrop={(e) => {
+              e.preventDefault(); e.stopPropagation(); setDragActive(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) void ingestFile(file);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                document.getElementById(`${idPrefix}-venice-json-file`)?.click();
+              }
+            }}
+            className={`mt-2 rounded-lg border-2 border-dashed p-2 transition-colors ${
+              dragActive
+                ? "border-emerald-400/60 bg-emerald-400/5"
+                : "border-border/60 bg-background/30 hover:border-border"
+            }`}
+          >
+            <p className="px-1 pb-2 pt-1 text-center text-[11px] text-muted-foreground">
+              Drag & drop a <span className="font-mono">.json</span> file here, or paste its contents below.
+            </p>
+            <Textarea
+              className="min-h-28 font-mono text-xs"
+              value={manualJson}
+              onChange={(e) => { setManualJson(e.target.value); setManualError(null); setManualVerified(false); }}
+              placeholder='{"slug":"alan-watts","name":"Alan Watts","description":"…","photoUrl":"https://…","author":"you","adult":false}'
+              aria-label="Character JSON"
+              aria-invalid={manualError ? true : undefined}
+              spellCheck={false}
+            />
+          </div>
+          {draftFilename && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Loaded from <span className="font-mono">{draftFilename}</span> — saved as draft for this workspace.
+            </p>
+          )}
           {manualError && (
-            <p className="mt-1 text-[11px] text-rose-300" role="alert">{manualError}</p>
+            <div className="mt-1 rounded-md border border-rose-400/30 bg-rose-400/10 p-2 text-[11px] text-rose-200" role="alert" aria-live="polite">
+              <p className="font-semibold text-rose-300">Couldn't load that Character JSON</p>
+              <p className="mt-0.5 whitespace-pre-line">{manualError}</p>
+            </div>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button type="button" size="sm" onClick={parseManual} disabled={!manualJson.trim()}>
@@ -386,51 +550,11 @@ export function VeniceCharacterField({
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 e.target.value = "";
-                if (!file) return;
-                if (file.size > 512 * 1024) {
-                  setManualError("File is larger than 512 KB — please upload a Character JSON export.");
-                  return;
-                }
-                try {
-                  const text = await file.text();
-                  setManualJson(text);
-                  setManualError(null);
-                  // Auto-parse after loading so the preview appears immediately.
-                  setTimeout(() => {
-                    // parseManual reads from state; wait a tick for setManualJson to apply.
-                    // Use a direct parse against the fresh text to avoid the stale-state race.
-                    try {
-                      const raw = JSON.parse(text);
-                      const parsed = manualSchema.parse(raw);
-                      const character = {
-                        slug: parsed.slug,
-                        name: parsed.name,
-                        description: parsed.description ?? null,
-                        photoUrl: parsed.photoUrl ?? null,
-                        author: parsed.author ?? "unknown",
-                        adult: !!parsed.adult,
-                      };
-                      onChange(character.slug);
-                      setResult({ found: true, character });
-                      setCheckedSlug(character.slug);
-                      setManualVerified(true);
-                      onPreview?.({ ...character, source: "manual" });
-                      toast.success(`Loaded ${file.name}`);
-                    } catch (err: any) {
-                      if (err?.issues?.length) {
-                        setManualError(err.issues.map((i: any) => `${i.path.join(".") || "value"}: ${i.message}`).join("; "));
-                      } else {
-                        setManualError(err?.message ?? "Could not parse JSON file");
-                      }
-                    }
-                  }, 0);
-                } catch (err: any) {
-                  setManualError(err?.message ?? "Could not read file");
-                }
+                if (file) await ingestFile(file);
               }}
             />
-            <Button type="button" variant="ghost" size="sm" onClick={() => { setManualJson(""); setManualError(null); }}>
-              Clear
+            <Button type="button" variant="ghost" size="sm" onClick={clearDraft}>
+              Clear draft
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowManual(false)}>
               Back to auto-lookup
