@@ -215,6 +215,39 @@ function PersonaEditForm({
     } catch (e: any) { toast.error(e.message ?? "Could not revoke invite"); }
     finally { setInviteBusy(false); }
   }
+
+  // Supporter invite grants
+  const createGrantFn = useServerFn(createInviteGrant);
+  const listGrantsFn = useServerFn(listInviteGrants);
+  const revokeGrantFn = useServerFn(revokeInviteGrant);
+  const [grants, setGrants] = useState<any[] | null>(null);
+  const [grantsBusy, setGrantsBusy] = useState(false);
+  const [grantExpiryHours, setGrantExpiryHours] = useState<number>(168);
+  const refreshGrants = useCallback(async () => {
+    try {
+      const r = await listGrantsFn({ data: { personaId: persona.id } });
+      setGrants(r.grants ?? []);
+    } catch (e: any) { toast.error(e?.message ?? "Could not load supporter invites"); }
+  }, [listGrantsFn, persona.id]);
+  useEffect(() => { if (tab === "invites" && grants === null) refreshGrants(); }, [tab, grants, refreshGrants]);
+
+  async function generateGrant() {
+    setGrantsBusy(true);
+    try {
+      await createGrantFn({ data: { personaId: persona.id, expiresInHours: grantExpiryHours } });
+      setGrants(null); await refreshGrants();
+      toast.success("Supporter invite created");
+    } catch (e: any) { toast.error(e?.message ?? "Could not create supporter invite"); }
+    finally { setGrantsBusy(false); }
+  }
+  async function handleRevokeGrant(id: string) {
+    setGrantsBusy(true);
+    try {
+      await revokeGrantFn({ data: { grantId: id } });
+      setGrants((s) => s?.map((g) => g.id === id ? { ...g, revoked_at: new Date().toISOString(), revocation_reason: "creator_revoked" } : g) ?? null);
+    } catch (e: any) { toast.error(e?.message ?? "Could not revoke"); }
+    finally { setGrantsBusy(false); }
+  }
   async function addSaved() {
     if (!newLabel.trim()) return;
     setSavedBusy("new");
