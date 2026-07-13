@@ -143,8 +143,9 @@ export function VoiceSourceRecorder({
         },
       });
 
-      if (res.recording.status === "rejected") {
-        toast.error(`Rejected: ${res.recording.rejection_reason}`);
+      const rec = res.recording as { status?: string; rejection_reason?: string | null } | null | undefined;
+      if (rec && rec.status === "rejected") {
+        toast.error(`Rejected: ${rec.rejection_reason ?? "Recording did not pass validation."}`);
       } else {
         toast.success("Recording validated and ready for voice cloning");
       }

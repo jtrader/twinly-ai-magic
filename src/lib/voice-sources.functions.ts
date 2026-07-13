@@ -61,6 +61,12 @@ async function assertVoiceSourceConsent(supabase: any, creatorId: string): Promi
   return record.id;
 }
 
+export type VoiceSourceRecordingResult = {
+  id: string;
+  status: "validated" | "rejected" | "cloned" | string;
+  rejection_reason: string | null;
+};
+
 export const uploadVoiceSourceRecording = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((d: {
@@ -108,7 +114,7 @@ export const uploadVoiceSourceRecording = createServerFn({ method: "POST" })
           })
           .select("*").single();
         if (error) throw error;
-        return { recording: row };
+        return { recording: row as unknown as VoiceSourceRecordingResult };
       }
       durationSeconds = wav.durationSeconds;
       sampleRate = wav.sampleRate;
@@ -141,7 +147,7 @@ export const uploadVoiceSourceRecording = createServerFn({ method: "POST" })
     await logAudit(userId, "voice_source.uploaded", { type: "voice_source_recording", id: row.id }, {
       personaId: data.personaId, status: result.status, sourceType: data.sourceType,
     });
-    return { recording: row };
+    return { recording: row as unknown as VoiceSourceRecordingResult };
   });
 
 export const listVoiceSourceRecordings = createServerFn({ method: "POST" })
