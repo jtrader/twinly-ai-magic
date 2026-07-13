@@ -83,4 +83,40 @@ describe("AgeGateDialog", () => {
       expect(a.getAttribute("target")).toBe("_blank");
     }
   });
+
+  it("re-opens the dialog when the stored acceptance is an older policy version", async () => {
+    // Simulate a user who accepted a previous version of the legal bundle.
+    localStorage.setItem(
+      AGE_GATE_STORAGE_KEY,
+      JSON.stringify({ at: new Date("2025-01-01").toISOString(), version: "2025-01-01" }),
+    );
+    render(<AgeGateDialog />);
+    const accept = await screen.findByRole("button", { name: /I'm 18\+ and I accept/i });
+    expect(accept).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /Accept legal policies/i }));
+    fireEvent.click(accept);
+
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem(AGE_GATE_STORAGE_KEY)!);
+      expect(stored.version).toBe("2026-07-13");
+      expect(new Date(stored.at).toString()).not.toBe("Invalid Date");
+    });
+  });
+
+  it("shows an error and does not persist acceptance when the server acceptLegal call fails", async () => {
+    h.acceptLegalMock.mockRejectedValueOnce(new Error("network down"));
+    render(<AgeGateDialog />);
+    const accept = await screen.findByRole("button", { name: /I'm 18\+ and I accept/i });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Accept legal policies/i }));
+    fireEvent.click(accept);
+
+    await waitFor(() => {
+      expect(screen.getByText(/network down/i)).toBeInTheDocument();
+    });
+    // Dialog stayed open, nothing persisted → user must retry.
+    expect(localStorage.getItem(AGE_GATE_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(LEGAL_STORAGE_KEY)).toBeNull();
+    expect(screen.getByRole("button", { name: /I'm 18\+ and I accept/i })).toBeInTheDocument();
+  });
 });

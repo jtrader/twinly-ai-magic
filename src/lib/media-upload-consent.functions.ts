@@ -26,37 +26,45 @@ const AckSchema = z.object({
   context: z.string().trim().max(120).optional(),
 });
 
+/**
+ * Testable helper that enforces legal acceptance, writes the media-upload
+ * consent record, and logs to audit. Exposed for integration tests that
+ * assert `requireLegalAcceptance` blocks direct requests when the caller
+ * has not accepted the current legal version.
+ */
+export async function acknowledgeMediaUploadConsentImpl(
+  context: { supabase: any; userId: string },
+  data: { context?: string } = {},
+) {
+  await assertLegalAccepted(context);
+  const { supabase, userId } = context;
+  const nowIso = new Date().toISOString();
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      media_upload_consent_at: nowIso,
+      media_upload_consent_version: MEDIA_UPLOAD_CONSENT_VERSION,
+    })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
+  try {
+    await supabase.rpc("log_audit", {
+      _action: "media_upload_consent.accepted",
+      _subject_type: "profile",
+      _subject_id: userId,
+      _metadata: {
+        version: MEDIA_UPLOAD_CONSENT_VERSION,
+        context: data.context ?? null,
+        accepted_at: nowIso,
+      },
+    });
+  } catch (e) {
+    console.warn("[media-upload-consent] audit log failed", e);
+  }
+  return { ok: true, acceptedAt: nowIso, version: MEDIA_UPLOAD_CONSENT_VERSION };
+}
+
 export const acknowledgeMediaUploadConsent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => AckSchema.parse(input ?? {}))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    // Server-side enforcement: media consent cannot be recorded before the
-    // user has accepted the current Terms/Privacy/AUP/AI-Disclosure bundle.
-    await assertLegalAccepted(context);
-    const nowIso = new Date().toISOString();
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        media_upload_consent_at: nowIso,
-        media_upload_consent_version: MEDIA_UPLOAD_CONSENT_VERSION,
-      } as any)
-      .eq("id", userId);
-    if (error) throw new Error(error.message);
-    // Audit log (best-effort). Uses SECURITY DEFINER function log_audit.
-    try {
-      await (supabase as any).rpc("log_audit", {
-        _action: "media_upload_consent.accepted",
-        _subject_type: "profile",
-        _subject_id: userId,
-        _metadata: {
-          version: MEDIA_UPLOAD_CONSENT_VERSION,
-          context: data.context ?? null,
-          accepted_at: nowIso,
-        },
-      });
-    } catch (e) {
-      console.warn("[media-upload-consent] audit log failed", e);
-    }
-    return { ok: true, acceptedAt: nowIso, version: MEDIA_UPLOAD_CONSENT_VERSION };
-  });
+  .handler(async ({ data, context }) => acknowledgeMediaUploadConsentImpl(context as any, data));

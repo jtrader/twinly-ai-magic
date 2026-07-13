@@ -66,11 +66,14 @@ export function RoleSignupForm() {
         if (role !== "fan" && data.user) {
           await supabase.from("user_roles").insert({ user_id: data.user.id, role });
         }
-        // Server-authoritative legal acceptance record (audit-logged).
+        // Server-authoritative legal acceptance record (audit-logged). If the
+        // audit write fails we surface the error and stop — do not silently
+        // continue into the app without a recorded acceptance.
         try {
           await recordLegal({ data: { version: LEGAL_ACCEPTANCE_VERSION, context: "signup_form" } });
-        } catch (e) {
-          console.warn("[signup] legal acceptance record failed", e);
+        } catch (e: any) {
+          toast.error(e?.message ?? "We couldn't record your legal acceptance. Please try again.");
+          return;
         }
         toast.success(isCreatorRole(role) ? "Welcome — let's create your AI personas" : "Welcome to Twinly.life");
       } else {
