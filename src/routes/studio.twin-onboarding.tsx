@@ -101,7 +101,7 @@ function computeAssignments(items: PendingItem[], serverLabels: Set<string>): Pe
   serverLabels.forEach((l) => { const m = reAdd.exec(l); if (m) usedAdditional.push(Number(m[1])); });
   let nextAdditional = usedAdditional.length ? Math.max(...usedAdditional) + 1 : 1;
 
-  const recommendedOrder = RECOMMENDED_SHOTS.map((s) => s.label);
+  const recommendedOrder: string[] = RECOMMENDED_SHOTS.map((s) => s.label);
 
   return items.map((item) => {
     // Keep the item's current label if it's still valid and not colliding.
