@@ -137,4 +137,101 @@ describe("SetupChecklist", () => {
     expect(link.getAttribute("href")).toContain("/studio/twin-onboarding");
     expect(link.getAttribute("href")).toMatch(/step=2/);
   });
+
+  // ---------------------------------------------------------------------------
+  // Supporter dashboard: the "Verify your identity (optional)" checklist step.
+  // The identity step must communicate three distinct verification states
+  // (verified / pending / not started) with the correct tone, and show a
+  // "Verifying…" skeleton while the server-side status is still loading.
+  // ---------------------------------------------------------------------------
+  describe("Supporter identity step", () => {
+    it("renders 'Verifying…' skeleton while the ID verification status is loading", async () => {
+      const steps: ChecklistStep[] = [
+        baseStep({
+          key: "identity",
+          title: "Verify your identity (optional)",
+          to: "/account",
+          optional: true,
+          done: false,
+          loading: true,
+          // Even with a statusReason set, loading must win — otherwise the UI
+          // shows a stale "Not verified" while the check is still in flight.
+          statusReason: "Not required to use Twinly.",
+          statusTone: "info",
+        }),
+      ];
+      await renderWithRouter(<SetupChecklist steps={steps} />);
+      expect(screen.getByTestId("checklist-step-identity-verifying")).toBeInTheDocument();
+      expect(screen.queryByText("Not required to use Twinly.")).not.toBeInTheDocument();
+      // Start link must be hidden until validation resolves — clicking it during
+      // loading could send the user off to /account before we know the answer.
+      expect(screen.queryByTestId("checklist-step-identity-start")).not.toBeInTheDocument();
+    });
+
+    it("shows 'ok' tone with the verified message once id_verified_at is set", async () => {
+      const steps: ChecklistStep[] = [
+        baseStep({
+          key: "identity",
+          title: "Verify your identity (optional)",
+          to: "/account",
+          optional: true,
+          done: true,
+          loading: false,
+          statusReason: "Verified — you can join every creator, including verified-only ones.",
+          statusTone: "ok",
+        }),
+      ];
+      await renderWithRouter(<SetupChecklist steps={steps} />);
+      const step = screen.getByTestId("checklist-step-identity");
+      expect(step.getAttribute("data-status")).toBe("ok");
+      expect(step.getAttribute("data-done")).toBe("true");
+      expect(screen.getByText(/Verified — you can join every creator/)).toBeInTheDocument();
+    });
+
+    it("shows 'warn' tone while a Stripe session is pending review", async () => {
+      const steps: ChecklistStep[] = [
+        baseStep({
+          key: "identity",
+          title: "Verify your identity (optional)",
+          to: "/account",
+          optional: true,
+          done: false,
+          loading: false,
+          statusReason: "Pending — Stripe is reviewing your submission.",
+          statusTone: "warn",
+        }),
+      ];
+      await renderWithRouter(<SetupChecklist steps={steps} />);
+      const step = screen.getByTestId("checklist-step-identity");
+      expect(step.getAttribute("data-status")).toBe("warn");
+      expect(step.getAttribute("data-done")).toBe("false");
+      expect(screen.getByText(/Pending — Stripe is reviewing/)).toBeInTheDocument();
+    });
+
+    it("shows 'info' tone with the 'not required' explainer when the fan hasn't started verification", async () => {
+      const steps: ChecklistStep[] = [
+        baseStep({
+          key: "identity",
+          title: "Verify your identity (optional)",
+          to: "/account",
+          optional: true,
+          done: false,
+          loading: false,
+          statusReason:
+            "Not required to use Twinly. Some creators do restrict their persona to verified supporters — verifying once here unlocks all of them.",
+          statusTone: "info",
+        }),
+      ];
+      await renderWithRouter(<SetupChecklist steps={steps} />);
+      const step = screen.getByTestId("checklist-step-identity");
+      expect(step.getAttribute("data-status")).toBe("info");
+      // "Optional" chip must render so the fan understands ID is not mandatory
+      // — this is our platform-wide guarantee, distinct from any single
+      // creator's per-persona verified-only restriction.
+      expect(within(step).getByText("Optional")).toBeInTheDocument();
+      expect(screen.getByText(/Not required to use Twinly/)).toBeInTheDocument();
+      // No retry action on the neutral info state — nothing has failed.
+      expect(screen.queryByTestId("checklist-step-identity-retry")).not.toBeInTheDocument();
+    });
+  });
 });
