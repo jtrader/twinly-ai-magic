@@ -12,6 +12,7 @@ import { useSession } from "@/lib/session";
 import { getTwinProfile, addTwinReference, upsertTwinConsent, submitTwinReferencesForReview } from "@/lib/twin.functions";
 import { getBaselineVeniceCharacter, setBaselineVeniceCharacter } from "@/lib/venice-character.functions";
 import { VeniceCharacterField } from "@/components/twinly/persona-form-shared";
+import { useMediaUploadConsent } from "@/components/twinly/MediaUploadConsentGate";
 
 export const Route = createFileRoute("/studio/twin-onboarding")({
   component: TwinOnboardingWizard,
