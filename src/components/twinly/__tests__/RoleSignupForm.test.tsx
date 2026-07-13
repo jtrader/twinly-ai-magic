@@ -4,33 +4,34 @@ import {
   createRootRoute, createRoute, createRouter, createMemoryHistory, RouterProvider, Outlet,
 } from "@tanstack/react-router";
 
-const signUpMock = vi.fn();
-const signInMock = vi.fn();
-const insertMock = vi.fn().mockResolvedValue({ error: null });
-const oauthMock = vi.fn().mockResolvedValue({ error: null });
-const toastErrorMock = vi.fn();
-const toastSuccessMock = vi.fn();
-const recordLegalMock = vi.fn().mockResolvedValue({ ok: true });
-
+const h = vi.hoisted(() => ({
+  signUpMock: vi.fn(),
+  signInMock: vi.fn(),
+  insertMock: vi.fn().mockResolvedValue({ error: null }),
+  oauthMock: vi.fn().mockResolvedValue({ error: null }),
+  toastErrorMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
+  recordLegalMock: vi.fn().mockResolvedValue({ ok: true }),
+  legalMarker: { __name: "acceptLegal" },
+}));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
-      signUp: (...a: any[]) => signUpMock(...a),
-      signInWithPassword: (...a: any[]) => signInMock(...a),
+      signUp: (...a: any[]) => h.signUpMock(...a),
+      signInWithPassword: (...a: any[]) => h.signInMock(...a),
     },
-    from: () => ({ insert: (...a: any[]) => insertMock(...a) }),
+    from: () => ({ insert: (...a: any[]) => h.insertMock(...a) }),
   },
 }));
 vi.mock("@/integrations/lovable/index", () => ({
-  lovable: { auth: { signInWithOAuth: (...a: any[]) => oauthMock(...a) } },
+  lovable: { auth: { signInWithOAuth: (...a: any[]) => h.oauthMock(...a) } },
 }));
-vi.mock("sonner", () => ({ toast: { error: toastErrorMock, success: toastSuccessMock } }));
-const legalMarker = { __name: "acceptLegal" };
+vi.mock("sonner", () => ({ toast: { error: h.toastErrorMock, success: h.toastSuccessMock } }));
 vi.mock("@/lib/legal-acceptance.functions", () => ({
-  acceptLegal: legalMarker,
+  acceptLegal: h.legalMarker,
   LEGAL_ACCEPTANCE_VERSION: "2026-07-13",
 }));
-vi.mock("@tanstack/react-start", () => ({ useServerFn: () => recordLegalMock }));
+vi.mock("@tanstack/react-start", () => ({ useServerFn: () => h.recordLegalMock }));
 
 import { RoleSignupForm } from "../RoleSignupForm";
 
@@ -50,12 +51,12 @@ async function renderForm() {
 }
 
 beforeEach(() => {
-  signUpMock.mockReset().mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
-  signInMock.mockReset();
-  insertMock.mockClear();
-  toastErrorMock.mockClear();
-  toastSuccessMock.mockClear();
-  recordLegalMock.mockClear();
+  h.signUpMock.mockReset().mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+  h.signInMock.mockReset();
+  h.insertMock.mockClear();
+  h.toastErrorMock.mockClear();
+  h.toastSuccessMock.mockClear();
+  h.recordLegalMock.mockClear();
 });
 afterEach(() => cleanup());
 
@@ -65,8 +66,8 @@ describe("RoleSignupForm legal acceptance", () => {
     fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: "a@b.co" } });
     fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: "password123" } });
     fireEvent.click(screen.getByRole("button", { name: /Create account/i }));
-    await waitFor(() => expect(toastErrorMock).toHaveBeenCalled());
-    expect(signUpMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(h.toastErrorMock).toHaveBeenCalled());
+    expect(h.signUpMock).not.toHaveBeenCalled();
   });
 
   it("passes legal_accepted_at + version into auth user metadata and records the server audit entry", async () => {
@@ -76,8 +77,8 @@ describe("RoleSignupForm legal acceptance", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /Accept legal policies/i }));
     fireEvent.click(screen.getByRole("button", { name: /Create account/i }));
 
-    await waitFor(() => expect(signUpMock).toHaveBeenCalled());
-    const arg = signUpMock.mock.calls[0][0];
+    await waitFor(() => expect(h.signUpMock).toHaveBeenCalled());
+    const arg = h.signUpMock.mock.calls[0][0];
     expect(arg.email).toBe("a@b.co");
     expect(arg.options.data.legal_accepted_version).toBe("2026-07-13");
     expect(typeof arg.options.data.legal_accepted_at).toBe("string");
@@ -85,7 +86,7 @@ describe("RoleSignupForm legal acceptance", () => {
 
     // Server-side record → written to profile + audit_logs (visible in admin user log).
     await waitFor(() =>
-      expect(recordLegalMock).toHaveBeenCalledWith({
+      expect(h.recordLegalMock).toHaveBeenCalledWith({
         data: { version: "2026-07-13", context: "signup_form" },
       }),
     );
