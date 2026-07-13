@@ -349,3 +349,86 @@ function ConnectForm(props: {
     </form>
   );
 }
+const TIMELINE_META: Record<string, { label: string; tone: string; icon: JSX.Element }> = {
+  agency_client_link_requested_by_creator: {
+    label: "Request submitted",
+    tone: "border-brand/30 bg-brand/10 text-brand-glow",
+    icon: <Clock className="size-4" />,
+  },
+  agency_client_link_request_cancelled: {
+    label: "Request cancelled by you",
+    tone: "border-border bg-surface-elevated text-muted-foreground",
+    icon: <XCircle className="size-4" />,
+  },
+  agency_client_link_request_approved: {
+    label: "Agency approved",
+    tone: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
+    icon: <CheckCircle2 className="size-4" />,
+  },
+  agency_client_link_request_declined: {
+    label: "Agency declined",
+    tone: "border-rose-400/30 bg-rose-400/10 text-rose-300",
+    icon: <XCircle className="size-4" />,
+  },
+  agency_client_auto_suspended: {
+    label: "Automatically suspended",
+    tone: "border-amber-400/30 bg-amber-400/10 text-amber-300",
+    icon: <AlertTriangle className="size-4" />,
+  },
+  agency_client_link_revoked: {
+    label: "Access revoked",
+    tone: "border-rose-400/30 bg-rose-400/10 text-rose-300",
+    icon: <XCircle className="size-4" />,
+  },
+};
+
+function AgencyTimeline({ events }: { events: AgencyTimelineEvent[] }) {
+  return (
+    <section className="mt-8 rounded-2xl border border-border bg-surface p-6">
+      <div className="flex items-center gap-2">
+        <Clock className="size-5 text-brand-glow" />
+        <h2 className="font-display text-lg font-semibold">Agreement history</h2>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Every submission, approval, cancellation, and revocation of your agency agreement is recorded here.
+      </p>
+      {events.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+          No agency agreement activity yet.
+        </div>
+      ) : (
+        <ol className="mt-5 space-y-4 border-l border-border pl-5">
+          {events.map((e) => {
+            const meta = TIMELINE_META[e.action] ?? {
+              label: e.action.replace(/_/g, " "),
+              tone: "border-border bg-surface-elevated text-muted-foreground",
+              icon: <Clock className="size-4" />,
+            };
+            const when = new Date(e.createdAt);
+            return (
+              <li key={e.id} className="relative">
+                <span className="absolute -left-[26px] top-1.5 flex size-4 items-center justify-center rounded-full border border-border bg-surface-elevated">
+                  <span className="size-2 rounded-full bg-brand-glow" />
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-widest ${meta.tone}`}>
+                    {meta.icon}{meta.label}
+                  </span>
+                  <time className="text-xs text-muted-foreground" dateTime={e.createdAt}>
+                    {when.toLocaleString()}
+                  </time>
+                </div>
+                <div className="mt-1 text-sm">
+                  {e.agencyName ? <>Agency: <b>{e.agencyName}</b></> : e.agencyId ? <>Agency <code className="text-xs">{e.agencyId.slice(0, 8)}…</code></> : null}
+                </div>
+                {e.reason && (
+                  <div className="mt-1 text-xs text-muted-foreground">Reason: {e.reason}</div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
+  );
+}
