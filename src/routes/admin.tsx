@@ -11,7 +11,7 @@ import { adminListModeration, adminResolveModeration } from "@/lib/moderation.fu
 import { adminListPendingAssets, adminSetAssetApproval } from "@/lib/admin.functions";
 import { adminListPendingPacks, adminSetPackApproval } from "@/lib/admin.functions";
 import { adminListPendingTwinRefs, adminSetTwinRefReview, adminGetTwinRefSignedUrl } from "@/lib/twin.functions";
-import { adminListDemoCreators, adminSeedDemoCreators, adminImpersonateCreator, adminListAllCreators, adminListAllAgencies, adminImpersonateUser } from "@/lib/demo.functions";
+import { adminListDemoCreators, adminSeedDemoCreators, adminImpersonateCreator, adminListAllCreators, adminListAllAgencies, adminImpersonateUser, adminListAllSupporters } from "@/lib/demo.functions";
 import { setImpersonationContext } from "@/components/twinly/ImpersonationBanner";
 import { adminListProviderDataHandlingRecords, adminUpsertProviderDataHandlingRecord, isReviewOverdue } from "@/lib/provider-data-handling.functions";
 import { adminTestVeniceConnection, type VeniceConnectionResult } from "@/lib/venice-health.functions";
@@ -32,7 +32,7 @@ function AdminPage() {
   const navigate = useNavigate();
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
-  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo" | "creators" | "agencies" | "settings" | "providers" | "venice">("overview");
+  const [tab, setTab] = useState<"overview" | "verifications" | "moderation" | "synthetic" | "packs" | "twin" | "audit" | "demo" | "supporters" | "creators" | "agencies" | "settings" | "providers" | "venice">("overview");
   const [stats, setStats] = useState<any>(null);
   const [creators, setCreators] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
@@ -45,6 +45,9 @@ function AdminPage() {
   const [demo, setDemo] = useState<{ seeded: any[]; available: any[]; emails: Record<string, string | null> } | null>(null);
   const [allCreators, setAllCreators] = useState<{ creators: any[]; emails: Record<string, string | null> } | null>(null);
   const [allAgencies, setAllAgencies] = useState<{ agencies: any[] } | null>(null);
+  const [allSupporters, setAllSupporters] = useState<{ supporters: any[]; emails: Record<string, string | null> } | null>(null);
+  const [supportersQuery, setSupportersQuery] = useState("");
+  const [supportersPage, setSupportersPage] = useState(1);
   const [platformSettings, setPlatformSettings] = useState<{ max_explicitness_ceiling: string } | null>(null);
   const [creatorsQuery, setCreatorsQuery] = useState("");
   const [creatorsPage, setCreatorsPage] = useState(1);
@@ -71,6 +74,7 @@ function AdminPage() {
   const impersonate = useServerFn(adminImpersonateCreator);
   const listAllCreatorsFn = useServerFn(adminListAllCreators);
   const listAllAgenciesFn = useServerFn(adminListAllAgencies);
+  const listAllSupportersFn = useServerFn(adminListAllSupporters);
   const impersonateUserFn = useServerFn(adminImpersonateUser);
   const getSettings = useServerFn(adminGetPlatformSettings);
   const setSettings = useServerFn(adminSetPlatformSettings);
@@ -117,6 +121,7 @@ function AdminPage() {
         if (tab === "demo") setDemo(await listDemo({}));
         if (tab === "creators") setAllCreators(await listAllCreatorsFn({}));
         if (tab === "agencies") setAllAgencies(await listAllAgenciesFn({}));
+        if (tab === "supporters") setAllSupporters(await listAllSupportersFn({}));
         if (tab === "settings") setPlatformSettings((await getSettings({})).settings);
         if (tab === "providers") setProviderRecords((await listProviderRecords({})).records);
       } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
@@ -302,7 +307,7 @@ function AdminPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2 border-b border-border pb-2">
-        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo","creators","agencies","settings","providers","venice"] as const).map((t) => (
+        {(["overview","verifications","moderation","synthetic","packs","twin","audit","demo","supporters","creators","agencies","settings","providers","venice"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
