@@ -948,6 +948,7 @@ export type Database = {
           style_notes: Json
           updated_at: string
           user_id: string
+          venice_character_slug: string | null
           verification_provider: string | null
           verification_provider_ref: string | null
           verification_status: Database["public"]["Enums"]["verification_status"]
@@ -977,6 +978,7 @@ export type Database = {
           style_notes?: Json
           updated_at?: string
           user_id: string
+          venice_character_slug?: string | null
           verification_provider?: string | null
           verification_provider_ref?: string | null
           verification_status?: Database["public"]["Enums"]["verification_status"]
@@ -1006,6 +1008,7 @@ export type Database = {
           style_notes?: Json
           updated_at?: string
           user_id?: string
+          venice_character_slug?: string | null
           verification_provider?: string | null
           verification_provider_ref?: string | null
           verification_status?: Database["public"]["Enums"]["verification_status"]
@@ -1899,6 +1902,7 @@ export type Database = {
           description: string | null
           disclosure_label: string
           display_name: string
+          elevenlabs_voice_id: string | null
           ends_at: string | null
           explicitness_ceiling: Database["public"]["Enums"]["explicitness_level"]
           heygen_avatar_id: string | null
@@ -1943,6 +1947,7 @@ export type Database = {
           description?: string | null
           disclosure_label: string
           display_name: string
+          elevenlabs_voice_id?: string | null
           ends_at?: string | null
           explicitness_ceiling?: Database["public"]["Enums"]["explicitness_level"]
           heygen_avatar_id?: string | null
@@ -1987,6 +1992,7 @@ export type Database = {
           description?: string | null
           disclosure_label?: string
           display_name?: string
+          elevenlabs_voice_id?: string | null
           ends_at?: string | null
           explicitness_ceiling?: Database["public"]["Enums"]["explicitness_level"]
           heygen_avatar_id?: string | null
