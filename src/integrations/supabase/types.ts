@@ -1788,18 +1788,21 @@ export type Database = {
           id: string
           persona_id: string
           real_me_profile_version_id: string
+          synced_at: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           persona_id: string
           real_me_profile_version_id: string
+          synced_at?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           persona_id?: string
           real_me_profile_version_id?: string
+          synced_at?: string | null
         }
         Relationships: [
           {
@@ -1901,6 +1904,7 @@ export type Database = {
           heygen_avatar_id: string | null
           heygen_voice_id: string | null
           id: string
+          intro_video_asset_id: string | null
           intro_video_uploaded_at: string | null
           intro_video_url: string | null
           is_default_seed: boolean
@@ -1944,6 +1948,7 @@ export type Database = {
           heygen_avatar_id?: string | null
           heygen_voice_id?: string | null
           id?: string
+          intro_video_asset_id?: string | null
           intro_video_uploaded_at?: string | null
           intro_video_url?: string | null
           is_default_seed?: boolean
@@ -1987,6 +1992,7 @@ export type Database = {
           heygen_avatar_id?: string | null
           heygen_voice_id?: string | null
           id?: string
+          intro_video_asset_id?: string | null
           intro_video_uploaded_at?: string | null
           intro_video_url?: string | null
           is_default_seed?: boolean
@@ -2028,6 +2034,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personas_intro_video_asset_id_fkey"
+            columns: ["intro_video_asset_id"]
+            isOneToOne: false
+            referencedRelation: "content_assets"
             referencedColumns: ["id"]
           },
         ]
@@ -2507,26 +2520,29 @@ export type Database = {
       }
       real_me_profile_versions: {
         Row: {
-          answers: Json
+          completion_percentage: number
           created_at: string
           id: string
           real_me_profile_id: string
+          responses: Json
           updated_at: string
           version_number: number
         }
         Insert: {
-          answers?: Json
+          completion_percentage?: number
           created_at?: string
           id?: string
           real_me_profile_id: string
+          responses?: Json
           updated_at?: string
           version_number: number
         }
         Update: {
-          answers?: Json
+          completion_percentage?: number
           created_at?: string
           id?: string
           real_me_profile_id?: string
+          responses?: Json
           updated_at?: string
           version_number?: number
         }
