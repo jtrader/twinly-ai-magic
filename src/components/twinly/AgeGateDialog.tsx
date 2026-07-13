@@ -21,7 +21,18 @@ export function AgeGateDialog() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!localStorage.getItem(AGE_GATE_STORAGE_KEY)) setOpen(true);
+    const raw = localStorage.getItem(AGE_GATE_STORAGE_KEY);
+    if (!raw) {
+      setOpen(true);
+      return;
+    }
+    // Re-prompt if the stored acceptance is for an older policy version.
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.version !== LEGAL_VERSION) setOpen(true);
+    } catch {
+      setOpen(true);
+    }
   }, []);
 
   async function confirm() {
@@ -36,18 +47,17 @@ export function AgeGateDialog() {
       if (userData.user) {
         // Signed-in: persist self-attestation to profile + audit.
         await verify({ data: { attested: true } });
-        try {
-          await recordLegal({ data: { version: LEGAL_VERSION, context: "age_gate_dialog" } });
-        } catch (e) {
-          console.warn("[age-gate] legal acceptance record failed", e);
-        }
+        // Server-authoritative record. If this fails we MUST NOT persist
+        // acceptance locally or dismiss the dialog — otherwise the user
+        // would appear accepted while the audit log shows nothing.
+        await recordLegal({ data: { version: LEGAL_VERSION, context: "age_gate_dialog" } });
       }
       const accepted = { at: new Date().toISOString(), version: LEGAL_VERSION };
       localStorage.setItem(AGE_GATE_STORAGE_KEY, JSON.stringify(accepted));
       localStorage.setItem(LEGAL_STORAGE_KEY, JSON.stringify(accepted));
       setOpen(false);
     } catch (e: any) {
-      setError(e?.message ?? "Could not verify age.");
+      setError(e?.message ?? "Could not record your acceptance. Please try again.");
     } finally {
       setBusy(false);
     }
