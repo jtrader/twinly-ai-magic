@@ -608,6 +608,7 @@ function DraftReviewBanner({
   onSave,
   onDiscard,
   onRegenerate,
+  lockCount,
   onExport,
 }: {
   seed: SeedInput | null;
@@ -616,6 +617,7 @@ function DraftReviewBanner({
   onSave: () => void;
   onDiscard: () => void;
   onRegenerate?: () => void;
+  lockCount?: number;
   onExport: (kind: "json" | "pdf") => void;
 }) {
   const isRestore = !!restoredFrom;
@@ -632,6 +634,11 @@ function DraftReviewBanner({
           <p className="text-xs text-muted-foreground">
             Edit anything below, then Save to create a new version. Nothing is stored until you save.
           </p>
+          {lockCount && lockCount > 0 ? (
+            <p className="mt-1 text-[11px] text-amber-400">
+              <Lock className="mr-1 inline size-3" /> {lockCount} locked answer{lockCount === 1 ? "" : "s"} — Regenerate will keep these fixed.
+            </p>
+          ) : null}
           {seed ? (
             <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
               <Badge variant="outline">{seed.gender}</Badge>
