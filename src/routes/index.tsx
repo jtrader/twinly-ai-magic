@@ -322,7 +322,7 @@ function ForCreators() {
 function Footer() {
   return (
     <footer className="border-t border-border/60 py-8 text-center text-xs text-muted-foreground">
-      <div>© {new Date().getFullYear()} Twinly.life · 18+ · <Link to="/legal/terms" className="underline">Terms</Link> · <Link to="/legal/privacy" className="underline">Privacy</Link> · <Link to="/legal/ai-disclosure" className="underline">AI disclosure</Link></div>
+      <div>© {new Date().getFullYear()} Twinly.life · 18+ · <Link to="/legal" className="underline">Legal &amp; policies</Link> · <Link to="/legal/terms" className="underline">Terms</Link> · <Link to="/legal/privacy" className="underline">Privacy</Link> · <Link to="/legal/ai-disclosure" className="underline">AI disclosure</Link> · <Link to="/legal/takedown" className="underline">Report deepfake</Link></div>
     </footer>
   );
 }

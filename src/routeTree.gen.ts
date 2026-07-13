@@ -20,6 +20,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioIndexRouteImport } from './routes/studio.index'
+import { Route as LegalIndexRouteImport } from './routes/legal.index'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
 import { Route as StudioTwinOnboardingRouteImport } from './routes/studio.twin-onboarding'
 import { Route as StudioTwinRouteImport } from './routes/studio.twin'
@@ -42,8 +43,17 @@ import { Route as StudioAnalyticsRouteImport } from './routes/studio.analytics'
 import { Route as StudioAiReviewRouteImport } from './routes/studio.ai-review'
 import { Route as SecurePersonasRouteImport } from './routes/secure.personas'
 import { Route as LegalTermsRouteImport } from './routes/legal.terms'
+import { Route as LegalTakedownRouteImport } from './routes/legal.takedown'
 import { Route as LegalPrivacyRouteImport } from './routes/legal.privacy'
+import { Route as LegalModerationRouteImport } from './routes/legal.moderation'
+import { Route as LegalLikenessRouteImport } from './routes/legal.likeness'
+import { Route as LegalDeepfakePolicyRouteImport } from './routes/legal.deepfake-policy'
+import { Route as LegalCreatorLicenceRouteImport } from './routes/legal.creator-licence'
+import { Route as LegalCopyrightRouteImport } from './routes/legal.copyright'
+import { Route as LegalChildSafetyRouteImport } from './routes/legal.child-safety'
+import { Route as LegalBiometricRouteImport } from './routes/legal.biometric'
 import { Route as LegalAiDisclosureRouteImport } from './routes/legal.ai-disclosure'
+import { Route as LegalAcceptableUseRouteImport } from './routes/legal.acceptable-use'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as FanUnlocksRouteImport } from './routes/fan.unlocks'
 import { Route as FanFlagsRouteImport } from './routes/fan.flags'
@@ -121,6 +131,11 @@ const IndexRoute = IndexRouteImport.update({
 const StudioIndexRoute = StudioIndexRouteImport.update({
   id: '/studio/',
   path: '/studio/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalIndexRoute = LegalIndexRouteImport.update({
+  id: '/legal/',
+  path: '/legal/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountIndexRoute = AccountIndexRouteImport.update({
@@ -233,14 +248,59 @@ const LegalTermsRoute = LegalTermsRouteImport.update({
   path: '/legal/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LegalTakedownRoute = LegalTakedownRouteImport.update({
+  id: '/legal/takedown',
+  path: '/legal/takedown',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LegalPrivacyRoute = LegalPrivacyRouteImport.update({
   id: '/legal/privacy',
   path: '/legal/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LegalModerationRoute = LegalModerationRouteImport.update({
+  id: '/legal/moderation',
+  path: '/legal/moderation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalLikenessRoute = LegalLikenessRouteImport.update({
+  id: '/legal/likeness',
+  path: '/legal/likeness',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalDeepfakePolicyRoute = LegalDeepfakePolicyRouteImport.update({
+  id: '/legal/deepfake-policy',
+  path: '/legal/deepfake-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalCreatorLicenceRoute = LegalCreatorLicenceRouteImport.update({
+  id: '/legal/creator-licence',
+  path: '/legal/creator-licence',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalCopyrightRoute = LegalCopyrightRouteImport.update({
+  id: '/legal/copyright',
+  path: '/legal/copyright',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalChildSafetyRoute = LegalChildSafetyRouteImport.update({
+  id: '/legal/child-safety',
+  path: '/legal/child-safety',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalBiometricRoute = LegalBiometricRouteImport.update({
+  id: '/legal/biometric',
+  path: '/legal/biometric',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LegalAiDisclosureRoute = LegalAiDisclosureRouteImport.update({
   id: '/legal/ai-disclosure',
   path: '/legal/ai-disclosure',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalAcceptableUseRoute = LegalAcceptableUseRouteImport.update({
+  id: '/legal/acceptable-use',
+  path: '/legal/acceptable-use',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
@@ -386,8 +446,17 @@ export interface FileRoutesByFullPath {
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/legal/acceptable-use': typeof LegalAcceptableUseRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
+  '/legal/biometric': typeof LegalBiometricRoute
+  '/legal/child-safety': typeof LegalChildSafetyRoute
+  '/legal/copyright': typeof LegalCopyrightRoute
+  '/legal/creator-licence': typeof LegalCreatorLicenceRoute
+  '/legal/deepfake-policy': typeof LegalDeepfakePolicyRoute
+  '/legal/likeness': typeof LegalLikenessRoute
+  '/legal/moderation': typeof LegalModerationRoute
   '/legal/privacy': typeof LegalPrivacyRoute
+  '/legal/takedown': typeof LegalTakedownRoute
   '/legal/terms': typeof LegalTermsRoute
   '/secure/personas': typeof SecurePersonasRoute
   '/studio/ai-review': typeof StudioAiReviewRoute
@@ -410,6 +479,7 @@ export interface FileRoutesByFullPath {
   '/studio/twin': typeof StudioTwinRoute
   '/studio/twin-onboarding': typeof StudioTwinOnboardingRoute
   '/account/': typeof AccountIndexRoute
+  '/legal/': typeof LegalIndexRoute
   '/studio/': typeof StudioIndexRoute
   '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
@@ -445,8 +515,17 @@ export interface FileRoutesByTo {
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/legal/acceptable-use': typeof LegalAcceptableUseRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
+  '/legal/biometric': typeof LegalBiometricRoute
+  '/legal/child-safety': typeof LegalChildSafetyRoute
+  '/legal/copyright': typeof LegalCopyrightRoute
+  '/legal/creator-licence': typeof LegalCreatorLicenceRoute
+  '/legal/deepfake-policy': typeof LegalDeepfakePolicyRoute
+  '/legal/likeness': typeof LegalLikenessRoute
+  '/legal/moderation': typeof LegalModerationRoute
   '/legal/privacy': typeof LegalPrivacyRoute
+  '/legal/takedown': typeof LegalTakedownRoute
   '/legal/terms': typeof LegalTermsRoute
   '/secure/personas': typeof SecurePersonasRoute
   '/studio/ai-review': typeof StudioAiReviewRoute
@@ -469,6 +548,7 @@ export interface FileRoutesByTo {
   '/studio/twin': typeof StudioTwinRoute
   '/studio/twin-onboarding': typeof StudioTwinOnboardingRoute
   '/account': typeof AccountIndexRoute
+  '/legal': typeof LegalIndexRoute
   '/studio': typeof StudioIndexRoute
   '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
@@ -506,8 +586,17 @@ export interface FileRoutesById {
   '/fan/flags': typeof FanFlagsRoute
   '/fan/unlocks': typeof FanUnlocksRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/legal/acceptable-use': typeof LegalAcceptableUseRoute
   '/legal/ai-disclosure': typeof LegalAiDisclosureRoute
+  '/legal/biometric': typeof LegalBiometricRoute
+  '/legal/child-safety': typeof LegalChildSafetyRoute
+  '/legal/copyright': typeof LegalCopyrightRoute
+  '/legal/creator-licence': typeof LegalCreatorLicenceRoute
+  '/legal/deepfake-policy': typeof LegalDeepfakePolicyRoute
+  '/legal/likeness': typeof LegalLikenessRoute
+  '/legal/moderation': typeof LegalModerationRoute
   '/legal/privacy': typeof LegalPrivacyRoute
+  '/legal/takedown': typeof LegalTakedownRoute
   '/legal/terms': typeof LegalTermsRoute
   '/secure/personas': typeof SecurePersonasRoute
   '/studio/ai-review': typeof StudioAiReviewRoute
@@ -530,6 +619,7 @@ export interface FileRoutesById {
   '/studio/twin': typeof StudioTwinRoute
   '/studio/twin-onboarding': typeof StudioTwinOnboardingRoute
   '/account/': typeof AccountIndexRoute
+  '/legal/': typeof LegalIndexRoute
   '/studio/': typeof StudioIndexRoute
   '/api/public/bootstrap-demo-creators': typeof ApiPublicBootstrapDemoCreatorsRoute
   '/api/public/bootstrap-support-admin': typeof ApiPublicBootstrapSupportAdminRoute
@@ -568,8 +658,17 @@ export interface FileRouteTypes {
     | '/fan/flags'
     | '/fan/unlocks'
     | '/invite/$token'
+    | '/legal/acceptable-use'
     | '/legal/ai-disclosure'
+    | '/legal/biometric'
+    | '/legal/child-safety'
+    | '/legal/copyright'
+    | '/legal/creator-licence'
+    | '/legal/deepfake-policy'
+    | '/legal/likeness'
+    | '/legal/moderation'
     | '/legal/privacy'
+    | '/legal/takedown'
     | '/legal/terms'
     | '/secure/personas'
     | '/studio/ai-review'
@@ -592,6 +691,7 @@ export interface FileRouteTypes {
     | '/studio/twin'
     | '/studio/twin-onboarding'
     | '/account/'
+    | '/legal/'
     | '/studio/'
     | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
@@ -627,8 +727,17 @@ export interface FileRouteTypes {
     | '/fan/flags'
     | '/fan/unlocks'
     | '/invite/$token'
+    | '/legal/acceptable-use'
     | '/legal/ai-disclosure'
+    | '/legal/biometric'
+    | '/legal/child-safety'
+    | '/legal/copyright'
+    | '/legal/creator-licence'
+    | '/legal/deepfake-policy'
+    | '/legal/likeness'
+    | '/legal/moderation'
     | '/legal/privacy'
+    | '/legal/takedown'
     | '/legal/terms'
     | '/secure/personas'
     | '/studio/ai-review'
@@ -651,6 +760,7 @@ export interface FileRouteTypes {
     | '/studio/twin'
     | '/studio/twin-onboarding'
     | '/account'
+    | '/legal'
     | '/studio'
     | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
@@ -687,8 +797,17 @@ export interface FileRouteTypes {
     | '/fan/flags'
     | '/fan/unlocks'
     | '/invite/$token'
+    | '/legal/acceptable-use'
     | '/legal/ai-disclosure'
+    | '/legal/biometric'
+    | '/legal/child-safety'
+    | '/legal/copyright'
+    | '/legal/creator-licence'
+    | '/legal/deepfake-policy'
+    | '/legal/likeness'
+    | '/legal/moderation'
     | '/legal/privacy'
+    | '/legal/takedown'
     | '/legal/terms'
     | '/secure/personas'
     | '/studio/ai-review'
@@ -711,6 +830,7 @@ export interface FileRouteTypes {
     | '/studio/twin'
     | '/studio/twin-onboarding'
     | '/account/'
+    | '/legal/'
     | '/studio/'
     | '/api/public/bootstrap-demo-creators'
     | '/api/public/bootstrap-support-admin'
@@ -742,8 +862,17 @@ export interface RootRouteChildren {
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   CreatorsHandleRoute: typeof CreatorsHandleRouteWithChildren
   InviteTokenRoute: typeof InviteTokenRoute
+  LegalAcceptableUseRoute: typeof LegalAcceptableUseRoute
   LegalAiDisclosureRoute: typeof LegalAiDisclosureRoute
+  LegalBiometricRoute: typeof LegalBiometricRoute
+  LegalChildSafetyRoute: typeof LegalChildSafetyRoute
+  LegalCopyrightRoute: typeof LegalCopyrightRoute
+  LegalCreatorLicenceRoute: typeof LegalCreatorLicenceRoute
+  LegalDeepfakePolicyRoute: typeof LegalDeepfakePolicyRoute
+  LegalLikenessRoute: typeof LegalLikenessRoute
+  LegalModerationRoute: typeof LegalModerationRoute
   LegalPrivacyRoute: typeof LegalPrivacyRoute
+  LegalTakedownRoute: typeof LegalTakedownRoute
   LegalTermsRoute: typeof LegalTermsRoute
   SecurePersonasRoute: typeof SecurePersonasRoute
   StudioAiReviewRoute: typeof StudioAiReviewRoute
@@ -765,6 +894,7 @@ export interface RootRouteChildren {
   StudioRealMeRoute: typeof StudioRealMeRoute
   StudioTwinRoute: typeof StudioTwinRoute
   StudioTwinOnboardingRoute: typeof StudioTwinOnboardingRoute
+  LegalIndexRoute: typeof LegalIndexRoute
   StudioIndexRoute: typeof StudioIndexRoute
   ApiPublicBootstrapDemoCreatorsRoute: typeof ApiPublicBootstrapDemoCreatorsRoute
   ApiPublicBootstrapSupportAdminRoute: typeof ApiPublicBootstrapSupportAdminRoute
@@ -854,6 +984,13 @@ declare module '@tanstack/react-router' {
       path: '/studio'
       fullPath: '/studio/'
       preLoaderRoute: typeof StudioIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/': {
+      id: '/legal/'
+      path: '/legal'
+      fullPath: '/legal/'
+      preLoaderRoute: typeof LegalIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account/': {
@@ -1010,6 +1147,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LegalTermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/legal/takedown': {
+      id: '/legal/takedown'
+      path: '/legal/takedown'
+      fullPath: '/legal/takedown'
+      preLoaderRoute: typeof LegalTakedownRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/legal/privacy': {
       id: '/legal/privacy'
       path: '/legal/privacy'
@@ -1017,11 +1161,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LegalPrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/legal/moderation': {
+      id: '/legal/moderation'
+      path: '/legal/moderation'
+      fullPath: '/legal/moderation'
+      preLoaderRoute: typeof LegalModerationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/likeness': {
+      id: '/legal/likeness'
+      path: '/legal/likeness'
+      fullPath: '/legal/likeness'
+      preLoaderRoute: typeof LegalLikenessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/deepfake-policy': {
+      id: '/legal/deepfake-policy'
+      path: '/legal/deepfake-policy'
+      fullPath: '/legal/deepfake-policy'
+      preLoaderRoute: typeof LegalDeepfakePolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/creator-licence': {
+      id: '/legal/creator-licence'
+      path: '/legal/creator-licence'
+      fullPath: '/legal/creator-licence'
+      preLoaderRoute: typeof LegalCreatorLicenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/copyright': {
+      id: '/legal/copyright'
+      path: '/legal/copyright'
+      fullPath: '/legal/copyright'
+      preLoaderRoute: typeof LegalCopyrightRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/child-safety': {
+      id: '/legal/child-safety'
+      path: '/legal/child-safety'
+      fullPath: '/legal/child-safety'
+      preLoaderRoute: typeof LegalChildSafetyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/biometric': {
+      id: '/legal/biometric'
+      path: '/legal/biometric'
+      fullPath: '/legal/biometric'
+      preLoaderRoute: typeof LegalBiometricRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/legal/ai-disclosure': {
       id: '/legal/ai-disclosure'
       path: '/legal/ai-disclosure'
       fullPath: '/legal/ai-disclosure'
       preLoaderRoute: typeof LegalAiDisclosureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal/acceptable-use': {
+      id: '/legal/acceptable-use'
+      path: '/legal/acceptable-use'
+      fullPath: '/legal/acceptable-use'
+      preLoaderRoute: typeof LegalAcceptableUseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/invite/$token': {
@@ -1280,8 +1480,17 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutReturnRoute: CheckoutReturnRoute,
   CreatorsHandleRoute: CreatorsHandleRouteWithChildren,
   InviteTokenRoute: InviteTokenRoute,
+  LegalAcceptableUseRoute: LegalAcceptableUseRoute,
   LegalAiDisclosureRoute: LegalAiDisclosureRoute,
+  LegalBiometricRoute: LegalBiometricRoute,
+  LegalChildSafetyRoute: LegalChildSafetyRoute,
+  LegalCopyrightRoute: LegalCopyrightRoute,
+  LegalCreatorLicenceRoute: LegalCreatorLicenceRoute,
+  LegalDeepfakePolicyRoute: LegalDeepfakePolicyRoute,
+  LegalLikenessRoute: LegalLikenessRoute,
+  LegalModerationRoute: LegalModerationRoute,
   LegalPrivacyRoute: LegalPrivacyRoute,
+  LegalTakedownRoute: LegalTakedownRoute,
   LegalTermsRoute: LegalTermsRoute,
   SecurePersonasRoute: SecurePersonasRoute,
   StudioAiReviewRoute: StudioAiReviewRoute,
@@ -1303,6 +1512,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioRealMeRoute: StudioRealMeRoute,
   StudioTwinRoute: StudioTwinRoute,
   StudioTwinOnboardingRoute: StudioTwinOnboardingRoute,
+  LegalIndexRoute: LegalIndexRoute,
   StudioIndexRoute: StudioIndexRoute,
   ApiPublicBootstrapDemoCreatorsRoute: ApiPublicBootstrapDemoCreatorsRoute,
   ApiPublicBootstrapSupportAdminRoute: ApiPublicBootstrapSupportAdminRoute,
