@@ -810,70 +810,192 @@ function ConsentRow({ label, hint, checked, onChange }: { label: string; hint: s
   );
 }
 
-function BulkPhotoDropzone({
-  busyLabel, disabled, onFiles,
+function BulkPhotoStager({
+  pending, serverLabels, busy, progress, disabled,
+  onFiles, onRemove, onReassign, onClear, onUpload, onCancel,
 }: {
-  busyLabel: string | null;
+  pending: PendingItem[];
+  serverLabels: Set<string>;
+  busy: boolean;
+  progress: { done: number; total: number };
   disabled: boolean;
   onFiles: (files: File[]) => void | Promise<void>;
+  onRemove: (id: string) => void;
+  onReassign: (id: string, label: string) => void;
+  onClear: () => void;
+  onUpload: () => void | Promise<void>;
+  onCancel: () => void;
 }) {
   const [dragActive, setDragActive] = useState(false);
   const inputId = "bulk-photo-input";
-  const busy = !!busyLabel;
+  const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+  const queuedByLabel = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of pending) if (p.assignedLabel) map.set(p.assignedLabel, p.id);
+    return map;
+  }, [pending]);
+
   return (
-    <div
-      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy && !disabled) setDragActive(true); }}
-      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy && !disabled) setDragActive(true); }}
-      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); }}
-      onDrop={(e) => {
-        e.preventDefault(); e.stopPropagation(); setDragActive(false);
-        if (busy || disabled) return;
-        const files = Array.from(e.dataTransfer.files ?? []);
-        if (files.length) void onFiles(files);
-      }}
-      className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
-        dragActive
-          ? "border-brand/60 bg-brand/5"
-          : "border-border/60 bg-surface/40 hover:border-border"
-      }`}
-      role="group"
-      aria-label="Bulk upload reference photos"
-    >
-      <p className="text-sm">
-        <span className="font-medium">Bulk upload</span>{" "}
-        <span className="text-muted-foreground">— drop several photos, or</span>
-      </p>
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy || disabled}
-          onClick={() => document.getElementById(inputId)?.click()}
-        >
-          {busy ? (
-            <><Loader2 className="mr-2 size-4 animate-spin" />Uploading {busyLabel}</>
-          ) : (
-            <><Upload className="mr-2 size-4" />Choose photos…</>
-          )}
-        </Button>
-        <input
-          id={inputId}
-          type="file"
-          accept="image/*"
-          multiple
-          className="sr-only"
-          disabled={busy || disabled}
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? []);
-            e.target.value = "";
-            if (files.length) void onFiles(files);
-          }}
-        />
+    <div className="space-y-3">
+      <div
+        onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (!disabled) setDragActive(true); }}
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); if (!disabled) setDragActive(true); }}
+        onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); }}
+        onDrop={(e) => {
+          e.preventDefault(); e.stopPropagation(); setDragActive(false);
+          if (disabled) return;
+          const files = Array.from(e.dataTransfer.files ?? []);
+          if (files.length) void onFiles(files);
+        }}
+        className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
+          dragActive
+            ? "border-brand/60 bg-brand/5"
+            : "border-border/60 bg-surface/40 hover:border-border"
+        }`}
+        role="group"
+        aria-label="Bulk upload reference photos"
+      >
+        <p className="text-sm">
+          <span className="font-medium">Bulk upload</span>{" "}
+          <span className="text-muted-foreground">— drop several photos, or</span>
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button type="button" variant="outline" size="sm" disabled={disabled}
+            onClick={() => document.getElementById(inputId)?.click()}>
+            <Upload className="mr-2 size-4" />Choose photos…
+          </Button>
+          <input
+            id={inputId} type="file" accept="image/*" multiple className="sr-only" disabled={disabled}
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              e.target.value = "";
+              if (files.length) void onFiles(files);
+            }}
+          />
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          JPEG/PNG/WebP up to 15 MB each. Files auto-fill unfilled recommended slots first, then overflow into "Additional N".
+        </p>
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        JPEG/PNG/WebP up to 15 MB each. Files fill the recommended slots below in order; extras become "Additional 1", "Additional 2"…
-      </p>
+
+      {pending.length > 0 && (
+        <div className="space-y-3 rounded-xl border border-border bg-surface/40 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-medium">
+              {pending.length} photo{pending.length === 1 ? "" : "s"} staged
+              {busy && <span className="ml-2 text-xs text-muted-foreground">Uploading {progress.done}/{progress.total}…</span>}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {busy ? (
+                <Button type="button" variant="destructive" size="sm" onClick={onCancel}>
+                  <X className="mr-1 size-4" />Cancel
+                </Button>
+              ) : (
+                <>
+                  <Button type="button" variant="ghost" size="sm" onClick={onClear}>
+                    <Trash2 className="mr-1 size-4" />Clear queue
+                  </Button>
+                  <Button type="button" size="sm" onClick={onUpload} disabled={disabled}>
+                    <Upload className="mr-1 size-4" />Upload all
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {busy && <Progress value={pct} aria-label={`Uploading ${progress.done} of ${progress.total}`} />}
+
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {pending.map((p) => {
+              const isRecommended = RECOMMENDED_SHOTS.some((s) => s.label === p.assignedLabel);
+              const options: { label: string; disabled?: boolean; hint?: string }[] = [
+                ...RECOMMENDED_SHOTS.map((s) => {
+                  const filledByServer = serverLabels.has(s.label);
+                  const heldBy = queuedByLabel.get(s.label);
+                  const takenElsewhere = filledByServer || (heldBy && heldBy !== p.id);
+                  return {
+                    label: s.label,
+                    disabled: !!takenElsewhere,
+                    hint: filledByServer ? "filled" : heldBy && heldBy !== p.id ? "in queue" : undefined,
+                  };
+                }),
+              ];
+              if (!isRecommended && p.assignedLabel) {
+                options.push({ label: p.assignedLabel });
+              }
+              return (
+                <li key={p.id} className={`flex items-start gap-3 rounded-lg border p-2 text-xs ${
+                  p.status === "error" ? "border-rose-400/40 bg-rose-400/5"
+                    : p.status === "needs_reattach" ? "border-amber-400/40 bg-amber-400/5"
+                    : p.status === "uploading" ? "border-brand/40 bg-brand/5"
+                    : "border-border bg-background/40"
+                }`}>
+                  <img src={p.thumb} alt="" className="size-14 shrink-0 rounded-md object-cover" />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium" title={p.name}>{p.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => onRemove(p.id)}
+                        disabled={busy}
+                        aria-label={`Remove ${p.name} from queue`}
+                        className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Select
+                        value={p.assignedLabel}
+                        onValueChange={(v) => onReassign(p.id, v)}
+                        disabled={busy || p.status === "uploading"}
+                      >
+                        <SelectTrigger className="h-7 w-[180px] text-xs">
+                          <SelectValue placeholder="Assign a slot" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {options.map((opt) => (
+                            <SelectItem key={opt.label} value={opt.label} disabled={opt.disabled}>
+                              {opt.label}{opt.hint ? ` — ${opt.hint}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <StatusPill status={p.status} />
+                    </div>
+                    {p.status === "error" && p.error && (
+                      <p className="text-[11px] text-rose-300">{p.error}</p>
+                    )}
+                    {p.status === "needs_reattach" && (
+                      <p className="text-[11px] text-amber-300">
+                        <AlertTriangle className="mr-1 inline size-3" />
+                        File body wasn't kept across refresh. Drag it in again (same filename) to re-attach.
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
+  );
+}
+
+function StatusPill({ status }: { status: PendingStatus }) {
+  const map: Record<PendingStatus, { label: string; className: string; icon?: JSX.Element }> = {
+    pending:        { label: "Ready", className: "border-border text-muted-foreground" },
+    uploading:      { label: "Uploading", className: "border-brand/40 text-brand-glow", icon: <Loader2 className="size-3 animate-spin" /> },
+    done:           { label: "Done", className: "border-emerald-400/40 text-emerald-300", icon: <CheckCircle2 className="size-3" /> },
+    error:          { label: "Failed", className: "border-rose-400/40 text-rose-300" },
+    canceled:       { label: "Canceled", className: "border-border text-muted-foreground", icon: <RotateCcw className="size-3" /> },
+    needs_reattach: { label: "Re-attach", className: "border-amber-400/40 text-amber-300", icon: <AlertTriangle className="size-3" /> },
+  };
+  const s = map[status];
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${s.className}`}>
+      {s.icon}{s.label}
+    </span>
   );
 }
