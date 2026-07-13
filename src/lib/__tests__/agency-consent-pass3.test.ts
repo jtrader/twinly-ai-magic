@@ -15,13 +15,6 @@ const billingSrc = readFileSync(
   resolve(process.cwd(), "src/lib/agency-billing.functions.ts"),
   "utf8",
 );
-const migrationSrc = readFileSync(
-  resolve(
-    process.cwd(),
-    "supabase/migrations",
-  ),
-  { encoding: "utf8" as any } as any,
-).toString();
 
 function fakeRpc(returnValue: unknown, error: any = null) {
   return { rpc: vi.fn().mockResolvedValue({ data: returnValue, error }) } as any;
@@ -129,11 +122,16 @@ describe("Agency billing wiring (§4c — $25 base + $25 per client)", () => {
 });
 
 describe("Migration invariants — schema shape survives future edits", () => {
-  it("has the latest agency-consent migration file present", () => {
+  it("has the latest agency-consent migration file present with trigger + billing tables", () => {
     const { readdirSync } = require("node:fs") as typeof import("node:fs");
     const files = readdirSync(resolve(process.cwd(), "supabase/migrations"));
-    const target = files.find((f) => /agency.*consent|agency_client_consent/i.test(f));
+    const target = files.find((f) => /agency.*consent|agency_client_consent|client_consent/i.test(f));
     expect(target, "expected an agency-consent migration file").toBeTruthy();
-    void migrationSrc; // silence unused
+    if (!target) return;
+    const body = readFileSync(resolve(process.cwd(), "supabase/migrations", target), "utf8");
+    expect(body).toMatch(/CREATE TABLE[\s\S]*agency_client_consents/);
+    expect(body).toMatch(/CREATE TABLE[\s\S]*agency_subscriptions/);
+    expect(body).toMatch(/suspend_agency_links_on_id_loss/);
+    expect(body).toMatch(/has_active_agency_consent/);
   });
 });
