@@ -26,6 +26,7 @@ import { Route as StudioTwinRouteImport } from './routes/studio.twin'
 import { Route as StudioRealMeRouteImport } from './routes/studio.real-me'
 import { Route as StudioPricingRouteImport } from './routes/studio.pricing'
 import { Route as StudioPollsRouteImport } from './routes/studio.polls'
+import { Route as StudioPersonasRouteImport } from './routes/studio.personas'
 import { Route as StudioPersonaOnboardingRouteImport } from './routes/studio.persona-onboarding'
 import { Route as StudioPayoutsRouteImport } from './routes/studio.payouts'
 import { Route as StudioPacksRouteImport } from './routes/studio.packs'
@@ -150,6 +151,11 @@ const StudioPricingRoute = StudioPricingRouteImport.update({
 const StudioPollsRoute = StudioPollsRouteImport.update({
   id: '/studio/polls',
   path: '/studio/polls',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioPersonasRoute = StudioPersonasRouteImport.update({
+  id: '/studio/personas',
+  path: '/studio/personas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudioPersonaOnboardingRoute = StudioPersonaOnboardingRouteImport.update({
@@ -288,9 +294,9 @@ const AccountFollowingRoute = AccountFollowingRouteImport.update({
   getParentRoute: () => AccountRoute,
 } as any)
 const StudioPersonasNewRoute = StudioPersonasNewRouteImport.update({
-  id: '/studio/personas/new',
-  path: '/studio/personas/new',
-  getParentRoute: () => rootRouteImport,
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => StudioPersonasRoute,
 } as any)
 const StudioPacksPackIdRoute = StudioPacksPackIdRouteImport.update({
   id: '/$packId',
@@ -321,9 +327,9 @@ const ApiPublicBootstrapDemoCreatorsRoute =
   } as any)
 const StudioPersonasPersonaIdEditRoute =
   StudioPersonasPersonaIdEditRouteImport.update({
-    id: '/studio/personas/$personaId/edit',
-    path: '/studio/personas/$personaId/edit',
-    getParentRoute: () => rootRouteImport,
+    id: '/$personaId/edit',
+    path: '/$personaId/edit',
+    getParentRoute: () => StudioPersonasRoute,
   } as any)
 const ApiPublicPaymentsWebhookRoute =
   ApiPublicPaymentsWebhookRouteImport.update({
@@ -397,6 +403,7 @@ export interface FileRoutesByFullPath {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
+  '/studio/personas': typeof StudioPersonasRouteWithChildren
   '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
   '/studio/real-me': typeof StudioRealMeRoute
@@ -455,6 +462,7 @@ export interface FileRoutesByTo {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
+  '/studio/personas': typeof StudioPersonasRouteWithChildren
   '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
   '/studio/real-me': typeof StudioRealMeRoute
@@ -515,6 +523,7 @@ export interface FileRoutesById {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
+  '/studio/personas': typeof StudioPersonasRouteWithChildren
   '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
   '/studio/real-me': typeof StudioRealMeRoute
@@ -576,6 +585,7 @@ export interface FileRouteTypes {
     | '/studio/packs'
     | '/studio/payouts'
     | '/studio/persona-onboarding'
+    | '/studio/personas'
     | '/studio/polls'
     | '/studio/pricing'
     | '/studio/real-me'
@@ -634,6 +644,7 @@ export interface FileRouteTypes {
     | '/studio/packs'
     | '/studio/payouts'
     | '/studio/persona-onboarding'
+    | '/studio/personas'
     | '/studio/polls'
     | '/studio/pricing'
     | '/studio/real-me'
@@ -693,6 +704,7 @@ export interface FileRouteTypes {
     | '/studio/packs'
     | '/studio/payouts'
     | '/studio/persona-onboarding'
+    | '/studio/personas'
     | '/studio/polls'
     | '/studio/pricing'
     | '/studio/real-me'
@@ -747,6 +759,7 @@ export interface RootRouteChildren {
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
   StudioPayoutsRoute: typeof StudioPayoutsRoute
   StudioPersonaOnboardingRoute: typeof StudioPersonaOnboardingRoute
+  StudioPersonasRoute: typeof StudioPersonasRouteWithChildren
   StudioPollsRoute: typeof StudioPollsRoute
   StudioPricingRoute: typeof StudioPricingRoute
   StudioRealMeRoute: typeof StudioRealMeRoute
@@ -756,14 +769,12 @@ export interface RootRouteChildren {
   ApiPublicBootstrapDemoCreatorsRoute: typeof ApiPublicBootstrapDemoCreatorsRoute
   ApiPublicBootstrapSupportAdminRoute: typeof ApiPublicBootstrapSupportAdminRoute
   ChatHandlePersonaRoute: typeof ChatHandlePersonaRoute
-  StudioPersonasNewRoute: typeof StudioPersonasNewRoute
   ApiPublicCronClosePollsRoute: typeof ApiPublicCronClosePollsRoute
   ApiPublicCronHeygenPollRoute: typeof ApiPublicCronHeygenPollRoute
   ApiPublicCronVeniceVideoPollRoute: typeof ApiPublicCronVeniceVideoPollRoute
   ApiPublicHooksHeygenRoute: typeof ApiPublicHooksHeygenRoute
   ApiPublicIdentityWebhookRoute: typeof ApiPublicIdentityWebhookRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
-  StudioPersonasPersonaIdEditRoute: typeof StudioPersonasPersonaIdEditRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -885,6 +896,13 @@ declare module '@tanstack/react-router' {
       path: '/studio/polls'
       fullPath: '/studio/polls'
       preLoaderRoute: typeof StudioPollsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio/personas': {
+      id: '/studio/personas'
+      path: '/studio/personas'
+      fullPath: '/studio/personas'
+      preLoaderRoute: typeof StudioPersonasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/studio/persona-onboarding': {
@@ -1078,10 +1096,10 @@ declare module '@tanstack/react-router' {
     }
     '/studio/personas/new': {
       id: '/studio/personas/new'
-      path: '/studio/personas/new'
+      path: '/new'
       fullPath: '/studio/personas/new'
       preLoaderRoute: typeof StudioPersonasNewRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof StudioPersonasRoute
     }
     '/studio/packs/$packId': {
       id: '/studio/packs/$packId'
@@ -1120,10 +1138,10 @@ declare module '@tanstack/react-router' {
     }
     '/studio/personas/$personaId/edit': {
       id: '/studio/personas/$personaId/edit'
-      path: '/studio/personas/$personaId/edit'
+      path: '/$personaId/edit'
       fullPath: '/studio/personas/$personaId/edit'
       preLoaderRoute: typeof StudioPersonasPersonaIdEditRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof StudioPersonasRoute
     }
     '/api/public/payments/webhook': {
       id: '/api/public/payments/webhook'
@@ -1233,6 +1251,20 @@ const StudioPacksRouteWithChildren = StudioPacksRoute._addFileChildren(
   StudioPacksRouteChildren,
 )
 
+interface StudioPersonasRouteChildren {
+  StudioPersonasNewRoute: typeof StudioPersonasNewRoute
+  StudioPersonasPersonaIdEditRoute: typeof StudioPersonasPersonaIdEditRoute
+}
+
+const StudioPersonasRouteChildren: StudioPersonasRouteChildren = {
+  StudioPersonasNewRoute: StudioPersonasNewRoute,
+  StudioPersonasPersonaIdEditRoute: StudioPersonasPersonaIdEditRoute,
+}
+
+const StudioPersonasRouteWithChildren = StudioPersonasRoute._addFileChildren(
+  StudioPersonasRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRouteWithChildren,
@@ -1265,6 +1297,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioPacksRoute: StudioPacksRouteWithChildren,
   StudioPayoutsRoute: StudioPayoutsRoute,
   StudioPersonaOnboardingRoute: StudioPersonaOnboardingRoute,
+  StudioPersonasRoute: StudioPersonasRouteWithChildren,
   StudioPollsRoute: StudioPollsRoute,
   StudioPricingRoute: StudioPricingRoute,
   StudioRealMeRoute: StudioRealMeRoute,
@@ -1274,14 +1307,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBootstrapDemoCreatorsRoute: ApiPublicBootstrapDemoCreatorsRoute,
   ApiPublicBootstrapSupportAdminRoute: ApiPublicBootstrapSupportAdminRoute,
   ChatHandlePersonaRoute: ChatHandlePersonaRoute,
-  StudioPersonasNewRoute: StudioPersonasNewRoute,
   ApiPublicCronClosePollsRoute: ApiPublicCronClosePollsRoute,
   ApiPublicCronHeygenPollRoute: ApiPublicCronHeygenPollRoute,
   ApiPublicCronVeniceVideoPollRoute: ApiPublicCronVeniceVideoPollRoute,
   ApiPublicHooksHeygenRoute: ApiPublicHooksHeygenRoute,
   ApiPublicIdentityWebhookRoute: ApiPublicIdentityWebhookRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
-  StudioPersonasPersonaIdEditRoute: StudioPersonasPersonaIdEditRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
