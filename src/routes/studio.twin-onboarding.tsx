@@ -1,11 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ShieldCheck, Upload, CheckCircle2, Loader2, ArrowRight } from "lucide-react";
+import { ShieldCheck, Upload, CheckCircle2, Loader2, ArrowRight, X, Trash2, RotateCcw, AlertTriangle } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
@@ -34,6 +36,113 @@ const RECOMMENDED_SHOTS = [
   { key: "closeup-eyes", label: "Close-up, eyes" },
   { key: "closeup-lips", label: "Close-up, lips" },
 ] as const;
+
+// ---- Bulk-upload helpers ---------------------------------------------------
+
+const BULK_MAX_BYTES = 15 * 1024 * 1024;      // per file
+const BULK_PERSIST_BUDGET = 4 * 1024 * 1024;  // total base64 payload cap
+const THUMB_MAX = 240;                        // px, longest edge
+
+type PendingStatus = "pending" | "uploading" | "done" | "error" | "canceled" | "needs_reattach";
+
+type PendingItem = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  thumb: string;               // small data-URL preview (persistable)
+  bodyDataUrl?: string;        // full base64 body, persisted opportunistically
+  assignedLabel: string;
+  status: PendingStatus;
+  error?: string;
+  hasBlob: boolean;            // true when a runtime File/Blob is available
+};
+
+/** Downscale an image to a preview data URL. Best-effort — falls back to
+ *  the original data URL if the canvas is unavailable. */
+async function makeThumb(file: File): Promise<string> {
+  const readAsDataUrl = () => new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+  const originalDataUrl = await readAsDataUrl();
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("decode failed"));
+      i.src = originalDataUrl;
+    });
+    const scale = Math.min(1, THUMB_MAX / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return originalDataUrl;
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", 0.72);
+  } catch {
+    return originalDataUrl;
+  }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [meta, b64] = dataUrl.split(",");
+  const mimeMatch = /data:([^;]+)/.exec(meta ?? "");
+  const mime = mimeMatch?.[1] ?? "application/octet-stream";
+  const bin = atob(b64 ?? "");
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+/** Assign the next available slot label for each pending item. Reliably
+ *  skips labels already used by the server (`serverLabels`) or by earlier
+ *  items in the queue. Respects an existing valid assignment where possible
+ *  so user re-orderings/refresh don't churn the labels. */
+function computeAssignments(items: PendingItem[], serverLabels: Set<string>): PendingItem[] {
+  const taken = new Set(serverLabels);
+  // Existing "Additional N" numbers already on the server + already assigned.
+  const usedAdditional: number[] = [];
+  const reAdd = /^Additional (\d+)$/;
+  serverLabels.forEach((l) => { const m = reAdd.exec(l); if (m) usedAdditional.push(Number(m[1])); });
+  let nextAdditional = usedAdditional.length ? Math.max(...usedAdditional) + 1 : 1;
+
+  const recommendedOrder: string[] = RECOMMENDED_SHOTS.map((s) => s.label);
+
+  return items.map((item) => {
+    // Keep the item's current label if it's still valid and not colliding.
+    const current = item.assignedLabel;
+    const isRecommended = recommendedOrder.includes(current);
+    const isAdditional = reAdd.test(current);
+    const collides = taken.has(current);
+    if (current && !collides && (isRecommended || isAdditional)) {
+      taken.add(current);
+      if (isAdditional) {
+        const n = Number(reAdd.exec(current)![1]);
+        if (n >= nextAdditional) nextAdditional = n + 1;
+      }
+      return item;
+    }
+    // Fresh assignment: prefer next open recommended, else Additional N.
+    const nextRec = recommendedOrder.find((l) => !taken.has(l));
+    const label = nextRec ?? `Additional ${nextAdditional++}`;
+    taken.add(label);
+    return { ...item, assignedLabel: label };
+  });
+}
 
 type Profile = Awaited<ReturnType<typeof getTwinProfile>>;
 
@@ -175,61 +284,229 @@ function TwinOnboardingWizard() {
     }
   }
 
-  // Bulk upload — assign each dropped/selected file to the next unfilled
-  // recommended shot slot in order; overflow goes into "Additional N".
-  async function uploadShotsBulk(files: File[]) {
-    if (!data?.creator || files.length === 0) return;
+  // ---- Bulk-upload staging queue (previews, progress, cancel, persistence)
+  const [pending, setPending] = useState<PendingItem[]>([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  const cancelRef = useRef(false);
+  const blobsRef = useRef<Map<string, Blob>>(new Map());     // id -> live Blob (in-memory only)
+  const bulkStorageKey = user ? `twin-bulk-queue:${user.id}` : null;
+  const hydratedBulkRef = useRef(false);
+
+  const serverLabels = useMemo(
+    () => new Set(identityRefs.map((r: any) => r.slot_label as string)),
+    [identityRefs],
+  );
+
+  // Recompute assignments whenever the server's filled slots change so
+  // pending items don't collide with newly-uploaded ones.
+  useEffect(() => {
+    setPending((prev) => computeAssignments(prev, serverLabels));
+  }, [serverLabels]);
+
+  // Hydrate the queue on mount (once we know the user id).
+  useEffect(() => {
+    if (hydratedBulkRef.current || !bulkStorageKey || typeof window === "undefined") return;
+    hydratedBulkRef.current = true;
+    try {
+      const raw = window.localStorage.getItem(bulkStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as PendingItem[];
+      if (!Array.isArray(parsed)) return;
+      const restored: PendingItem[] = parsed
+        .filter((p) => p && typeof p.id === "string" && typeof p.name === "string")
+        .map((p) => {
+          const hasBody = !!p.bodyDataUrl;
+          return {
+            id: p.id,
+            name: p.name,
+            size: p.size ?? 0,
+            type: p.type ?? "image/jpeg",
+            thumb: p.thumb,
+            bodyDataUrl: p.bodyDataUrl,
+            assignedLabel: p.assignedLabel,
+            status: (hasBody ? "pending" : "needs_reattach") as PendingStatus,
+            error: p.error,
+            hasBlob: hasBody,
+          };
+        });
+      // Rebuild in-memory blobs from any persisted bodies so uploads can run.
+      for (const item of restored) {
+        if (item.bodyDataUrl) {
+          try {
+            const blob = dataUrlToBlob(item.bodyDataUrl);
+            blobsRef.current.set(item.id, blob);
+          } catch {
+            item.hasBlob = false;
+            item.status = "needs_reattach";
+          }
+        }
+      }
+      setPending(computeAssignments(restored, serverLabels));
+    } catch {
+      /* corrupt draft — ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkStorageKey]);
+
+  // Persist queue on every change. Full bodies are stored opportunistically
+  // (biggest-item-first) until the payload budget is reached.
+  useEffect(() => {
+    if (!hydratedBulkRef.current || !bulkStorageKey || typeof window === "undefined") return;
+    try {
+      if (pending.length === 0) {
+        window.localStorage.removeItem(bulkStorageKey);
+        return;
+      }
+      const totalThumbBytes = pending.reduce((sum, p) => sum + p.thumb.length, 0);
+      let remaining = Math.max(0, BULK_PERSIST_BUDGET - totalThumbBytes);
+      const withBodies = [...pending].sort((a, b) => (a.bodyDataUrl?.length ?? 0) - (b.bodyDataUrl?.length ?? 0));
+      const bodyById = new Map<string, string | undefined>();
+      for (const p of withBodies) {
+        const len = p.bodyDataUrl?.length ?? 0;
+        if (len && len <= remaining) {
+          bodyById.set(p.id, p.bodyDataUrl);
+          remaining -= len;
+        } else {
+          bodyById.set(p.id, undefined);
+        }
+      }
+      const persisted = pending.map((p) => ({
+        id: p.id, name: p.name, size: p.size, type: p.type,
+        thumb: p.thumb, bodyDataUrl: bodyById.get(p.id),
+        assignedLabel: p.assignedLabel,
+        status: p.status === "uploading" ? "pending" : p.status,
+        error: p.error,
+      }));
+      window.localStorage.setItem(bulkStorageKey, JSON.stringify(persisted));
+    } catch {
+      /* quota exceeded — best-effort only */
+    }
+  }, [pending, bulkStorageKey]);
+
+  const enqueueFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+    const additions: PendingItem[] = [];
+    let skipped = 0;
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) {
+        toast.error(`Skipped "${file.name}" — not an image.`);
+        skipped++; continue;
+      }
+      if (file.size > BULK_MAX_BYTES) {
+        toast.error(`Skipped "${file.name}" — larger than 15 MB.`);
+        skipped++; continue;
+      }
+      // If a "needs re-attach" item with the same filename exists, refill it.
+      const orphan = pending.find((p) => p.status === "needs_reattach" && p.name === file.name);
+      const id = orphan?.id ?? crypto.randomUUID();
+      blobsRef.current.set(id, file);
+      const thumb = await makeThumb(file);
+      const bodyDataUrl = file.size <= 512 * 1024 ? await blobToDataUrl(file) : undefined;
+      const base: PendingItem = orphan
+        ? { ...orphan, thumb, bodyDataUrl, status: "pending", error: undefined, hasBlob: true, size: file.size, type: file.type }
+        : {
+            id, name: file.name, size: file.size, type: file.type, thumb, bodyDataUrl,
+            assignedLabel: "", status: "pending", hasBlob: true,
+          };
+      if (orphan) {
+        setPending((prev) => computeAssignments(prev.map((p) => p.id === id ? base : p), serverLabels));
+      } else {
+        additions.push(base);
+      }
+    }
+    if (additions.length) {
+      setPending((prev) => computeAssignments([...prev, ...additions], serverLabels));
+    }
+    if (additions.length + (files.length - skipped - additions.length) > 0) {
+      // silent success — the queue UI is the confirmation
+    }
+  }, [pending, serverLabels]);
+
+  const removePending = useCallback((id: string) => {
+    blobsRef.current.delete(id);
+    setPending((prev) => computeAssignments(prev.filter((p) => p.id !== id), serverLabels));
+  }, [serverLabels]);
+
+  const reassignPending = useCallback((id: string, nextLabel: string) => {
+    setPending((prev) => {
+      const withNew = prev.map((p) => p.id === id ? { ...p, assignedLabel: nextLabel } : p);
+      // Bump any conflicting sibling off nextLabel then recompute.
+      const cleared = withNew.map((p) =>
+        p.id !== id && p.assignedLabel === nextLabel ? { ...p, assignedLabel: "" } : p,
+      );
+      return computeAssignments(cleared, serverLabels);
+    });
+  }, [serverLabels]);
+
+  const clearBulkQueue = useCallback(() => {
+    blobsRef.current.clear();
+    setPending([]);
+  }, []);
+
+  const cancelBulkUpload = useCallback(() => { cancelRef.current = true; }, []);
+
+  async function uploadBulkQueue() {
+    if (!data?.creator || pending.length === 0) return;
+    const runnable = pending.filter((p) => (p.status === "pending" || p.status === "error") && p.hasBlob);
+    if (runnable.length === 0) {
+      toast.error("Nothing to upload — re-attach any items marked with a warning first.");
+      return;
+    }
     if (!(await ensureConsent({ context: "twin.onboarding.reference" }))) return;
 
-    const MAX_BYTES = 15 * 1024 * 1024;
-    const eligible = files.filter((f) => {
-      if (!f.type.startsWith("image/")) {
-        toast.error(`Skipped "${f.name}" — not an image.`);
-        return false;
-      }
-      if (f.size > MAX_BYTES) {
-        toast.error(`Skipped "${f.name}" — larger than 15 MB.`);
-        return false;
-      }
-      return true;
-    });
-    if (eligible.length === 0) return;
+    cancelRef.current = false;
+    setBulkBusy(true);
+    setBulkProgress({ done: 0, total: runnable.length });
 
-    // Snapshot which recommended labels are already filled so we don't reuse
-    // them across this batch even before the server round-trip refreshes.
-    const takenLabels = new Set(identityRefs.map((r: any) => r.slot_label as string));
-    const openSlots = RECOMMENDED_SHOTS.filter((s) => !takenLabels.has(s.label)).map((s) => s.label);
-    const existingAdditional = identityRefs
-      .map((r: any) => r.slot_label as string)
-      .filter((l) => /^Additional \d+$/.test(l))
-      .map((l) => Number(l.replace(/^Additional /, "")));
-    let nextAdditional = existingAdditional.length ? Math.max(...existingAdditional) + 1 : 1;
-
-    let ok = 0;
-    let failed = 0;
-    for (const file of eligible) {
-      const label = openSlots.shift() ?? `Additional ${nextAdditional++}`;
-      setUploading(`${label} (${ok + failed + 1}/${eligible.length})`);
+    let ok = 0, failed = 0, canceled = 0;
+    for (const item of runnable) {
+      if (cancelRef.current) {
+        canceled++;
+        setPending((prev) => prev.map((p) => p.id === item.id ? { ...p, status: "canceled" } : p));
+        continue;
+      }
+      setPending((prev) => prev.map((p) => p.id === item.id ? { ...p, status: "uploading", error: undefined } : p));
+      const blob = blobsRef.current.get(item.id);
+      if (!blob) {
+        failed++;
+        setPending((prev) => prev.map((p) => p.id === item.id ? { ...p, status: "needs_reattach", hasBlob: false, error: "Re-attach the file" } : p));
+        continue;
+      }
       try {
-        const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
+        const ext = item.name.includes(".") ? item.name.slice(item.name.lastIndexOf(".")) : "";
         const key = `${data.creator.id}/twin/identity_ref/${crypto.randomUUID()}${ext}`;
         const { error } = await supabase.storage
           .from("content-assets")
-          .upload(key, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
-        if (error) { failed++; toast.error(`${file.name}: ${error.message}`); continue; }
-        await add({ data: { kind: "identity_ref", storagePath: key, mimeType: file.type || undefined, slotLabel: label } });
+          .upload(key, blob, { cacheControl: "3600", upsert: false, contentType: item.type || undefined });
+        if (error) throw error;
+        await add({ data: { kind: "identity_ref", storagePath: key, mimeType: item.type || undefined, slotLabel: item.assignedLabel } });
         ok++;
+        // Successful items are pruned from the queue (server owns them now).
+        blobsRef.current.delete(item.id);
+        setPending((prev) => prev.filter((p) => p.id !== item.id));
       } catch (e: any) {
         failed++;
-        toast.error(`${file.name}: ${e?.message ?? "Upload failed"}`);
+        const msg = e?.message ?? "Upload failed";
+        setPending((prev) => prev.map((p) => p.id === item.id ? { ...p, status: "error", error: msg } : p));
+        toast.error(`${item.name}: ${msg}`);
+      } finally {
+        setBulkProgress((s) => ({ ...s, done: s.done + 1 }));
       }
     }
-    setUploading(null);
+
+    setBulkBusy(false);
+    cancelRef.current = false;
     await refresh();
+
     if (ok > 0) {
       toast.success(
-        `Uploaded ${ok} photo${ok === 1 ? "" : "s"}${failed ? ` (${failed} failed)` : ""}.`,
+        `Uploaded ${ok} photo${ok === 1 ? "" : "s"}` +
+        (failed ? ` — ${failed} failed` : "") +
+        (canceled ? ` — ${canceled} canceled` : ""),
       );
+    } else if (canceled) {
+      toast.message(`Canceled. ${canceled} upload${canceled === 1 ? "" : "s"} skipped.`);
     }
   }
 
@@ -420,10 +697,18 @@ function TwinOnboardingWizard() {
             <p className="text-sm text-muted-foreground">
               Fill in as many as you're comfortable with — more angles means more consistent results, but you can continue with just one and add the rest later from your Digital Twin Profile.
             </p>
-            <BulkPhotoDropzone
-              busyLabel={uploading}
+            <BulkPhotoStager
+              pending={pending}
+              serverLabels={serverLabels}
+              busy={bulkBusy}
+              progress={bulkProgress}
               disabled={!data?.creator}
-              onFiles={uploadShotsBulk}
+              onFiles={enqueueFiles}
+              onRemove={removePending}
+              onReassign={reassignPending}
+              onClear={clearBulkQueue}
+              onUpload={uploadBulkQueue}
+              onCancel={cancelBulkUpload}
             />
             <div className="grid gap-3 sm:grid-cols-2">
               {RECOMMENDED_SHOTS.map((shot) => {
@@ -525,70 +810,192 @@ function ConsentRow({ label, hint, checked, onChange }: { label: string; hint: s
   );
 }
 
-function BulkPhotoDropzone({
-  busyLabel, disabled, onFiles,
+function BulkPhotoStager({
+  pending, serverLabels, busy, progress, disabled,
+  onFiles, onRemove, onReassign, onClear, onUpload, onCancel,
 }: {
-  busyLabel: string | null;
+  pending: PendingItem[];
+  serverLabels: Set<string>;
+  busy: boolean;
+  progress: { done: number; total: number };
   disabled: boolean;
   onFiles: (files: File[]) => void | Promise<void>;
+  onRemove: (id: string) => void;
+  onReassign: (id: string, label: string) => void;
+  onClear: () => void;
+  onUpload: () => void | Promise<void>;
+  onCancel: () => void;
 }) {
   const [dragActive, setDragActive] = useState(false);
   const inputId = "bulk-photo-input";
-  const busy = !!busyLabel;
+  const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+  const queuedByLabel = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of pending) if (p.assignedLabel) map.set(p.assignedLabel, p.id);
+    return map;
+  }, [pending]);
+
   return (
-    <div
-      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy && !disabled) setDragActive(true); }}
-      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy && !disabled) setDragActive(true); }}
-      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); }}
-      onDrop={(e) => {
-        e.preventDefault(); e.stopPropagation(); setDragActive(false);
-        if (busy || disabled) return;
-        const files = Array.from(e.dataTransfer.files ?? []);
-        if (files.length) void onFiles(files);
-      }}
-      className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
-        dragActive
-          ? "border-brand/60 bg-brand/5"
-          : "border-border/60 bg-surface/40 hover:border-border"
-      }`}
-      role="group"
-      aria-label="Bulk upload reference photos"
-    >
-      <p className="text-sm">
-        <span className="font-medium">Bulk upload</span>{" "}
-        <span className="text-muted-foreground">— drop several photos, or</span>
-      </p>
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy || disabled}
-          onClick={() => document.getElementById(inputId)?.click()}
-        >
-          {busy ? (
-            <><Loader2 className="mr-2 size-4 animate-spin" />Uploading {busyLabel}</>
-          ) : (
-            <><Upload className="mr-2 size-4" />Choose photos…</>
-          )}
-        </Button>
-        <input
-          id={inputId}
-          type="file"
-          accept="image/*"
-          multiple
-          className="sr-only"
-          disabled={busy || disabled}
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? []);
-            e.target.value = "";
-            if (files.length) void onFiles(files);
-          }}
-        />
+    <div className="space-y-3">
+      <div
+        onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (!disabled) setDragActive(true); }}
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); if (!disabled) setDragActive(true); }}
+        onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); }}
+        onDrop={(e) => {
+          e.preventDefault(); e.stopPropagation(); setDragActive(false);
+          if (disabled) return;
+          const files = Array.from(e.dataTransfer.files ?? []);
+          if (files.length) void onFiles(files);
+        }}
+        className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
+          dragActive
+            ? "border-brand/60 bg-brand/5"
+            : "border-border/60 bg-surface/40 hover:border-border"
+        }`}
+        role="group"
+        aria-label="Bulk upload reference photos"
+      >
+        <p className="text-sm">
+          <span className="font-medium">Bulk upload</span>{" "}
+          <span className="text-muted-foreground">— drop several photos, or</span>
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button type="button" variant="outline" size="sm" disabled={disabled}
+            onClick={() => document.getElementById(inputId)?.click()}>
+            <Upload className="mr-2 size-4" />Choose photos…
+          </Button>
+          <input
+            id={inputId} type="file" accept="image/*" multiple className="sr-only" disabled={disabled}
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              e.target.value = "";
+              if (files.length) void onFiles(files);
+            }}
+          />
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          JPEG/PNG/WebP up to 15 MB each. Files auto-fill unfilled recommended slots first, then overflow into "Additional N".
+        </p>
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        JPEG/PNG/WebP up to 15 MB each. Files fill the recommended slots below in order; extras become "Additional 1", "Additional 2"…
-      </p>
+
+      {pending.length > 0 && (
+        <div className="space-y-3 rounded-xl border border-border bg-surface/40 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-medium">
+              {pending.length} photo{pending.length === 1 ? "" : "s"} staged
+              {busy && <span className="ml-2 text-xs text-muted-foreground">Uploading {progress.done}/{progress.total}…</span>}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {busy ? (
+                <Button type="button" variant="destructive" size="sm" onClick={onCancel}>
+                  <X className="mr-1 size-4" />Cancel
+                </Button>
+              ) : (
+                <>
+                  <Button type="button" variant="ghost" size="sm" onClick={onClear}>
+                    <Trash2 className="mr-1 size-4" />Clear queue
+                  </Button>
+                  <Button type="button" size="sm" onClick={onUpload} disabled={disabled}>
+                    <Upload className="mr-1 size-4" />Upload all
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {busy && <Progress value={pct} aria-label={`Uploading ${progress.done} of ${progress.total}`} />}
+
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {pending.map((p) => {
+              const isRecommended = RECOMMENDED_SHOTS.some((s) => s.label === p.assignedLabel);
+              const options: { label: string; disabled?: boolean; hint?: string }[] = [
+                ...RECOMMENDED_SHOTS.map((s) => {
+                  const filledByServer = serverLabels.has(s.label);
+                  const heldBy = queuedByLabel.get(s.label);
+                  const takenElsewhere = filledByServer || (heldBy && heldBy !== p.id);
+                  return {
+                    label: s.label,
+                    disabled: !!takenElsewhere,
+                    hint: filledByServer ? "filled" : heldBy && heldBy !== p.id ? "in queue" : undefined,
+                  };
+                }),
+              ];
+              if (!isRecommended && p.assignedLabel) {
+                options.push({ label: p.assignedLabel });
+              }
+              return (
+                <li key={p.id} className={`flex items-start gap-3 rounded-lg border p-2 text-xs ${
+                  p.status === "error" ? "border-rose-400/40 bg-rose-400/5"
+                    : p.status === "needs_reattach" ? "border-amber-400/40 bg-amber-400/5"
+                    : p.status === "uploading" ? "border-brand/40 bg-brand/5"
+                    : "border-border bg-background/40"
+                }`}>
+                  <img src={p.thumb} alt="" className="size-14 shrink-0 rounded-md object-cover" />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium" title={p.name}>{p.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => onRemove(p.id)}
+                        disabled={busy}
+                        aria-label={`Remove ${p.name} from queue`}
+                        className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Select
+                        value={p.assignedLabel}
+                        onValueChange={(v) => onReassign(p.id, v)}
+                        disabled={busy || p.status === "uploading"}
+                      >
+                        <SelectTrigger className="h-7 w-[180px] text-xs">
+                          <SelectValue placeholder="Assign a slot" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {options.map((opt) => (
+                            <SelectItem key={opt.label} value={opt.label} disabled={opt.disabled}>
+                              {opt.label}{opt.hint ? ` — ${opt.hint}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <StatusPill status={p.status} />
+                    </div>
+                    {p.status === "error" && p.error && (
+                      <p className="text-[11px] text-rose-300">{p.error}</p>
+                    )}
+                    {p.status === "needs_reattach" && (
+                      <p className="text-[11px] text-amber-300">
+                        <AlertTriangle className="mr-1 inline size-3" />
+                        File body wasn't kept across refresh. Drag it in again (same filename) to re-attach.
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
+  );
+}
+
+function StatusPill({ status }: { status: PendingStatus }) {
+  const map: Record<PendingStatus, { label: string; className: string; icon?: React.ReactNode }> = {
+    pending:        { label: "Ready", className: "border-border text-muted-foreground" },
+    uploading:      { label: "Uploading", className: "border-brand/40 text-brand-glow", icon: <Loader2 className="size-3 animate-spin" /> },
+    done:           { label: "Done", className: "border-emerald-400/40 text-emerald-300", icon: <CheckCircle2 className="size-3" /> },
+    error:          { label: "Failed", className: "border-rose-400/40 text-rose-300" },
+    canceled:       { label: "Canceled", className: "border-border text-muted-foreground", icon: <RotateCcw className="size-3" /> },
+    needs_reattach: { label: "Re-attach", className: "border-amber-400/40 text-amber-300", icon: <AlertTriangle className="size-3" /> },
+  };
+  const s = map[status];
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${s.className}`}>
+      {s.icon}{s.label}
+    </span>
   );
 }
