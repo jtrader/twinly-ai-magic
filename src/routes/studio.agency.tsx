@@ -16,6 +16,8 @@ import {
   getMyAgencyConnection,
   requestAgencyLinkAsCreator,
   cancelMyAgencyRequest,
+  getMyAgencyTimeline,
+  type AgencyTimelineEvent,
   CREATOR_AGENCY_AGREEMENT_VERSION,
 } from "@/lib/agency-connect.functions";
 import { VALID_AGENCY_SCOPES } from "@/lib/agency-consent.functions";
@@ -45,12 +47,14 @@ function StudioAgencyPage() {
   const loadAgencies = useServerFn(listAvailableAgencies);
   const loadConnection = useServerFn(getMyAgencyConnection);
   const loadLevel = useServerFn(getMyVerificationLevel);
+  const loadTimeline = useServerFn(getMyAgencyTimeline);
   const submitRequest = useServerFn(requestAgencyLinkAsCreator);
   const cancelRequest = useServerFn(cancelMyAgencyRequest);
 
   const [agencies, setAgencies] = useState<{ id: string; name: string }[] | null>(null);
   const [connection, setConnection] = useState<any>(null);
   const [level, setLevel] = useState<{ level: number; isAdult: boolean } | null>(null);
+  const [timeline, setTimeline] = useState<AgencyTimelineEvent[]>([]);
   const [ready, setReady] = useState(false);
 
   const [agencyId, setAgencyId] = useState("");
@@ -66,14 +70,16 @@ function StudioAgencyPage() {
 
   async function refresh() {
     try {
-      const [ag, conn, lv] = await Promise.all([
+      const [ag, conn, lv, tl] = await Promise.all([
         loadAgencies(),
         loadConnection(),
         loadLevel().catch(() => ({ level: 0, isAdult: false })),
+        loadTimeline().catch(() => ({ events: [] as AgencyTimelineEvent[] })),
       ]);
       setAgencies(ag.agencies);
       setConnection(conn);
       setLevel({ level: (lv as any)?.level ?? 0, isAdult: !!(lv as any)?.isAdultVerified });
+      setTimeline((tl as any)?.events ?? []);
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to load agency data");
     } finally {
@@ -156,6 +162,8 @@ function StudioAgencyPage() {
           />
         )
       )}
+
+      <AgencyTimeline events={timeline} />
     </AppShell>
   );
 }
