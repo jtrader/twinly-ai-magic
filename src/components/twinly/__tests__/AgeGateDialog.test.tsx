@@ -1,18 +1,19 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 
-// Mocks — must be declared before importing the component under test.
-const verifyAgeMock = vi.fn().mockResolvedValue({ ok: true });
-const acceptLegalMock = vi.fn().mockResolvedValue({ ok: true });
-vi.mock("@tanstack/react-start", () => ({
-  useServerFn: (fn: any) => (fn === verifyAgeMarker ? verifyAgeMock : acceptLegalMock),
+// Mocks — hoisted so they run before the component's imports execute.
+const h = vi.hoisted(() => ({
+  verifyAgeMock: vi.fn().mockResolvedValue({ ok: true }),
+  acceptLegalMock: vi.fn().mockResolvedValue({ ok: true }),
+  verifyAgeMarker: { __name: "verifyAge" },
+  acceptLegalMarker: { __name: "acceptLegal" },
 }));
-// Sentinel objects so the mocked useServerFn can tell the two fns apart.
-const verifyAgeMarker = { __name: "verifyAge" };
-const acceptLegalMarker = { __name: "acceptLegal" };
-vi.mock("@/lib/age-gate.functions", () => ({ verifyAge: verifyAgeMarker }));
+vi.mock("@tanstack/react-start", () => ({
+  useServerFn: (fn: any) => (fn === h.verifyAgeMarker ? h.verifyAgeMock : h.acceptLegalMock),
+}));
+vi.mock("@/lib/age-gate.functions", () => ({ verifyAge: h.verifyAgeMarker }));
 vi.mock("@/lib/legal-acceptance.functions", () => ({
-  acceptLegal: acceptLegalMarker,
+  acceptLegal: h.acceptLegalMarker,
   LEGAL_ACCEPTANCE_VERSION: "2026-07-13",
 }));
 vi.mock("@/integrations/supabase/client", () => ({
@@ -23,8 +24,8 @@ import { AgeGateDialog, AGE_GATE_STORAGE_KEY, LEGAL_STORAGE_KEY } from "../AgeGa
 
 beforeEach(() => {
   localStorage.clear();
-  verifyAgeMock.mockClear();
-  acceptLegalMock.mockClear();
+  h.verifyAgeMock.mockClear();
+  h.acceptLegalMock.mockClear();
 });
 afterEach(() => cleanup());
 
@@ -48,7 +49,7 @@ describe("AgeGateDialog", () => {
     expect(new Date(stored.at).toString()).not.toBe("Invalid Date");
 
     // Server-authoritative record for the admin user log.
-    expect(acceptLegalMock).toHaveBeenCalledWith({
+    expect(h.acceptLegalMock).toHaveBeenCalledWith({
       data: { version: "2026-07-13", context: "age_gate_dialog" },
     });
   });
