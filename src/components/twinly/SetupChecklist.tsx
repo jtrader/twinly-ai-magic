@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, Circle, ChevronRight, HelpCircle } from "lucide-react";
+import { CheckCircle2, ChevronRight, HelpCircle, AlertTriangle, Clock, Info } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -8,12 +8,25 @@ export type ChecklistStep = {
   title: string;
   to: string;
   toHash?: string;
+  toSearch?: Record<string, string | number>;
   done: boolean;
   optional?: boolean;
   why: string; // Why it matters
   who: string; // Who is involved
   what: string; // What you'll do
   how: string; // How long / how to
+  /** Short inline status line rendered under the title, e.g. "60% complete",
+   *  "Awaiting admin review", "Verified — Alan Watts", "ID no longer resolves". */
+  statusReason?: string;
+  /** Colours the inline status line. Defaults to "info". */
+  statusTone?: "ok" | "warn" | "error" | "info";
+};
+
+const TONE_STYLES: Record<NonNullable<ChecklistStep["statusTone"]>, { text: string; Icon: typeof CheckCircle2 }> = {
+  ok: { text: "text-emerald-300", Icon: CheckCircle2 },
+  warn: { text: "text-amber-300", Icon: Clock },
+  error: { text: "text-rose-300", Icon: AlertTriangle },
+  info: { text: "text-muted-foreground", Icon: Info },
 };
 
 export function SetupChecklist({ steps }: { steps: ChecklistStep[] }) {
@@ -84,6 +97,7 @@ export function SetupChecklist({ steps }: { steps: ChecklistStep[] }) {
       <ol className="space-y-2">
         {steps.map((step, i) => {
           const isNext = !step.done && i === nextIdx;
+          const tone = TONE_STYLES[step.statusTone ?? "info"];
           return (
             <li
               key={step.key}
@@ -131,6 +145,12 @@ export function SetupChecklist({ steps }: { steps: ChecklistStep[] }) {
                       <span className="sr-only">Step {i + 1} complete</span>
                     )}
                   </div>
+                  {step.statusReason && (
+                    <p className={`mt-1 inline-flex items-center gap-1 text-[11px] font-medium ${tone.text}`} role="status">
+                      <tone.Icon className="size-3.5" aria-hidden />
+                      <span>{step.statusReason}</span>
+                    </p>
+                  )}
                   {!step.done && (
                     <p className={"mt-1 text-xs " + (isNext ? "text-foreground/80" : "text-muted-foreground")}>
                       {step.why}
@@ -155,6 +175,7 @@ export function SetupChecklist({ steps }: { steps: ChecklistStep[] }) {
                   <Link
                     to={step.to}
                     hash={step.toHash}
+                    search={step.toSearch as any}
                     className="shrink-0"
                     aria-label={`${isNext ? "Start" : "Open"}: ${step.title}`}
                   >
