@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadVoiceSourceRecording } from "@/lib/voice-sources.functions";
+import { useMediaUploadConsent } from "@/components/twinly/MediaUploadConsentGate";
 import { Mic, Square, Upload, RotateCcw } from "lucide-react";
 
 type MicPermission = "idle" | "requesting" | "granted" | "denied";
