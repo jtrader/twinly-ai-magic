@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
 import { getTwinProfile, addTwinReference, upsertTwinConsent, submitTwinReferencesForReview } from "@/lib/twin.functions";
+import { getBaselineVeniceCharacter, setBaselineVeniceCharacter } from "@/lib/venice-character.functions";
+import { VeniceCharacterField } from "@/components/twinly/persona-form-shared";
 
 export const Route = createFileRoute("/studio/twin-onboarding")({
   component: TwinOnboardingWizard,
@@ -37,8 +39,10 @@ function TwinOnboardingWizard() {
   const add = useServerFn(addTwinReference);
   const upsertConsent = useServerFn(upsertTwinConsent);
   const submitReview = useServerFn(submitTwinReferencesForReview);
+  const loadBaseline = useServerFn(getBaselineVeniceCharacter);
+  const saveBaseline = useServerFn(setBaselineVeniceCharacter);
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [data, setData] = useState<Profile | null>(null);
   const [ready, setReady] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -48,6 +52,9 @@ function TwinOnboardingWizard() {
   const [videoOk, setVideoOk] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [baselineSlug, setBaselineSlug] = useState("");
+  const [baselineInitial, setBaselineInitial] = useState<string | null>(null);
+  const [savingBaseline, setSavingBaseline] = useState(false);
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
@@ -67,6 +74,39 @@ function TwinOnboardingWizard() {
   };
 
   useEffect(() => { if (user) refresh(); }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    (async () => {
+      try {
+        const r = await loadBaseline();
+        if (!alive) return;
+        setBaselineSlug(r.slug ?? "");
+        setBaselineInitial(r.slug);
+      } catch { /* ignore */ }
+    })();
+    return () => { alive = false; };
+  }, [user, loadBaseline]);
+
+  async function saveBaselineAndContinue() {
+    const next = baselineSlug.trim() || null;
+    if (next === (baselineInitial?.trim() || null)) {
+      setStep(3);
+      return;
+    }
+    setSavingBaseline(true);
+    try {
+      const r = await saveBaseline({ data: { slug: next } });
+      setBaselineInitial(r.slug);
+      if (r.slug) toast.success("Baseline Character ID saved");
+      setStep(3);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not save Character ID");
+    } finally {
+      setSavingBaseline(false);
+    }
+  }
 
   const identityRefs = useMemo(() => (data?.refs ?? []).filter((r: any) => r.kind === "identity_ref"), [data]);
   const filledShots = useMemo(() => {
@@ -97,7 +137,7 @@ function TwinOnboardingWizard() {
     if (!likenessOk) return toast.error("Likeness consent is required to generate any synthetic content.");
     try {
       await upsertConsent({ data: { likenessOk, imageOk, voiceOk, videoOk } });
-      setStep(4);
+      setStep(5);
     } catch (e: any) {
       toast.error(e.message ?? "Could not save consent");
     }
@@ -134,7 +174,7 @@ function TwinOnboardingWizard() {
     <AppShell>
       <div className="mx-auto max-w-2xl">
         <div className="mb-8 flex items-center gap-2">
-          {([1, 2, 3, 4] as const).map((s) => (
+          {([1, 2, 3, 4, 5] as const).map((s) => (
             <div key={s} className={`h-1.5 flex-1 rounded-full ${s <= step ? "bg-brand" : "bg-border"}`} />
           ))}
         </div>
@@ -155,6 +195,37 @@ function TwinOnboardingWizard() {
         )}
 
         {step === 2 && (
+          <div className="space-y-4">
+            <div className="flex items-baseline justify-between">
+              <h1 className="font-display text-2xl font-bold">Character ID (optional)</h1>
+              <span className="text-xs text-muted-foreground">Step 2 of 5</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              If you've already built a Venice Character, paste its ID here and every new AI persona will
+              pick it up as the default — no need to paste it into each persona later. You can skip this
+              and add or change it any time from your Digital Twin Profile.
+            </p>
+            <VeniceCharacterField
+              idPrefix="onboarding-baseline"
+              value={baselineSlug}
+              onChange={setBaselineSlug}
+            />
+            <div className="flex justify-between pt-2">
+              <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setStep(3)} disabled={savingBaseline}>
+                  Skip
+                </Button>
+                <Button onClick={saveBaselineAndContinue} disabled={savingBaseline}>
+                  {savingBaseline ? "Saving…" : "Save & continue"}
+                  <ArrowRight className="ml-2 size-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
           <div className="space-y-4">
             <div className="flex items-baseline justify-between">
               <h1 className="font-display text-2xl font-bold">Reference photos</h1>
@@ -185,15 +256,15 @@ function TwinOnboardingWizard() {
               })}
             </div>
             <div className="flex justify-between pt-2">
-              <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={() => setStep(3)} disabled={identityRefs.length === 0}>
+              <Button variant="ghost" onClick={() => setStep(2)}>Back</Button>
+              <Button onClick={() => setStep(4)} disabled={identityRefs.length === 0}>
                 Continue<ArrowRight className="ml-2 size-4" />
               </Button>
             </div>
           </div>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <div className="space-y-4">
             <h1 className="font-display text-2xl font-bold">Consent</h1>
             <p className="text-sm text-muted-foreground">
@@ -210,13 +281,13 @@ function TwinOnboardingWizard() {
               <Link to="/studio/twin" className="text-brand-glow underline">full Digital Twin Profile</Link> any time.
             </p>
             <div className="flex justify-between pt-2">
-              <Button variant="ghost" onClick={() => setStep(2)}>Back</Button>
+              <Button variant="ghost" onClick={() => setStep(3)}>Back</Button>
               <Button onClick={saveConsentAndContinue}>Continue<ArrowRight className="ml-2 size-4" /></Button>
             </div>
           </div>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <div className="space-y-4">
             <h1 className="font-display text-2xl font-bold">Submit for review</h1>
             {!submitted ? (
@@ -225,7 +296,7 @@ function TwinOnboardingWizard() {
                   An admin will review your {identityRefs.length} photo{identityRefs.length === 1 ? "" : "s"} before they can be used to generate anything. This is usually quick, and you can keep working in the meantime.
                 </p>
                 <div className="flex justify-between pt-2">
-                  <Button variant="ghost" onClick={() => setStep(3)}>Back</Button>
+                  <Button variant="ghost" onClick={() => setStep(4)}>Back</Button>
                   <Button onClick={finishAndSubmit} disabled={submitting}>
                     {submitting ? "Submitting…" : "Submit for review"}
                   </Button>
