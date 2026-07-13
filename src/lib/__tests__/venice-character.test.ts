@@ -7,7 +7,9 @@ const lookupSrc = readFileSync(resolve(process.cwd(), "src/lib/venice-character.
 const studioSrc = readFileSync(resolve(process.cwd(), "src/lib/persona-studio.functions.ts"), "utf8");
 const chatSrc = readFileSync(resolve(process.cwd(), "src/lib/chat.functions.ts"), "utf8");
 const onboardingSrc = readFileSync(resolve(process.cwd(), "src/lib/onboarding.functions.ts"), "utf8");
-const uiSrc = readFileSync(resolve(process.cwd(), "src/routes/studio.personas.tsx"), "utf8");
+const uiSrc = readFileSync(resolve(process.cwd(), "src/components/twinly/persona-form-shared.tsx"), "utf8");
+const newPersonaSrc = readFileSync(resolve(process.cwd(), "src/routes/studio.personas.new.tsx"), "utf8");
+const editPersonaSrc = readFileSync(resolve(process.cwd(), "src/routes/studio.personas.$personaId.edit.tsx"), "utf8");
 
 describe("getVeniceCharacter (structural)", () => {
   const start = veniceSrc.indexOf("export async function getVeniceCharacter");
@@ -107,18 +109,20 @@ describe("venice_character_slug reaches the chat generation path (structural)", 
 
 describe("Venice Character quick-start UI (structural)", () => {
   it("previews via the auth-gated lookup function, not a raw fetch to Venice from the client", () => {
-    expect(uiSrc).toContain('import { lookupVeniceCharacter } from "@/lib/venice-character.functions";');
+    expect(uiSrc).toContain('lookupVeniceCharacter, type LookupVeniceCharacterResult } from "@/lib/venice-character.functions";');
     expect(uiSrc).toContain("useServerFn(lookupVeniceCharacter)");
   });
 
-  it("only shows the field for AI personas, in both create and edit dialogs", () => {
-    const createIdx = uiSrc.indexOf('idPrefix="create-persona"');
-    const editIdx = uiSrc.indexOf('idPrefix="edit-persona"');
-    expect(createIdx).toBeGreaterThan(-1);
-    expect(editIdx).toBeGreaterThan(-1);
+  it("only shows the field for AI personas, in both the new-persona and edit-persona pages", () => {
+    // The field now lives in a shared ExternalModelIdsPanel component, rendered
+    // only inside each page's `kind === "ai"` branch, with a page-specific idPrefix.
+    expect(newPersonaSrc).toContain('idPrefix="new-persona"');
+    expect(newPersonaSrc).toContain("<ExternalModelIdsPanel");
+    expect(editPersonaSrc).toContain('idPrefix="edit-persona"');
+    expect(editPersonaSrc).toContain("<ExternalModelIdsPanel");
   });
 
-  it("renders the not-found case distinctly from a found character, rather than silently accepting any slug", () => {
-    expect(uiSrc).toContain("No published Venice Character found with that slug.");
+  it("renders the not-found case distinctly from a found character, rather than silently accepting any ID", () => {
+    expect(uiSrc).toContain("No published Venice Character found with that ID.");
   });
 });

@@ -111,8 +111,8 @@ describe("chat TTS engine selection (structural)", () => {
   const start = chatSrc.indexOf("if ((persona as any).voice_reply_enabled)");
   const body = chatSrc.slice(start, start + 1500);
 
-  it("only uses the cloned voice when both the persona opted in AND the creator actually has one", () => {
-    expect(body).toContain("(persona as any).use_cloned_voice && creator.elevenlabs_voice_id");
+  it("only uses the cloned voice when both the persona opted in AND the creator actually has one (absent a persona-level override)", () => {
+    expect(body).toContain("(persona as any).use_cloned_voice ? creator.elevenlabs_voice_id : null");
   });
 
   it("never falls back from ElevenLabs to the generic preset (or vice versa) within a single reply", () => {
