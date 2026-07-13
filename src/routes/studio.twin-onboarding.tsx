@@ -524,3 +524,71 @@ function ConsentRow({ label, hint, checked, onChange }: { label: string; hint: s
     </div>
   );
 }
+
+function BulkPhotoDropzone({
+  busyLabel, disabled, onFiles,
+}: {
+  busyLabel: string | null;
+  disabled: boolean;
+  onFiles: (files: File[]) => void | Promise<void>;
+}) {
+  const [dragActive, setDragActive] = useState(false);
+  const inputId = "bulk-photo-input";
+  const busy = !!busyLabel;
+  return (
+    <div
+      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy && !disabled) setDragActive(true); }}
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy && !disabled) setDragActive(true); }}
+      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); }}
+      onDrop={(e) => {
+        e.preventDefault(); e.stopPropagation(); setDragActive(false);
+        if (busy || disabled) return;
+        const files = Array.from(e.dataTransfer.files ?? []);
+        if (files.length) void onFiles(files);
+      }}
+      className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
+        dragActive
+          ? "border-brand/60 bg-brand/5"
+          : "border-border/60 bg-surface/40 hover:border-border"
+      }`}
+      role="group"
+      aria-label="Bulk upload reference photos"
+    >
+      <p className="text-sm">
+        <span className="font-medium">Bulk upload</span>{" "}
+        <span className="text-muted-foreground">— drop several photos, or</span>
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={busy || disabled}
+          onClick={() => document.getElementById(inputId)?.click()}
+        >
+          {busy ? (
+            <><Loader2 className="mr-2 size-4 animate-spin" />Uploading {busyLabel}</>
+          ) : (
+            <><Upload className="mr-2 size-4" />Choose photos…</>
+          )}
+        </Button>
+        <input
+          id={inputId}
+          type="file"
+          accept="image/*"
+          multiple
+          className="sr-only"
+          disabled={busy || disabled}
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = "";
+            if (files.length) void onFiles(files);
+          }}
+        />
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        JPEG/PNG/WebP up to 15 MB each. Files fill the recommended slots below in order; extras become "Additional 1", "Additional 2"…
+      </p>
+    </div>
+  );
+}
