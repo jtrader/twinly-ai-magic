@@ -2353,6 +2353,8 @@ export type Database = {
           handle: string | null
           id: string
           id_verified_at: string | null
+          media_upload_consent_at: string | null
+          media_upload_consent_version: string | null
           profile_completed_at: string | null
           strike_count: number
           updated_at: string
@@ -2371,6 +2373,8 @@ export type Database = {
           handle?: string | null
           id: string
           id_verified_at?: string | null
+          media_upload_consent_at?: string | null
+          media_upload_consent_version?: string | null
           profile_completed_at?: string | null
           strike_count?: number
           updated_at?: string
@@ -2389,6 +2393,8 @@ export type Database = {
           handle?: string | null
           id?: string
           id_verified_at?: string | null
+          media_upload_consent_at?: string | null
+          media_upload_consent_version?: string | null
           profile_completed_at?: string | null
           strike_count?: number
           updated_at?: string
@@ -3690,6 +3696,8 @@ export type Database = {
           handle: string | null
           id: string
           id_verified_at: string | null
+          media_upload_consent_at: string | null
+          media_upload_consent_version: string | null
           profile_completed_at: string | null
           strike_count: number
           updated_at: string
