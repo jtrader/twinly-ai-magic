@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertLegalAccepted } from "./legal-acceptance.functions";
 
 export const MEDIA_UPLOAD_CONSENT_VERSION = "2026-07-13";
 
@@ -30,6 +31,9 @@ export const acknowledgeMediaUploadConsent = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => AckSchema.parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    // Server-side enforcement: media consent cannot be recorded before the
+    // user has accepted the current Terms/Privacy/AUP/AI-Disclosure bundle.
+    await assertLegalAccepted(context);
     const nowIso = new Date().toISOString();
     const { error } = await supabase
       .from("profiles")
