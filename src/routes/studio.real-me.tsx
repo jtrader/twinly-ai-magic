@@ -685,13 +685,21 @@ function GenerateProfileDialog({
   open,
   onOpenChange,
   initialSeed,
+  autoRun,
+  lockedIds,
+  lockedAnswers,
+  previousAnswers,
   generate,
   onPick,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initialSeed: SeedInput | null;
-  generate: (input: { data: { seed: SeedInput; count: number } }) => Promise<{ variants: Variant[] }>;
+  autoRun?: boolean;
+  lockedIds?: string[];
+  lockedAnswers?: Record<string, unknown>;
+  previousAnswers?: Record<string, unknown> | null;
+  generate: (input: { data: { seed: SeedInput; count: number; lockedAnswers?: Record<string, unknown> } }) => Promise<{ variants: Variant[] }>;
   onPick: (seed: SeedInput, answers: Record<string, unknown>) => void;
 }) {
   const [step, setStep] = useState<"seeds" | "loading" | "pick" | "error">("seeds");
@@ -703,6 +711,8 @@ function GenerateProfileDialog({
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [attempt, setAttempt] = useState(0);
   const [pickView, setPickView] = useState<"cards" | "compare">("cards");
+  const lockedAnswersRef = useRef<Record<string, unknown>>({});
+  useEffect(() => { lockedAnswersRef.current = lockedAnswers ?? {}; }, [lockedAnswers]);
 
   // Rehydrate previous seeds when dialog re-opens (e.g. Regenerate from draft banner)
   useEffect(() => {
@@ -713,10 +723,17 @@ function GenerateProfileDialog({
       setLifestyle(initialSeed.lifestyle);
       setTraits(initialSeed.traits);
     }
-    setStep("seeds");
     setVariants([]);
     setErrorMsg("");
-    setPickView("cards");
+    setPickView(previousAnswers ? "compare" : "cards");
+    if (autoRun && initialSeed) {
+      setStep("loading");
+      // Kick off generation once state is set.
+      void runGenerateWith(initialSeed);
+    } else {
+      setStep("seeds");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialSeed]);
 
   function toggle(list: string[], value: string, setter: (v: string[]) => void, limit: number) {
@@ -727,14 +744,12 @@ function GenerateProfileDialog({
   const busy = step === "loading";
   const canGenerate = !!gender && !!age && lifestyle.length > 0 && traits.length > 0 && !busy;
 
-  async function runGenerate() {
-    if (!canGenerate) return;
-    const seed: SeedInput = { gender, ageBracket: age, lifestyle, traits };
+  async function runGenerateWith(seed: SeedInput) {
     setStep("loading");
     setErrorMsg("");
     setAttempt((a) => a + 1);
     try {
-      const res = await generate({ data: { seed, count: 3 } });
+      const res = await generate({ data: { seed, count: 3, lockedAnswers: lockedAnswersRef.current } });
       if (!res.variants.length) {
         setStep("error");
         setErrorMsg("AI returned no usable variants. Try again.");
@@ -748,6 +763,11 @@ function GenerateProfileDialog({
     }
   }
 
+  async function runGenerate() {
+    if (!canGenerate) return;
+    await runGenerateWith({ gender, ageBracket: age, lifestyle, traits });
+  }
+
   function pickVariant(v: Variant) {
     onPick({ gender, ageBracket: age, lifestyle, traits }, v.answers);
   }
@@ -758,11 +778,18 @@ function GenerateProfileDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="size-4 text-brand" /> Generate random AI profile
+            {lockedIds && lockedIds.length > 0 && (
+              <Badge variant="outline" className="ml-1 gap-1 border-amber-400/50 text-amber-400">
+                <Lock className="size-3" /> {lockedIds.length} locked
+              </Badge>
+            )}
           </DialogTitle>
           <DialogDescription>
             {step === "pick"
               ? "Pick your favorite variant. You'll be able to edit every field before saving."
-              : "Answer a few quick seeds — AI drafts 3 alternate profiles so you can pick the best one."}
+              : lockedIds && lockedIds.length > 0
+                ? "Locked answers stay fixed. AI drafts 3 alternate profiles for the rest."
+                : "Answer a few quick seeds — AI drafts 3 alternate profiles so you can pick the best one."}
           </DialogDescription>
         </DialogHeader>
 
@@ -866,7 +893,7 @@ function GenerateProfileDialog({
                 ))}
               </div>
             ) : (
-              <VariantCompareTable variants={variants} onPick={pickVariant} />
+              <VariantCompareTable variants={variants} previousAnswers={previousAnswers ?? null} onPick={pickVariant} />
             )}
           </div>
         )}
