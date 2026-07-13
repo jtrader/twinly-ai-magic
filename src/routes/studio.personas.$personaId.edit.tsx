@@ -32,7 +32,7 @@ import {
   type PersonaIntroVideoStatus,
 } from "@/lib/persona-intro-video.functions";
 import {
-  CONTENT_THEME_KEYS, CONTENT_THEME_LABELS, VISIBILITY_LABEL, VeniceCharacterField, VoiceSettingSlider,
+  CONTENT_THEME_KEYS, CONTENT_THEME_LABELS, VISIBILITY_LABEL, ExternalModelIdsPanel, VoiceSettingSlider,
   centsToDollarsInput, dollarsInputToCents, resizeImageToBlob,
   type Persona, type Visibility,
 } from "@/components/twinly/persona-form-shared";
@@ -59,7 +59,7 @@ function EditPersonaPage() {
   const setVis = useServerFn(setPersonaVisibility);
 
   const [persona, setPersona] = useState<Persona | null>(null);
-  const [creator, setCreator] = useState<{ id: string; elevenlabsVoiceId: string | null; digitalTwinStatus?: string } | null>(null);
+  const [creator, setCreator] = useState<{ id: string; elevenlabsVoiceId: string | null; digitalTwinStatus?: string; baselineVeniceSlug: string | null } | null>(null);
   const [ready, setReady] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -71,6 +71,7 @@ function EditPersonaPage() {
       id: r.creator.id,
       elevenlabsVoiceId: (r.creator as any).elevenlabs_voice_id ?? null,
       digitalTwinStatus: (r.creator as any).digital_twin_status,
+      baselineVeniceSlug: (r.creator as any).venice_character_slug ?? null,
     });
     setPersona(p);
     setReady(true);
@@ -100,7 +101,7 @@ function PersonaEditForm({
   persona, creator, update, setVis, refresh,
 }: {
   persona: Persona;
-  creator: { id: string; elevenlabsVoiceId: string | null; digitalTwinStatus?: string };
+  creator: { id: string; elevenlabsVoiceId: string | null; digitalTwinStatus?: string; baselineVeniceSlug: string | null };
   update: ReturnType<typeof useServerFn<typeof updatePersona>>;
   setVis: ReturnType<typeof useServerFn<typeof setPersonaVisibility>>;
   refresh: () => Promise<void>;
@@ -238,6 +239,7 @@ function PersonaEditForm({
   const [linkedRefIds, setLinkedRefIds] = useState<string[]>(((persona as any).linked_twin_ref_ids as string[] | null) ?? []);
   const [heygenAvatarId, setHeygenAvatarId] = useState(((persona as any).heygen_avatar_id as string | null) ?? "");
   const [heygenVoiceId, setHeygenVoiceId] = useState(((persona as any).heygen_voice_id as string | null) ?? "");
+  const [elevenlabsVoiceIdOverride, setElevenlabsVoiceIdOverride] = useState(((persona as any).elevenlabs_voice_id as string | null) ?? "");
   const [twinRefs, setTwinRefs] = useState<any[] | null>(null);
   const loadTwin = useServerFn(getTwinProfile);
   useEffect(() => {
@@ -376,6 +378,7 @@ function PersonaEditForm({
         voiceStyle: persona.kind === "ai" && useClonedVoice ? voiceStyle : undefined,
         requireIdVerification: persona.kind === "ai" ? requireIdVerification : undefined,
         veniceCharacterSlug: persona.kind === "ai" ? veniceCharacterSlug : undefined,
+        elevenlabsVoiceId: persona.kind === "ai" ? elevenlabsVoiceIdOverride : undefined,
         trainingNotes: { tone_examples: toneExamples, dos, donts, sample_phrasings: samplePhrasings, voice_ref_url: voiceRefUrl },
         twinLinkMode, linkedTwinRefIds: twinLinkMode === "selected" ? linkedRefIds : [],
         heygenAvatarId, heygenVoiceId, avatarUrl,
