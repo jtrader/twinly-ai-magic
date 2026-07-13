@@ -54,6 +54,7 @@ import { Route as ApiGenerateImageRouteImport } from './routes/api/generate-imag
 import { Route as AccountSubscriptionsRouteImport } from './routes/account.subscriptions'
 import { Route as AccountSetupRouteImport } from './routes/account.setup'
 import { Route as AccountFollowingRouteImport } from './routes/account.following'
+import { Route as StudioPersonasNewRouteImport } from './routes/studio.personas.new'
 import { Route as StudioPacksPackIdRouteImport } from './routes/studio.packs.$packId'
 import { Route as CreatorsHandlePersonaRouteImport } from './routes/creators.$handle.$persona'
 import { Route as ChatHandlePersonaRouteImport } from './routes/chat.$handle.$persona'
@@ -291,6 +292,11 @@ const AccountFollowingRoute = AccountFollowingRouteImport.update({
   path: '/following',
   getParentRoute: () => AccountRoute,
 } as any)
+const StudioPersonasNewRoute = StudioPersonasNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => StudioPersonasRoute,
+} as any)
 const StudioPacksPackIdRoute = StudioPacksPackIdRouteImport.update({
   id: '/$packId',
   path: '/$packId',
@@ -390,7 +396,7 @@ export interface FileRoutesByFullPath {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
-  '/studio/personas': typeof StudioPersonasRoute
+  '/studio/personas': typeof StudioPersonasRouteWithChildren
   '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
   '/studio/real-me': typeof StudioRealMeRoute
@@ -403,6 +409,7 @@ export interface FileRoutesByFullPath {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/studio/personas/new': typeof StudioPersonasNewRoute
   '/api/public/cron/close-polls': typeof ApiPublicCronClosePollsRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/cron/venice-video-poll': typeof ApiPublicCronVeniceVideoPollRoute
@@ -447,7 +454,7 @@ export interface FileRoutesByTo {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
-  '/studio/personas': typeof StudioPersonasRoute
+  '/studio/personas': typeof StudioPersonasRouteWithChildren
   '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
   '/studio/real-me': typeof StudioRealMeRoute
@@ -460,6 +467,7 @@ export interface FileRoutesByTo {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/studio/personas/new': typeof StudioPersonasNewRoute
   '/api/public/cron/close-polls': typeof ApiPublicCronClosePollsRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/cron/venice-video-poll': typeof ApiPublicCronVeniceVideoPollRoute
@@ -506,7 +514,7 @@ export interface FileRoutesById {
   '/studio/packs': typeof StudioPacksRouteWithChildren
   '/studio/payouts': typeof StudioPayoutsRoute
   '/studio/persona-onboarding': typeof StudioPersonaOnboardingRoute
-  '/studio/personas': typeof StudioPersonasRoute
+  '/studio/personas': typeof StudioPersonasRouteWithChildren
   '/studio/polls': typeof StudioPollsRoute
   '/studio/pricing': typeof StudioPricingRoute
   '/studio/real-me': typeof StudioRealMeRoute
@@ -519,6 +527,7 @@ export interface FileRoutesById {
   '/chat/$handle/$persona': typeof ChatHandlePersonaRoute
   '/creators/$handle/$persona': typeof CreatorsHandlePersonaRoute
   '/studio/packs/$packId': typeof StudioPacksPackIdRoute
+  '/studio/personas/new': typeof StudioPersonasNewRoute
   '/api/public/cron/close-polls': typeof ApiPublicCronClosePollsRoute
   '/api/public/cron/heygen-poll': typeof ApiPublicCronHeygenPollRoute
   '/api/public/cron/venice-video-poll': typeof ApiPublicCronVeniceVideoPollRoute
@@ -579,6 +588,7 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/studio/personas/new'
     | '/api/public/cron/close-polls'
     | '/api/public/cron/heygen-poll'
     | '/api/public/cron/venice-video-poll'
@@ -636,6 +646,7 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/studio/personas/new'
     | '/api/public/cron/close-polls'
     | '/api/public/cron/heygen-poll'
     | '/api/public/cron/venice-video-poll'
@@ -694,6 +705,7 @@ export interface FileRouteTypes {
     | '/chat/$handle/$persona'
     | '/creators/$handle/$persona'
     | '/studio/packs/$packId'
+    | '/studio/personas/new'
     | '/api/public/cron/close-polls'
     | '/api/public/cron/heygen-poll'
     | '/api/public/cron/venice-video-poll'
@@ -734,7 +746,7 @@ export interface RootRouteChildren {
   StudioPacksRoute: typeof StudioPacksRouteWithChildren
   StudioPayoutsRoute: typeof StudioPayoutsRoute
   StudioPersonaOnboardingRoute: typeof StudioPersonaOnboardingRoute
-  StudioPersonasRoute: typeof StudioPersonasRoute
+  StudioPersonasRoute: typeof StudioPersonasRouteWithChildren
   StudioPollsRoute: typeof StudioPollsRoute
   StudioPricingRoute: typeof StudioPricingRoute
   StudioRealMeRoute: typeof StudioRealMeRoute
@@ -1069,6 +1081,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountFollowingRouteImport
       parentRoute: typeof AccountRoute
     }
+    '/studio/personas/new': {
+      id: '/studio/personas/new'
+      path: '/new'
+      fullPath: '/studio/personas/new'
+      preLoaderRoute: typeof StudioPersonasNewRouteImport
+      parentRoute: typeof StudioPersonasRoute
+    }
     '/studio/packs/$packId': {
       id: '/studio/packs/$packId'
       path: '/$packId'
@@ -1212,6 +1231,18 @@ const StudioPacksRouteWithChildren = StudioPacksRoute._addFileChildren(
   StudioPacksRouteChildren,
 )
 
+interface StudioPersonasRouteChildren {
+  StudioPersonasNewRoute: typeof StudioPersonasNewRoute
+}
+
+const StudioPersonasRouteChildren: StudioPersonasRouteChildren = {
+  StudioPersonasNewRoute: StudioPersonasNewRoute,
+}
+
+const StudioPersonasRouteWithChildren = StudioPersonasRoute._addFileChildren(
+  StudioPersonasRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRouteWithChildren,
@@ -1244,7 +1275,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudioPacksRoute: StudioPacksRouteWithChildren,
   StudioPayoutsRoute: StudioPayoutsRoute,
   StudioPersonaOnboardingRoute: StudioPersonaOnboardingRoute,
-  StudioPersonasRoute: StudioPersonasRoute,
+  StudioPersonasRoute: StudioPersonasRouteWithChildren,
   StudioPollsRoute: StudioPollsRoute,
   StudioPricingRoute: StudioPricingRoute,
   StudioRealMeRoute: StudioRealMeRoute,
