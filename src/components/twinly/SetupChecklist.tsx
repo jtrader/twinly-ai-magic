@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, ChevronRight, HelpCircle, AlertTriangle, Clock, Info } from "lucide-react";
+import { CheckCircle2, ChevronRight, HelpCircle, AlertTriangle, Clock, Info, Loader2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -20,6 +20,16 @@ export type ChecklistStep = {
   statusReason?: string;
   /** Colours the inline status line. Defaults to "info". */
   statusTone?: "ok" | "warn" | "error" | "info";
+  /** True while server-side validation for this step is still running.
+   *  Renders a "Verifying…" skeleton instead of a status line and hides
+   *  the Start button until the check resolves. */
+  loading?: boolean;
+  /** Optional retry action, shown when a step failed validation
+   *  (typically tone "warn" / "error"). Lets the user re-run the check
+   *  without losing progress or navigating away. */
+  onRetry?: () => void;
+  /** Label for the retry button. Defaults to "Retry". */
+  retryLabel?: string;
 };
 
 const TONE_STYLES: Record<NonNullable<ChecklistStep["statusTone"]>, { text: string; Icon: typeof CheckCircle2 }> = {
@@ -98,9 +108,16 @@ export function SetupChecklist({ steps }: { steps: ChecklistStep[] }) {
         {steps.map((step, i) => {
           const isNext = !step.done && i === nextIdx;
           const tone = TONE_STYLES[step.statusTone ?? "info"];
+          const showRetry = !!step.onRetry && !step.done && !step.loading
+            && (step.statusTone === "warn" || step.statusTone === "error");
           return (
             <li
               key={step.key}
+              data-testid={`checklist-step-${step.key}`}
+              data-done={step.done ? "true" : "false"}
+              data-next={isNext ? "true" : "false"}
+              data-loading={step.loading ? "true" : "false"}
+              data-status={step.statusTone ?? ""}
               aria-current={isNext ? "step" : undefined}
               className={
                 "rounded-xl border p-3 transition " +
@@ -145,11 +162,35 @@ export function SetupChecklist({ steps }: { steps: ChecklistStep[] }) {
                       <span className="sr-only">Step {i + 1} complete</span>
                     )}
                   </div>
-                  {step.statusReason && (
+                  {step.loading ? (
+                    <p
+                      className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground"
+                      role="status"
+                      aria-live="polite"
+                      data-testid={`checklist-step-${step.key}-verifying`}
+                    >
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                      <span>Verifying…</span>
+                    </p>
+                  ) : step.statusReason && (
                     <p className={`mt-1 inline-flex items-center gap-1 text-[11px] font-medium ${tone.text}`} role="status">
                       <tone.Icon className="size-3.5" aria-hidden />
                       <span>{step.statusReason}</span>
                     </p>
+                  )}
+                  {showRetry && (
+                    <div className="mt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={step.onRetry}
+                        data-testid={`checklist-step-${step.key}-retry`}
+                        className="h-7 px-2 text-xs"
+                      >
+                        <RefreshCw className="mr-1 size-3.5" aria-hidden />
+                        {step.retryLabel ?? "Retry"}
+                      </Button>
+                    </div>
                   )}
                   {!step.done && (
                     <p className={"mt-1 text-xs " + (isNext ? "text-foreground/80" : "text-muted-foreground")}>
@@ -171,12 +212,13 @@ export function SetupChecklist({ steps }: { steps: ChecklistStep[] }) {
                     </details>
                   )}
                 </div>
-                {!step.done && (
+                {!step.done && !step.loading && (
                   <Link
                     to={step.to}
                     hash={step.toHash}
                     search={step.toSearch as any}
                     className="shrink-0"
+                    data-testid={`checklist-step-${step.key}-start`}
                     aria-label={`${isNext ? "Start" : "Open"}: ${step.title}`}
                   >
                     <Button size="sm" variant={isNext ? "default" : "outline"} className="min-h-9">
@@ -184,6 +226,15 @@ export function SetupChecklist({ steps }: { steps: ChecklistStep[] }) {
                       <ChevronRight className="ml-1 size-4" aria-hidden />
                     </Button>
                   </Link>
+                )}
+                {!step.done && step.loading && (
+                  <div
+                    className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-background/40 px-2 py-1 text-[11px] text-muted-foreground"
+                    aria-hidden
+                  >
+                    <Loader2 className="size-3.5 animate-spin" />
+                    Checking
+                  </div>
                 )}
               </div>
             </li>

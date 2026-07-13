@@ -77,6 +77,19 @@ function TwinOnboardingWizard() {
     }
   }, [search.step]);
 
+  // Mirror local step -> URL so back/forward navigation and refresh land the
+  // user back on the same wizard step. `replace` avoids piling up history
+  // entries for each Next/Back click while still updating the URL.
+  useEffect(() => {
+    if (search.step === step) return;
+    navigate({
+      to: "/studio/twin-onboarding",
+      search: { step },
+      replace: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   const refresh = async () => {
     try {
       const res = await load();
