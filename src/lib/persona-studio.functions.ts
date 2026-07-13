@@ -74,6 +74,9 @@ export const createPersona = createServerFn({ method: "POST" })
     voiceStyle?: number | null;
     requireIdVerification?: boolean;
     veniceCharacterSlug?: string | null;
+    heygenAvatarId?: string | null;
+    heygenVoiceId?: string | null;
+    elevenlabsVoiceId?: string | null;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -161,9 +164,12 @@ export const createPersona = createServerFn({ method: "POST" })
         voice_style: data.voiceStyle ?? null,
         require_id_verification: !!data.requireIdVerification,
         venice_character_slug: data.veniceCharacterSlug?.trim().slice(0, 120) || null,
+        heygen_avatar_id: data.heygenAvatarId?.trim().slice(0, 120) || null,
+        heygen_voice_id: data.heygenVoiceId?.trim().slice(0, 120) || null,
+        elevenlabs_voice_id: data.elevenlabsVoiceId?.trim().slice(0, 120) || null,
         visibility: "draft" as Visibility,
         sort_order: nextOrder,
-      })
+      } as any)
       .select("*").single();
     if (error) throw error;
 
@@ -205,6 +211,7 @@ export const updatePersona = createServerFn({ method: "POST" })
     voiceStyle?: number | null;
     requireIdVerification?: boolean;
     veniceCharacterSlug?: string | null;
+    elevenlabsVoiceId?: string | null;
   }) => d)
   .middleware([requireSupabaseAuth])
   .handler(async ({ data, context }) => {
@@ -227,6 +234,7 @@ export const updatePersona = createServerFn({ method: "POST" })
       linked_twin_ref_ids?: string[];
       heygen_avatar_id?: string | null;
       heygen_voice_id?: string | null;
+      elevenlabs_voice_id?: string | null;
       avatar_url?: string | null;
       venice_chat_opt_in?: boolean;
       content_theme_overrides?: Record<string, boolean>;
@@ -302,6 +310,10 @@ export const updatePersona = createServerFn({ method: "POST" })
     if (data.veniceCharacterSlug !== undefined) {
       const v = (data.veniceCharacterSlug ?? "").trim();
       patch.venice_character_slug = v ? v.slice(0, 120) : null;
+    }
+    if (data.elevenlabsVoiceId !== undefined) {
+      const v = (data.elevenlabsVoiceId ?? "").trim();
+      patch.elevenlabs_voice_id = v ? v.slice(0, 120) : null;
     }
 
     // Per-persona save-time regression gate: re-check the freshly-merged
