@@ -108,6 +108,7 @@ function PersonaEditForm({
   refresh: () => Promise<void>;
 }) {
   const { user } = useSession();
+  const { ensureConsent } = useMediaUploadConsent();
   const getFeedPolicy = useServerFn(getPersonaVisibilityPolicy);
   const setFeedPolicy = useServerFn(setPersonaDefaultVisibility);
   const [feedTier, setFeedTier] = useState<FeedVisibilityTier>("subscribers_only");
