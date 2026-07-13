@@ -175,6 +175,64 @@ function TwinOnboardingWizard() {
     }
   }
 
+  // Bulk upload — assign each dropped/selected file to the next unfilled
+  // recommended shot slot in order; overflow goes into "Additional N".
+  async function uploadShotsBulk(files: File[]) {
+    if (!data?.creator || files.length === 0) return;
+    if (!(await ensureConsent({ context: "twin.onboarding.reference" }))) return;
+
+    const MAX_BYTES = 15 * 1024 * 1024;
+    const eligible = files.filter((f) => {
+      if (!f.type.startsWith("image/")) {
+        toast.error(`Skipped "${f.name}" — not an image.`);
+        return false;
+      }
+      if (f.size > MAX_BYTES) {
+        toast.error(`Skipped "${f.name}" — larger than 15 MB.`);
+        return false;
+      }
+      return true;
+    });
+    if (eligible.length === 0) return;
+
+    // Snapshot which recommended labels are already filled so we don't reuse
+    // them across this batch even before the server round-trip refreshes.
+    const takenLabels = new Set(identityRefs.map((r: any) => r.slot_label as string));
+    const openSlots = RECOMMENDED_SHOTS.filter((s) => !takenLabels.has(s.label)).map((s) => s.label);
+    const existingAdditional = identityRefs
+      .map((r: any) => r.slot_label as string)
+      .filter((l) => /^Additional \d+$/.test(l))
+      .map((l) => Number(l.replace(/^Additional /, "")));
+    let nextAdditional = existingAdditional.length ? Math.max(...existingAdditional) + 1 : 1;
+
+    let ok = 0;
+    let failed = 0;
+    for (const file of eligible) {
+      const label = openSlots.shift() ?? `Additional ${nextAdditional++}`;
+      setUploading(`${label} (${ok + failed + 1}/${eligible.length})`);
+      try {
+        const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
+        const key = `${data.creator.id}/twin/identity_ref/${crypto.randomUUID()}${ext}`;
+        const { error } = await supabase.storage
+          .from("content-assets")
+          .upload(key, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
+        if (error) { failed++; toast.error(`${file.name}: ${error.message}`); continue; }
+        await add({ data: { kind: "identity_ref", storagePath: key, mimeType: file.type || undefined, slotLabel: label } });
+        ok++;
+      } catch (e: any) {
+        failed++;
+        toast.error(`${file.name}: ${e?.message ?? "Upload failed"}`);
+      }
+    }
+    setUploading(null);
+    await refresh();
+    if (ok > 0) {
+      toast.success(
+        `Uploaded ${ok} photo${ok === 1 ? "" : "s"}${failed ? ` (${failed} failed)` : ""}.`,
+      );
+    }
+  }
+
   async function saveConsentAndContinue() {
     if (!likenessOk) return toast.error("Likeness consent is required to generate any synthetic content.");
     try {
@@ -362,6 +420,11 @@ function TwinOnboardingWizard() {
             <p className="text-sm text-muted-foreground">
               Fill in as many as you're comfortable with — more angles means more consistent results, but you can continue with just one and add the rest later from your Digital Twin Profile.
             </p>
+            <BulkPhotoDropzone
+              busyLabel={uploading}
+              disabled={!data?.creator}
+              onFiles={uploadShotsBulk}
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               {RECOMMENDED_SHOTS.map((shot) => {
                 const filled = filledShots.some((s) => s.key === shot.key);
@@ -458,6 +521,74 @@ function ConsentRow({ label, hint, checked, onChange }: { label: string; hint: s
         <div className="text-xs text-muted-foreground">{hint}</div>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}
+
+function BulkPhotoDropzone({
+  busyLabel, disabled, onFiles,
+}: {
+  busyLabel: string | null;
+  disabled: boolean;
+  onFiles: (files: File[]) => void | Promise<void>;
+}) {
+  const [dragActive, setDragActive] = useState(false);
+  const inputId = "bulk-photo-input";
+  const busy = !!busyLabel;
+  return (
+    <div
+      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy && !disabled) setDragActive(true); }}
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); if (!busy && !disabled) setDragActive(true); }}
+      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); }}
+      onDrop={(e) => {
+        e.preventDefault(); e.stopPropagation(); setDragActive(false);
+        if (busy || disabled) return;
+        const files = Array.from(e.dataTransfer.files ?? []);
+        if (files.length) void onFiles(files);
+      }}
+      className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
+        dragActive
+          ? "border-brand/60 bg-brand/5"
+          : "border-border/60 bg-surface/40 hover:border-border"
+      }`}
+      role="group"
+      aria-label="Bulk upload reference photos"
+    >
+      <p className="text-sm">
+        <span className="font-medium">Bulk upload</span>{" "}
+        <span className="text-muted-foreground">— drop several photos, or</span>
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={busy || disabled}
+          onClick={() => document.getElementById(inputId)?.click()}
+        >
+          {busy ? (
+            <><Loader2 className="mr-2 size-4 animate-spin" />Uploading {busyLabel}</>
+          ) : (
+            <><Upload className="mr-2 size-4" />Choose photos…</>
+          )}
+        </Button>
+        <input
+          id={inputId}
+          type="file"
+          accept="image/*"
+          multiple
+          className="sr-only"
+          disabled={busy || disabled}
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = "";
+            if (files.length) void onFiles(files);
+          }}
+        />
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        JPEG/PNG/WebP up to 15 MB each. Files fill the recommended slots below in order; extras become "Additional 1", "Additional 2"…
+      </p>
     </div>
   );
 }
