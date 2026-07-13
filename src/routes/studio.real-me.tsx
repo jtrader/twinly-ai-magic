@@ -749,7 +749,7 @@ function GenerateProfileDialog({
     setErrorMsg("");
     setAttempt((a) => a + 1);
     try {
-      const res = await generate({ data: { seed, count: 3, lockedAnswers: lockedAnswersRef.current } });
+      const res = await generate({ data: { seed, count: 3, lockedAnswers: lockedAnswersRef.current as any } });
       if (!res.variants.length) {
         setStep("error");
         setErrorMsg("AI returned no usable variants. Try again.");
@@ -971,7 +971,7 @@ const COMPARE_QUESTION_IDS: string[] = [
   "6.1", // Humor
 ];
 
-function VariantCompareTable({ variants, onPick }: { variants: Variant[]; onPick: (v: Variant) => void }) {
+function VariantCompareTable({ variants, previousAnswers, onPick }: { variants: Variant[]; previousAnswers?: Record<string, unknown> | null; onPick: (v: Variant) => void }) {
   const byId = new Map<string, QuestionDefinition>();
   for (const s of REAL_ME_QUESTIONNAIRE) for (const q of s.questions) byId.set(q.id, q);
   const rows = COMPARE_QUESTION_IDS.map((id) => byId.get(id)).filter((q): q is QuestionDefinition => !!q);
@@ -983,12 +983,24 @@ function VariantCompareTable({ variants, onPick }: { variants: Variant[]; onPick
     return String(v);
   }
 
+  function same(a: unknown, b: unknown): boolean {
+    if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, i) => x === b[i]);
+    return a === b;
+  }
+
+  const showPrev = !!previousAnswers && Object.keys(previousAnswers).length > 0;
+
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
       <table className="w-full min-w-[560px] border-collapse text-xs">
         <thead className="bg-surface-elevated/60 text-[10px] uppercase tracking-widest text-muted-foreground">
           <tr>
             <th className="sticky left-0 z-10 bg-surface-elevated/60 px-3 py-2 text-left font-semibold">Field</th>
+            {showPrev && (
+              <th className="border-l border-border px-3 py-2 text-left font-semibold text-muted-foreground/80">
+                Previous pick
+              </th>
+            )}
             {variants.map((v, i) => (
               <th key={v.id} className="border-l border-border px-3 py-2 text-left font-semibold">
                 <div className="flex items-center justify-between gap-2">
@@ -1003,8 +1015,19 @@ function VariantCompareTable({ variants, onPick }: { variants: Variant[]; onPick
           {rows.map((q) => (
             <tr key={q.id} className="border-t border-border align-top">
               <td className="sticky left-0 z-10 bg-surface px-3 py-2 font-medium text-muted-foreground">{q.promptText}</td>
+              {showPrev && (
+                <td className="border-l border-border px-3 py-2 text-muted-foreground/80">
+                  {fmt(previousAnswers![q.id])}
+                </td>
+              )}
               {variants.map((v) => (
-                <td key={v.id + q.id} className="border-l border-border px-3 py-2">
+                <td
+                  key={v.id + q.id}
+                  className={
+                    "border-l border-border px-3 py-2 " +
+                    (showPrev && !same(v.answers[q.id], previousAnswers![q.id]) ? "bg-brand/5 text-foreground" : "")
+                  }
+                >
                   {fmt(v.answers[q.id])}
                 </td>
               ))}
@@ -1012,6 +1035,7 @@ function VariantCompareTable({ variants, onPick }: { variants: Variant[]; onPick
           ))}
           <tr className="border-t border-border bg-surface-elevated/40">
             <td className="sticky left-0 z-10 bg-surface-elevated/40 px-3 py-2" />
+            {showPrev && <td className="border-l border-border px-3 py-2" />}
             {variants.map((v) => (
               <td key={"pick-" + v.id} className="border-l border-border px-3 py-2">
                 <Button size="sm" className="w-full" onClick={() => onPick(v)}>
