@@ -461,41 +461,68 @@ type Variant = { id: string; style: string; answers: Record<string, unknown>; co
 
 function DraftReviewBanner({
   seed,
+  restoredFrom,
   saving,
   onSave,
   onDiscard,
   onRegenerate,
+  onExport,
 }: {
-  seed: SeedInput;
+  seed: SeedInput | null;
+  restoredFrom?: { id: string; versionNumber: number };
   saving: boolean;
   onSave: () => void;
   onDiscard: () => void;
-  onRegenerate: () => void;
+  onRegenerate?: () => void;
+  onExport: (kind: "json" | "pdf") => void;
 }) {
+  const isRestore = !!restoredFrom;
   return (
     <div className="mb-4 rounded-xl border border-brand/40 bg-brand/5 p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-brand">
-            <Sparkles className="size-4" /> Reviewing AI-generated draft
+            {isRestore ? <RotateCcw className="size-4" /> : <Sparkles className="size-4" />}
+            {isRestore
+              ? `Reviewing restored draft (from Version ${restoredFrom!.versionNumber})`
+              : "Reviewing AI-generated draft"}
           </div>
           <p className="text-xs text-muted-foreground">
             Edit anything below, then Save to create a new version. Nothing is stored until you save.
           </p>
-          <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
-            <Badge variant="outline">{seed.gender}</Badge>
-            <Badge variant="outline">{seed.ageBracket}</Badge>
-            {seed.lifestyle.map((l) => <Badge key={"l-" + l} variant="outline">{l}</Badge>)}
-            {seed.traits.map((t) => <Badge key={"t-" + t} variant="outline">{t}</Badge>)}
-          </div>
+          {seed ? (
+            <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
+              <Badge variant="outline">{seed.gender}</Badge>
+              <Badge variant="outline">{seed.ageBracket}</Badge>
+              {seed.lifestyle.map((l) => <Badge key={"l-" + l} variant="outline">{l}</Badge>)}
+              {seed.traits.map((t) => <Badge key={"t-" + t} variant="outline">{t}</Badge>)}
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost" disabled={saving}>
+                <Download className="mr-1.5 size-4" /> Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onExport("json")}>
+                <FileJson className="mr-2 size-4" /> Download JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport("pdf")}>
+                <FileText className="mr-2 size-4" /> Print / Save as PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" variant="ghost" onClick={onDiscard} disabled={saving}>
             <X className="mr-1.5 size-4" /> Discard
           </Button>
-          <Button size="sm" variant="outline" onClick={onRegenerate} disabled={saving}>
-            <RefreshCw className="mr-1.5 size-4" /> Regenerate
-          </Button>
+          {onRegenerate ? (
+            <Button size="sm" variant="outline" onClick={onRegenerate} disabled={saving}>
+              <RefreshCw className="mr-1.5 size-4" /> Regenerate
+            </Button>
+          ) : null}
           <Button size="sm" onClick={onSave} disabled={saving}>
             {saving ? <><Loader2 className="mr-1.5 size-4 animate-spin" /> Saving…</> : <><Save className="mr-1.5 size-4" /> Save as new version</>}
           </Button>
