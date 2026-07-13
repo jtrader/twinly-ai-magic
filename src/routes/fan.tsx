@@ -198,38 +198,7 @@ function FanDashboard() {
         <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
       </div>
 
-      {showChecklist && (
-        <section className="mb-6 rounded-2xl border border-brand/30 bg-brand/10 p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="font-display text-lg font-semibold text-brand-glow">Finish setting up your account</div>
-              <p className="text-xs text-muted-foreground">{doneCount} of {onboardingSteps.length} done — takes about a minute.</p>
-            </div>
-            <Sparkles className="size-5 text-brand-glow" aria-hidden />
-          </div>
-          <ul className="mt-4 space-y-2">
-            {onboardingSteps.map((s) => (
-              <li key={s.key} className="flex items-center gap-3 rounded-xl border border-border/60 bg-surface px-3 py-2.5">
-                <CheckCircle2
-                  className={"size-4 shrink-0 " + (s.done ? "text-emerald-400" : "text-muted-foreground/40")}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
-                  <div className={"text-sm " + (s.done ? "text-muted-foreground line-through" : "font-medium")}>{s.label}</div>
-                  {s.hint && <div className="text-[11px] text-muted-foreground">{s.hint}</div>}
-                </div>
-                {s.cta && (
-                  <Link to={s.cta as any}>
-                    <Button size="sm" variant={s.done ? "ghost" : "default"}>
-                      {s.ctaLabel} <ChevronRight className="ml-1 size-3.5" />
-                    </Button>
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <SetupChecklist steps={supporterSteps} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Active rooms" value={subs.filter((s) => s.status === "active").length} />
