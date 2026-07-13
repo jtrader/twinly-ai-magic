@@ -1,10 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { Home, MessageCircle, LayoutDashboard, User, Menu, CreditCard, Heart, LogOut, Settings, LogIn, Wallet, Sparkles, Palette, Building2, ShieldCheck } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { createBillingPortal } from "@/lib/checkout.functions";
 import { getStripeEnvironment, isPaymentsConfigured } from "@/lib/stripe";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ImpersonationBanner } from "@/components/twinly/ImpersonationBanner";
 import { AdminViewSwitcher } from "@/components/twinly/AdminViewSwitcher";
@@ -24,6 +24,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 
 export function AppShell({ children, mobileNav = true }: { children: ReactNode; mobileNav?: boolean }) {
+  useDashboardRoleGuard();
   return (
     <div className="min-h-screen bg-background">
       <PaymentTestModeBanner />
@@ -35,6 +36,63 @@ export function AppShell({ children, mobileNav = true }: { children: ReactNode; 
       {mobileNav && <BottomNav />}
     </div>
   );
+}
+
+/**
+ * Central dashboard access policy. Applied wherever <AppShell/> is used.
+ * - Signed-in-only sections redirect anonymous users to /auth.
+ * - Role-scoped sections redirect users who lack a required role to their
+ *   best-fit landing page with a toast.
+ * Public pages (Discover, Pricing, Legal, Creator/Persona profiles, Chat)
+ * fall through with no guard.
+ */
+type Policy = { prefix: string; roles?: string[]; requireAuth?: boolean };
+const DASHBOARD_POLICIES: Policy[] = [
+  { prefix: "/admin", roles: ["admin"] },
+  { prefix: "/agency", roles: ["agency", "admin"] },
+  { prefix: "/studio", roles: ["creator", "admin"] },
+  { prefix: "/secure/personas", roles: ["creator", "admin"] },
+  { prefix: "/fan", requireAuth: true },
+  { prefix: "/account", requireAuth: true },
+  { prefix: "/app", requireAuth: true },
+  { prefix: "/onboarding", requireAuth: true },
+  { prefix: "/checkout", requireAuth: true },
+];
+
+function bestLandingForRoles(roles: string[]): string {
+  if (roles.includes("admin")) return "/admin";
+  if (roles.includes("agency")) return "/agency";
+  if (roles.includes("creator")) return "/studio";
+  return "/app";
+}
+
+function useDashboardRoleGuard() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { user, loading } = useSession();
+  const roles = useUserRoles(user?.id);
+  const navigate = useNavigate();
+  const rolesReady = !user || roles.length > 0 || !loading; // roles fetch is fire-and-forget
+
+  useEffect(() => {
+    if (loading) return;
+    const policy = DASHBOARD_POLICIES.find(
+      (p) => pathname === p.prefix || pathname.startsWith(p.prefix + "/"),
+    );
+    if (!policy) return;
+    if (!user) {
+      navigate({ to: "/auth" });
+      return;
+    }
+    if (policy.roles && policy.roles.length > 0) {
+      // Wait for roles to load before enforcing — avoids flash-redirect on hydration.
+      if (roles.length === 0) return;
+      const allowed = policy.roles.some((r) => roles.includes(r));
+      if (!allowed) {
+        toast.error("You don't have access to that section.");
+        navigate({ to: bestLandingForRoles(roles) as any });
+      }
+    }
+  }, [pathname, user, loading, roles.join(","), navigate, rolesReady]);
 }
 
 function TopBar() {
