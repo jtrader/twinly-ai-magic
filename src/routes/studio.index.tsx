@@ -147,7 +147,7 @@ function StudioHome() {
         <Tile to="/studio/analytics" icon={<BarChart3 className="size-5 text-brand-glow" />} title="Analytics" desc="Generation volume, approval rate, chat engagement." />
         <Tile to="/studio/twin" icon={<User className="size-5 text-brand-glow" />} title="Digital twin profile" desc="Identity, voice, style, consent & use rules." />
         <Tile to="/studio/away" icon={<Moon className="size-5 text-brand-glow" />} title="Away mode" desc="Auto-reply for Real Me and route fans to your AI personas when you're offline." />
-        <Tile icon={<ShieldCheck className="size-5 text-brand-glow" />} title="Consent & verification" desc="Digital twin consent, ID checks." disabled />
+        <Tile to="/secure/personas" icon={<ShieldCheck className="size-5 text-brand-glow" />} title="Secure persona setup hub" desc="Default personas, custom persona creation, training inputs and content-pack setup — the guided post-signup flow, available any time." />
       </div>
     </AppShell>
   );
