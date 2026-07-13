@@ -302,18 +302,33 @@ function RealMePage() {
           <h1 className="font-display text-2xl font-bold">Real Me baseline</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-          {lockedIds.size > 0 && (
-            <Badge variant="outline" className="gap-1 border-amber-400/50 text-amber-400">
-              <Lock className="size-3" /> {lockedIds.size} locked
-              <button
-                type="button"
-                onClick={clearAllLocks}
-                className="ml-1 underline hover:text-amber-300"
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className={lockedIds.size > 0 ? "border-amber-400/50 text-amber-400" : undefined}>
+                {lockedIds.size > 0 ? <Lock className="mr-1.5 size-4" /> : <Unlock className="mr-1.5 size-4" />}
+                <span className="hidden sm:inline">Locks</span>
+                {lockedIds.size > 0 && (
+                  <Badge variant="outline" className="ml-1.5 border-amber-400/50 px-1.5 py-0 text-[10px] text-amber-400">
+                    {lockedIds.size}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem
+                onClick={lockAll}
+                disabled={allEffectiveQuestionIds.length === 0 || lockedIds.size >= allEffectiveQuestionIds.length}
               >
-                clear
-              </button>
-            </Badge>
-          )}
+                <Lock className="mr-2 size-4" /> Lock all answers
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setConfirmClearLocks(true)}
+                disabled={lockedIds.size === 0}
+              >
+                <Unlock className="mr-2 size-4" /> Unlock all answers
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" variant="outline" onClick={() => setShowHistory((s) => !s)} disabled={!!draft}>
             <History className="mr-1.5 size-4" />
             <span className="hidden sm:inline">Version history</span>
