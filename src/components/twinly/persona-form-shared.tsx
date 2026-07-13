@@ -164,11 +164,11 @@ export function VeniceCharacterField({
   // Strict schema with human-readable messages. Accepts a couple of common
   // shape variants exported by Venice (photoUrl vs photo_url, id vs slug).
   const manualSchema = z.object({
-    slug: z.string({ error: "`slug` is required" })
+    slug: z.string({ required_error: "`slug` is required", invalid_type_error: "`slug` must be a string" })
       .trim().min(1, "`slug` cannot be empty")
       .regex(/^[a-z0-9][a-z0-9-]*$/i, "`slug` must be a URL-safe id (letters, numbers, hyphens)")
       .max(120, "`slug` must be 120 characters or fewer"),
-    name: z.string({ error: "`name` is required" })
+    name: z.string({ required_error: "`name` is required", invalid_type_error: "`name` must be a string" })
       .trim().min(1, "`name` cannot be empty").max(200, "`name` is too long"),
     description: z.string().max(4000, "`description` is too long").nullable().optional(),
     photoUrl: z.string().url("`photoUrl` must be a valid URL").nullable().optional(),
