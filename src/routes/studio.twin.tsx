@@ -24,6 +24,8 @@ import {
   upsertTwinConsent, revokeTwinConsent, upsertStyleNotes, getTwinRefSignedUrl,
   restoreTwinReference, hardDeleteTwinReference, submitTwinReferencesForReview,
 } from "@/lib/twin.functions";
+import { getBaselineVeniceCharacter, setBaselineVeniceCharacter } from "@/lib/venice-character.functions";
+import { VeniceCharacterField } from "@/components/twinly/persona-form-shared";
 
 export const Route = createFileRoute("/studio/twin")({
   component: TwinProfilePage,
@@ -112,6 +114,7 @@ function TwinProfilePage() {
       </div>
 
       <nav className="mb-6 flex flex-wrap gap-2 text-xs">
+        <a href="#baseline-character" className="rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-brand-glow hover:border-brand/70">Character ID</a>
         <a href="#identity"  className="rounded-full border border-border bg-surface px-3 py-1 hover:border-brand/50">Identity</a>
         <a href="#voice"     className="rounded-full border border-border bg-surface px-3 py-1 hover:border-brand/50">Voice</a>
         <a href="#style"     className="rounded-full border border-border bg-surface px-3 py-1 hover:border-brand/50">Style</a>
@@ -122,6 +125,7 @@ function TwinProfilePage() {
 
       <div className="grid gap-6">
         <SummaryCard data={data} />
+        <BaselineCharacterSection />
         <ReferencesSection
           id="identity" title="Identity references" icon={<User className="size-4" />}
           hint="Upload 5+ clear photos: face front, 3/4 profile, side, body, expressions. Used to anchor likeness."
