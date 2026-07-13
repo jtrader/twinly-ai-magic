@@ -24,7 +24,8 @@ import { Moon } from "lucide-react";
 function friendlyChatError(message: string | undefined): { text: string; needsIdVerify?: boolean; needsAgeGate?: boolean } {
   if (message === "AGE_GATE_REQUIRED") return { text: "Confirm your age from your account to continue.", needsAgeGate: true };
   if (message === "ID_VERIFICATION_REQUIRED") return {
-    text: "This creator restricts this content to verified supporters. Verify your identity to join — Stripe handles it in a few minutes and Twinly never stores your ID.",
+    text:
+      "This creator has chosen to restrict this persona to verified supporters. ID verification isn't required to use Twinly, but you'll need it to join this specific creator. Stripe handles it in ~3 minutes and Twinly never sees or stores your ID.",
     needsIdVerify: true,
   };
   return { text: message ?? "Failed to send" };

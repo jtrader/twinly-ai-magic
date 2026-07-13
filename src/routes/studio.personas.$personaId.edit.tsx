@@ -686,10 +686,10 @@ function PersonaEditForm({
                   <div>
                     <Label htmlFor="edit-persona-require-id-verification">Require ID verification</Label>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Fans must complete identity verification before chatting or viewing this persona's feed content — regardless of explicitness tier.
+                      Optional. When on, this persona becomes verified-supporters only — fans must complete identity verification before chatting or viewing this persona's feed, regardless of explicitness tier.
                     </p>
                     <p className="mt-1 text-[11px] text-brand-glow/90">
-                      Tip: turning this on restricts your audience to verified supporters only. Unverified fans get a prompt to verify from their account before they can join.
+                      Platform-wide, ID verification is <span className="font-semibold">not mandatory</span> for supporters — you're choosing to restrict <span className="font-semibold">this persona's</span> audience. Unverified fans see a friendly prompt on the join / chat screens explaining they can verify in ~3 minutes to unlock it.
                     </p>
                   </div>
                   <Switch id="edit-persona-require-id-verification" checked={requireIdVerification} onCheckedChange={setRequireIdVerification} />

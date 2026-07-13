@@ -125,3 +125,52 @@ describe("explicit-tier gating wiring (structural)", () => {
     expect(fanFeedSrc).toContain("requireIdVerification: !!persona.require_id_verification");
   });
 });
+
+describe("Creator 'Require ID verification' setting consistently drives BOTH the chat error prompt and the supporter join gate (regression)", () => {
+  const creatorsRouteSrc = readFileSync(
+    resolve(process.cwd(), "src/routes/creators.$handle.$persona.tsx"),
+    "utf8",
+  );
+  const chatRouteSrc = readFileSync(
+    resolve(process.cwd(), "src/routes/chat.$handle.$persona.tsx"),
+    "utf8",
+  );
+
+  it("chat.functions.ts server guard triggers on require_id_verification even when the tier is NOT explicit", () => {
+    // The predicate uses OR — a persona with explicitness_ceiling='suggestive'
+    // but require_id_verification=true still throws ID_VERIFICATION_REQUIRED.
+    // If someone rewrites this to AND (or drops the require_id_verification
+    // clause), the creator setting stops gating anything and this fails.
+    const idx = chatSrc.indexOf(
+      '(persona as any).explicitness_ceiling === "explicit" || (persona as any).require_id_verification',
+    );
+    expect(idx).toBeGreaterThan(-1);
+  });
+
+  it("fan-feed asset access predicate uses the SAME OR-shape (isExplicit || requireIdVerification)", () => {
+    // Both gates must key off the same disjunction so a creator toggling the
+    // switch produces one behaviour, not two subtly different ones.
+    expect(fanFeedSrc).toContain(
+      "(opts.isExplicit || opts.requireIdVerification) && !opts.idVerified",
+    );
+  });
+
+  it("creators/$handle/$persona page shows a verify prompt with the same disjunction (isExplicit || requireIdVerification)", () => {
+    expect(creatorsRouteSrc).toMatch(
+      /persona\.isExplicit \|\| \(persona as any\)\.requireIdVerification/,
+    );
+    // And the prompt must link to /account (the single verification surface).
+    expect(creatorsRouteSrc).toMatch(/Link to="\/account"[^>]*>[^<]*Verify your identity/);
+  });
+
+  it("chat error handler maps the ID_VERIFICATION_REQUIRED sentinel to a supporter-facing prompt with a verify action", () => {
+    // The sentinel string is the contract between server (throws) and client
+    // (shows prompt). If it drifts, unverified fans get a generic "Failed to
+    // send" and never learn how to unblock themselves.
+    expect(chatRouteSrc).toContain('message === "ID_VERIFICATION_REQUIRED"');
+    expect(chatRouteSrc).toContain("needsIdVerify: true");
+    // Prompt must reinforce that ID verification is a per-creator choice,
+    // not a platform-wide requirement.
+    expect(chatRouteSrc).toMatch(/isn't required to use Twinly|not required to use Twinly/i);
+  });
+});
