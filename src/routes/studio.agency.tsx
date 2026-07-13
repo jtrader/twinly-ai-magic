@@ -349,7 +349,7 @@ function ConnectForm(props: {
     </form>
   );
 }
-const TIMELINE_META: Record<string, { label: string; tone: string; icon: JSX.Element }> = {
+const TIMELINE_META: Record<string, { label: string; tone: string; icon: React.ReactNode }> = {
   agency_client_link_requested_by_creator: {
     label: "Request submitted",
     tone: "border-brand/30 bg-brand/10 text-brand-glow",
