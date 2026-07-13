@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import {
   createRootRoute,
   createRoute,
@@ -12,7 +12,7 @@ import { SetupChecklist, type ChecklistStep } from "../SetupChecklist";
 
 // Minimal in-memory router so <Link to="/studio/twin-onboarding" search={{ step: 2 }} />
 // actually resolves — otherwise TanStack Router throws on render.
-function renderWithRouter(ui: React.ReactNode) {
+async function renderWithRouter(ui: React.ReactNode) {
   const rootRoute = createRootRoute({ component: () => <Outlet /> });
   const homeRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: () => <>{ui}</> });
   const twinRoute = createRoute({
@@ -26,7 +26,11 @@ function renderWithRouter(ui: React.ReactNode) {
     routeTree: rootRoute.addChildren([homeRoute, twinRoute, realMeRoute]),
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });
-  return { ...render(<RouterProvider router={router} />), router };
+  const utils = render(<RouterProvider router={router} />);
+  // TanStack RouterProvider hydrates asynchronously; wait for the first
+  // route match to actually mount our children.
+  await waitFor(() => expect(utils.container.querySelector("ol")).not.toBeNull());
+  return { ...utils, router };
 }
 
 function baseStep(overrides: Partial<ChecklistStep> = {}): ChecklistStep {
@@ -41,13 +45,13 @@ function baseStep(overrides: Partial<ChecklistStep> = {}): ChecklistStep {
 }
 
 describe("SetupChecklist", () => {
-  it("marks completed steps done, strikes them through, and highlights the next incomplete step", () => {
+  it("marks completed steps done, strikes them through, and highlights the next incomplete step", async () => {
     const steps: ChecklistStep[] = [
       baseStep({ key: "profile", title: "Profile", done: true, statusReason: "Signed in as @x", statusTone: "ok" }),
       baseStep({ key: "real-me", title: "Real Me", done: false }),
       baseStep({ key: "twin", title: "Twin", done: false }),
     ];
-    renderWithRouter(<SetupChecklist steps={steps} />);
+    await renderWithRouter(<SetupChecklist steps={steps} />);
 
     const profile = screen.getByTestId("checklist-step-profile");
     expect(profile.getAttribute("data-done")).toBe("true");
@@ -63,13 +67,13 @@ describe("SetupChecklist", () => {
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("1");
   });
 
-  it("renders status reason with the requested tone (verified / awaiting review / error)", () => {
+  it("renders status reason with the requested tone (verified / awaiting review / error)", async () => {
     const steps: ChecklistStep[] = [
       baseStep({ key: "venice", title: "Venice", done: true, statusReason: "Verified — Alan Watts", statusTone: "ok" }),
       baseStep({ key: "twin", title: "Twin", done: false, statusReason: "Awaiting admin review", statusTone: "warn" }),
       baseStep({ key: "v2", title: "V2", done: false, statusReason: "ID no longer resolves", statusTone: "error" }),
     ];
-    renderWithRouter(<SetupChecklist steps={steps} />);
+    await renderWithRouter(<SetupChecklist steps={steps} />);
 
     expect(screen.getByTestId("checklist-step-venice").getAttribute("data-status")).toBe("ok");
     expect(screen.getByText("Verified — Alan Watts")).toBeInTheDocument();
@@ -78,11 +82,11 @@ describe("SetupChecklist", () => {
     expect(screen.getByTestId("checklist-step-v2").getAttribute("data-status")).toBe("error");
   });
 
-  it("shows a 'Verifying…' skeleton and hides the Start link while a step is loading", () => {
+  it("shows a 'Verifying…' skeleton and hides the Start link while a step is loading", async () => {
     const steps: ChecklistStep[] = [
       baseStep({ key: "venice", title: "Venice", done: false, loading: true, statusReason: "Verified", statusTone: "ok" }),
     ];
-    renderWithRouter(<SetupChecklist steps={steps} />);
+    await renderWithRouter(<SetupChecklist steps={steps} />);
 
     expect(screen.getByTestId("checklist-step-venice-verifying")).toBeInTheDocument();
     // The Verifying skeleton replaces the status line while checking.
@@ -90,7 +94,7 @@ describe("SetupChecklist", () => {
     expect(screen.queryByTestId("checklist-step-venice-start")).not.toBeInTheDocument();
   });
 
-  it("renders a Retry button on Venice error/warn states and fires onRetry without navigating away", () => {
+  it("renders a Retry button on Venice error/warn states and fires onRetry without navigating away", async () => {
     const onRetry = vi.fn();
     const steps: ChecklistStep[] = [
       baseStep({
@@ -99,7 +103,7 @@ describe("SetupChecklist", () => {
         onRetry, retryLabel: "Re-check Venice",
       }),
     ];
-    renderWithRouter(<SetupChecklist steps={steps} />);
+    await renderWithRouter(<SetupChecklist steps={steps} />);
 
     const retry = screen.getByTestId("checklist-step-venice-retry");
     expect(retry).toHaveTextContent("Re-check Venice");
@@ -107,25 +111,25 @@ describe("SetupChecklist", () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it("does NOT render a Retry button on 'ok' or 'info' states (nothing to retry)", () => {
+  it("does NOT render a Retry button on 'ok' or 'info' states (nothing to retry)", async () => {
     const onRetry = vi.fn();
     const steps: ChecklistStep[] = [
       baseStep({ key: "a", title: "A", done: false, statusReason: "In progress", statusTone: "info", onRetry }),
       baseStep({ key: "b", title: "B", done: true, statusReason: "Done", statusTone: "ok", onRetry }),
     ];
-    renderWithRouter(<SetupChecklist steps={steps} />);
+    await renderWithRouter(<SetupChecklist steps={steps} />);
     expect(screen.queryByTestId("checklist-step-a-retry")).not.toBeInTheDocument();
     expect(screen.queryByTestId("checklist-step-b-retry")).not.toBeInTheDocument();
   });
 
-  it("start link deep-links to the correct route path AND preserves ?step=N search params", () => {
+  it("start link deep-links to the correct route path AND preserves ?step=N search params", async () => {
     const steps: ChecklistStep[] = [
       baseStep({
         key: "venice", title: "Venice", done: false,
         to: "/studio/twin-onboarding", toSearch: { step: 2 },
       }),
     ];
-    renderWithRouter(<SetupChecklist steps={steps} />);
+    await renderWithRouter(<SetupChecklist steps={steps} />);
 
     const link = screen.getByTestId("checklist-step-venice-start") as HTMLAnchorElement;
     // TanStack Router serialises search into the href; both parts must be present
