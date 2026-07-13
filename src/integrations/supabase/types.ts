@@ -232,7 +232,6 @@ export type Database = {
           provider: string | null
           provider_error: string | null
           provider_job_id: string | null
-          provider_model: string | null
           provider_status: string | null
           render_completed_at: string | null
           render_started_at: string | null
@@ -265,7 +264,6 @@ export type Database = {
           provider?: string | null
           provider_error?: string | null
           provider_job_id?: string | null
-          provider_model?: string | null
           provider_status?: string | null
           render_completed_at?: string | null
           render_started_at?: string | null
@@ -298,7 +296,6 @@ export type Database = {
           provider?: string | null
           provider_error?: string | null
           provider_job_id?: string | null
-          provider_model?: string | null
           provider_status?: string | null
           render_completed_at?: string | null
           render_started_at?: string | null
@@ -557,7 +554,6 @@ export type Database = {
           resolution_note: string | null
           resolved_at: string | null
           resolved_by: string | null
-          severity: string | null
           status: Database["public"]["Enums"]["conversation_flag_status"]
           updated_at: string
         }
@@ -575,7 +571,6 @@ export type Database = {
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
-          severity?: string | null
           status?: Database["public"]["Enums"]["conversation_flag_status"]
           updated_at?: string
         }
@@ -593,7 +588,6 @@ export type Database = {
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
-          severity?: string | null
           status?: Database["public"]["Enums"]["conversation_flag_status"]
           updated_at?: string
         }
@@ -644,7 +638,6 @@ export type Database = {
       }
       conversations: {
         Row: {
-          ai_suspended: boolean
           creator_id: string
           fan_id: string
           id: string
@@ -653,7 +646,6 @@ export type Database = {
           started_at: string
         }
         Insert: {
-          ai_suspended?: boolean
           creator_id: string
           fan_id: string
           id?: string
@@ -662,7 +654,6 @@ export type Database = {
           started_at?: string
         }
         Update: {
-          ai_suspended?: boolean
           creator_id?: string
           fan_id?: string
           id?: string
@@ -749,7 +740,6 @@ export type Database = {
           like_count: number
           linked_pack_id: string | null
           linked_persona_id: string | null
-          linked_poll_id: string | null
           removed_reason: string | null
           unlock_price_cents: number | null
           updated_at: string
@@ -766,7 +756,6 @@ export type Database = {
           like_count?: number
           linked_pack_id?: string | null
           linked_persona_id?: string | null
-          linked_poll_id?: string | null
           removed_reason?: string | null
           unlock_price_cents?: number | null
           updated_at?: string
@@ -783,7 +772,6 @@ export type Database = {
           like_count?: number
           linked_pack_id?: string | null
           linked_persona_id?: string | null
-          linked_poll_id?: string | null
           removed_reason?: string | null
           unlock_price_cents?: number | null
           updated_at?: string
@@ -815,13 +803,6 @@ export type Database = {
             columns: ["linked_persona_id"]
             isOneToOne: false
             referencedRelation: "personas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "creator_posts_linked_poll_id_fkey"
-            columns: ["linked_poll_id"]
-            isOneToOne: false
-            referencedRelation: "polls"
             referencedColumns: ["id"]
           },
         ]
@@ -936,9 +917,6 @@ export type Database = {
           cover_url: string | null
           created_at: string
           digital_twin_status: Database["public"]["Enums"]["twin_status"]
-          elevenlabs_voice_id: string | null
-          elevenlabs_voice_requires_verification: boolean | null
-          elevenlabs_voice_cloned_at: string | null
           generation_spend_cap_cents: number | null
           handle: string
           id: string
@@ -965,9 +943,6 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           digital_twin_status?: Database["public"]["Enums"]["twin_status"]
-          elevenlabs_voice_id?: string | null
-          elevenlabs_voice_requires_verification?: boolean | null
-          elevenlabs_voice_cloned_at?: string | null
           generation_spend_cap_cents?: number | null
           handle: string
           id?: string
@@ -994,9 +969,6 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           digital_twin_status?: Database["public"]["Enums"]["twin_status"]
-          elevenlabs_voice_id?: string | null
-          elevenlabs_voice_requires_verification?: boolean | null
-          elevenlabs_voice_cloned_at?: string | null
           generation_spend_cap_cents?: number | null
           handle?: string
           id?: string
@@ -1136,106 +1108,6 @@ export type Database = {
             foreignKeyName: "escalation_requests_from_persona_id_fkey"
             columns: ["from_persona_id"]
             isOneToOne: false
-            referencedRelation: "personas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      feed_item_visibility_overrides: {
-        Row: {
-          feed_post_id: string
-          id: string
-          overrides_default: boolean
-          updated_at: string
-          updated_by: string | null
-          visibility: Database["public"]["Enums"]["feed_visibility_tier"]
-        }
-        Insert: {
-          feed_post_id: string
-          id?: string
-          overrides_default?: boolean
-          updated_at?: string
-          updated_by?: string | null
-          visibility: Database["public"]["Enums"]["feed_visibility_tier"]
-        }
-        Update: {
-          feed_post_id?: string
-          id?: string
-          overrides_default?: boolean
-          updated_at?: string
-          updated_by?: string | null
-          visibility?: Database["public"]["Enums"]["feed_visibility_tier"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "feed_item_visibility_overrides_feed_post_id_fkey"
-            columns: ["feed_post_id"]
-            isOneToOne: true
-            referencedRelation: "creator_posts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      feed_visibility_audit_log: {
-        Row: {
-          actor_id: string
-          actor_role: Database["public"]["Enums"]["app_role"]
-          after_value: Json | null
-          before_value: Json | null
-          changed_at: string
-          id: string
-          target_id: string
-          target_type: Database["public"]["Enums"]["feed_visibility_target_type"]
-        }
-        Insert: {
-          actor_id: string
-          actor_role: Database["public"]["Enums"]["app_role"]
-          after_value?: Json | null
-          before_value?: Json | null
-          changed_at?: string
-          id?: string
-          target_id: string
-          target_type: Database["public"]["Enums"]["feed_visibility_target_type"]
-        }
-        Update: {
-          actor_id?: string
-          actor_role?: Database["public"]["Enums"]["app_role"]
-          after_value?: Json | null
-          before_value?: Json | null
-          changed_at?: string
-          id?: string
-          target_id?: string
-          target_type?: Database["public"]["Enums"]["feed_visibility_target_type"]
-        }
-        Relationships: []
-      }
-      feed_visibility_policies: {
-        Row: {
-          default_visibility: Database["public"]["Enums"]["feed_visibility_tier"]
-          id: string
-          persona_id: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          default_visibility?: Database["public"]["Enums"]["feed_visibility_tier"]
-          id?: string
-          persona_id: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          default_visibility?: Database["public"]["Enums"]["feed_visibility_tier"]
-          id?: string
-          persona_id?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "feed_visibility_policies_persona_id_fkey"
-            columns: ["persona_id"]
-            isOneToOne: true
             referencedRelation: "personas"
             referencedColumns: ["id"]
           },
@@ -1666,133 +1538,10 @@ export type Database = {
           },
         ]
       }
-      persona_onboarding_configs: {
-        Row: {
-          content_framework_choices: Json
-          id: string
-          opener_templates: string[]
-          persona_id: string
-          questionnaire_response_id: string | null
-          status: Database["public"]["Enums"]["persona_onboarding_status"]
-          tone_guidelines: string | null
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          content_framework_choices?: Json
-          id?: string
-          opener_templates?: string[]
-          persona_id: string
-          questionnaire_response_id?: string | null
-          status?: Database["public"]["Enums"]["persona_onboarding_status"]
-          tone_guidelines?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          content_framework_choices?: Json
-          id?: string
-          opener_templates?: string[]
-          persona_id?: string
-          questionnaire_response_id?: string | null
-          status?: Database["public"]["Enums"]["persona_onboarding_status"]
-          tone_guidelines?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "persona_onboarding_configs_persona_id_fkey"
-            columns: ["persona_id"]
-            isOneToOne: true
-            referencedRelation: "personas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "persona_onboarding_configs_questionnaire_response_id_fkey"
-            columns: ["questionnaire_response_id"]
-            isOneToOne: false
-            referencedRelation: "persona_questionnaire_responses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      persona_questionnaire_responses: {
-        Row: {
-          answers: Json
-          created_at: string
-          created_by: string | null
-          id: string
-          persona_id: string
-          version: number
-        }
-        Insert: {
-          answers?: Json
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          persona_id: string
-          version: number
-        }
-        Update: {
-          answers?: Json
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          persona_id?: string
-          version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "persona_questionnaire_responses_persona_id_fkey"
-            columns: ["persona_id"]
-            isOneToOne: false
-            referencedRelation: "personas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      persona_real_me_references: {
-        Row: {
-          id: string
-          persona_id: string
-          real_me_profile_version_id: string
-          synced_at: string
-        }
-        Insert: {
-          id?: string
-          persona_id: string
-          real_me_profile_version_id: string
-          synced_at?: string
-        }
-        Update: {
-          id?: string
-          persona_id?: string
-          real_me_profile_version_id?: string
-          synced_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "persona_real_me_references_persona_id_fkey"
-            columns: ["persona_id"]
-            isOneToOne: true
-            referencedRelation: "personas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "persona_real_me_references_real_me_profile_version_id_fkey"
-            columns: ["real_me_profile_version_id"]
-            isOneToOne: false
-            referencedRelation: "real_me_profile_versions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       personas: {
         Row: {
           avatar_url: string | null
           boundary_rules: Json
-          content_theme_overrides: Json
           cover_url: string | null
           created_at: string
           creator_id: string
@@ -1810,9 +1559,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["persona_kind"]
           linked_twin_ref_ids: string[]
           memory_enabled: boolean
-          persona_type: Database["public"]["Enums"]["persona_type"]
           price_cents: number
-          require_id_verification: boolean
           slug: string
           sort_order: number
           starts_at: string | null
@@ -1822,19 +1569,12 @@ export type Database = {
           tts_voice: string | null
           twin_link_mode: string
           updated_at: string
-          use_cloned_voice: boolean
-          venice_character_slug: string | null
-          venice_chat_opt_in: boolean
           visibility: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled: boolean
-          voice_similarity_boost: number | null
-          voice_stability: number | null
-          voice_style: number | null
         }
         Insert: {
           avatar_url?: string | null
           boundary_rules?: Json
-          content_theme_overrides?: Json
           cover_url?: string | null
           created_at?: string
           creator_id: string
@@ -1852,9 +1592,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["persona_kind"]
           linked_twin_ref_ids?: string[]
           memory_enabled?: boolean
-          persona_type?: Database["public"]["Enums"]["persona_type"]
           price_cents?: number
-          require_id_verification?: boolean
           slug: string
           sort_order?: number
           starts_at?: string | null
@@ -1864,19 +1602,12 @@ export type Database = {
           tts_voice?: string | null
           twin_link_mode?: string
           updated_at?: string
-          use_cloned_voice?: boolean
-          venice_character_slug?: string | null
-          venice_chat_opt_in?: boolean
           visibility?: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled?: boolean
-          voice_similarity_boost?: number | null
-          voice_stability?: number | null
-          voice_style?: number | null
         }
         Update: {
           avatar_url?: string | null
           boundary_rules?: Json
-          content_theme_overrides?: Json
           cover_url?: string | null
           created_at?: string
           creator_id?: string
@@ -1894,9 +1625,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["persona_kind"]
           linked_twin_ref_ids?: string[]
           memory_enabled?: boolean
-          persona_type?: Database["public"]["Enums"]["persona_type"]
           price_cents?: number
-          require_id_verification?: boolean
           slug?: string
           sort_order?: number
           starts_at?: string | null
@@ -1906,14 +1635,8 @@ export type Database = {
           tts_voice?: string | null
           twin_link_mode?: string
           updated_at?: string
-          use_cloned_voice?: boolean
-          venice_character_slug?: string | null
-          venice_chat_opt_in?: boolean
           visibility?: Database["public"]["Enums"]["visibility"]
           voice_reply_enabled?: boolean
-          voice_similarity_boost?: number | null
-          voice_stability?: number | null
-          voice_style?: number | null
         }
         Relationships: [
           {
@@ -1931,108 +1654,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      persona_invites: {
-        Row: {
-          id: string
-          persona_id: string
-          creator_id: string
-          token: string
-          invited_fan_id: string | null
-          status: Database["public"]["Enums"]["persona_invite_status"]
-          note: string | null
-          created_at: string
-          accepted_at: string | null
-          revoked_at: string | null
-        }
-        Insert: {
-          id?: string
-          persona_id: string
-          creator_id: string
-          token: string
-          invited_fan_id?: string | null
-          status?: Database["public"]["Enums"]["persona_invite_status"]
-          note?: string | null
-          created_at?: string
-          accepted_at?: string | null
-          revoked_at?: string | null
-        }
-        Update: {
-          id?: string
-          persona_id?: string
-          creator_id?: string
-          token?: string
-          invited_fan_id?: string | null
-          status?: Database["public"]["Enums"]["persona_invite_status"]
-          note?: string | null
-          created_at?: string
-          accepted_at?: string | null
-          revoked_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "persona_invites_persona_id_fkey"
-            columns: ["persona_id"]
-            isOneToOne: false
-            referencedRelation: "personas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "persona_invites_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: false
-            referencedRelation: "creators"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      provider_data_handling_records: {
-        Row: {
-          id: string
-          provider_name: string
-          reviewed_at: string | null
-          reviewed_by: string | null
-          zero_data_retention: boolean | null
-          used_for_training: boolean | null
-          covers_creator_data: boolean | null
-          covers_supporter_data: boolean | null
-          contract_reference: string | null
-          notes: string | null
-          next_review_due: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          provider_name: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          zero_data_retention?: boolean | null
-          used_for_training?: boolean | null
-          covers_creator_data?: boolean | null
-          covers_supporter_data?: boolean | null
-          contract_reference?: string | null
-          notes?: string | null
-          next_review_due?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          provider_name?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          zero_data_retention?: boolean | null
-          used_for_training?: boolean | null
-          covers_creator_data?: boolean | null
-          covers_supporter_data?: boolean | null
-          contract_reference?: string | null
-          notes?: string | null
-          next_review_due?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       platform_settings: {
         Row: {
@@ -2109,157 +1730,6 @@ export type Database = {
         }
         Relationships: []
       }
-      poll_options: {
-        Row: {
-          display_order: number
-          id: string
-          label: string
-          linked_tip_amount_usd: number | null
-          poll_id: string
-        }
-        Insert: {
-          display_order?: number
-          id?: string
-          label: string
-          linked_tip_amount_usd?: number | null
-          poll_id: string
-        }
-        Update: {
-          display_order?: number
-          id?: string
-          label?: string
-          linked_tip_amount_usd?: number | null
-          poll_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "poll_options_poll_id_fkey"
-            columns: ["poll_id"]
-            isOneToOne: false
-            referencedRelation: "polls"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      poll_responses: {
-        Row: {
-          created_at: string
-          id: string
-          poll_id: string
-          poll_option_id: string
-          poll_type: Database["public"]["Enums"]["poll_type"]
-          supporter_id: string
-          tip_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          poll_id: string
-          poll_option_id: string
-          poll_type: Database["public"]["Enums"]["poll_type"]
-          supporter_id: string
-          tip_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          poll_id?: string
-          poll_option_id?: string
-          poll_type?: Database["public"]["Enums"]["poll_type"]
-          supporter_id?: string
-          tip_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "poll_responses_poll_id_fkey"
-            columns: ["poll_id"]
-            isOneToOne: false
-            referencedRelation: "polls"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "poll_responses_poll_option_id_fkey"
-            columns: ["poll_option_id"]
-            isOneToOne: false
-            referencedRelation: "poll_options"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "poll_responses_tip_id_fkey"
-            columns: ["tip_id"]
-            isOneToOne: false
-            referencedRelation: "transactions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      polls: {
-        Row: {
-          anonymous: boolean
-          closes_at: string | null
-          created_at: string
-          creator_id: string
-          id: string
-          persona_id: string | null
-          poll_type: Database["public"]["Enums"]["poll_type"]
-          question: string
-          results_visible_after_close: boolean
-          status: Database["public"]["Enums"]["poll_status"]
-          updated_at: string
-          visibility: Database["public"]["Enums"]["feed_visibility_tier"]
-        }
-        Insert: {
-          anonymous?: boolean
-          closes_at?: string | null
-          created_at?: string
-          creator_id: string
-          id?: string
-          persona_id?: string | null
-          poll_type: Database["public"]["Enums"]["poll_type"]
-          question: string
-          results_visible_after_close?: boolean
-          status?: Database["public"]["Enums"]["poll_status"]
-          updated_at?: string
-          visibility?: Database["public"]["Enums"]["feed_visibility_tier"]
-        }
-        Update: {
-          anonymous?: boolean
-          closes_at?: string | null
-          created_at?: string
-          creator_id?: string
-          id?: string
-          persona_id?: string | null
-          poll_type?: Database["public"]["Enums"]["poll_type"]
-          question?: string
-          results_visible_after_close?: boolean
-          status?: Database["public"]["Enums"]["poll_status"]
-          updated_at?: string
-          visibility?: Database["public"]["Enums"]["feed_visibility_tier"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "polls_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: false
-            referencedRelation: "creators"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "polls_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: false
-            referencedRelation: "creators_public"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "polls_persona_id_fkey"
-            columns: ["persona_id"]
-            isOneToOne: false
-            referencedRelation: "personas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       post_comments: {
         Row: {
           author_user_id: string
@@ -2335,7 +1805,6 @@ export type Database = {
           full_name: string | null
           handle: string | null
           id: string
-          id_verified_at: string | null
           profile_completed_at: string | null
           strike_count: number
           updated_at: string
@@ -2353,7 +1822,6 @@ export type Database = {
           full_name?: string | null
           handle?: string | null
           id: string
-          id_verified_at?: string | null
           profile_completed_at?: string | null
           strike_count?: number
           updated_at?: string
@@ -2371,46 +1839,9 @@ export type Database = {
           full_name?: string | null
           handle?: string | null
           id?: string
-          id_verified_at?: string | null
           profile_completed_at?: string | null
           strike_count?: number
           updated_at?: string
-        }
-        Relationships: []
-      }
-      identity_verifications: {
-        Row: {
-          id: string
-          user_id: string
-          provider: string
-          provider_session_id: string
-          status: string
-          environment: string
-          created_at: string
-          updated_at: string
-          verified_at: string | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          provider?: string
-          provider_session_id: string
-          status?: string
-          environment: string
-          created_at?: string
-          updated_at?: string
-          verified_at?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          provider?: string
-          provider_session_id?: string
-          status?: string
-          environment?: string
-          created_at?: string
-          updated_at?: string
-          verified_at?: string | null
         }
         Relationships: []
       }
@@ -2434,87 +1865,6 @@ export type Database = {
           window_start?: string
         }
         Relationships: []
-      }
-      real_me_profile_versions: {
-        Row: {
-          completion_percentage: number
-          created_at: string
-          id: string
-          real_me_profile_id: string
-          responses: Json
-          updated_at: string
-          version_number: number
-        }
-        Insert: {
-          completion_percentage?: number
-          created_at?: string
-          id?: string
-          real_me_profile_id: string
-          responses?: Json
-          updated_at?: string
-          version_number: number
-        }
-        Update: {
-          completion_percentage?: number
-          created_at?: string
-          id?: string
-          real_me_profile_id?: string
-          responses?: Json
-          updated_at?: string
-          version_number?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "real_me_profile_versions_real_me_profile_id_fkey"
-            columns: ["real_me_profile_id"]
-            isOneToOne: false
-            referencedRelation: "real_me_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      real_me_profiles: {
-        Row: {
-          created_at: string
-          creator_id: string
-          current_version_id: string | null
-          id: string
-        }
-        Insert: {
-          created_at?: string
-          creator_id: string
-          current_version_id?: string | null
-          id?: string
-        }
-        Update: {
-          created_at?: string
-          creator_id?: string
-          current_version_id?: string | null
-          id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "real_me_profiles_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: true
-            referencedRelation: "creators"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "real_me_profiles_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: true
-            referencedRelation: "creators_public"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "real_me_profiles_current_version_fkey"
-            columns: ["current_version_id"]
-            isOneToOne: false
-            referencedRelation: "real_me_profile_versions"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       subscriptions: {
         Row: {
@@ -2758,83 +2108,6 @@ export type Database = {
         }
         Relationships: []
       }
-      voice_source_recordings: {
-        Row: {
-          consent_record_id: string
-          created_at: string
-          creator_id: string
-          duration_seconds: number
-          file_ref: string
-          format: string
-          id: string
-          persona_id: string
-          rejection_reason: string | null
-          sample_rate: number
-          source_type: Database["public"]["Enums"]["voice_source_type"]
-          status: Database["public"]["Enums"]["voice_source_status"]
-          submitted_for_clone_at: string | null
-        }
-        Insert: {
-          consent_record_id: string
-          created_at?: string
-          creator_id: string
-          duration_seconds: number
-          file_ref: string
-          format: string
-          id?: string
-          persona_id: string
-          rejection_reason?: string | null
-          sample_rate: number
-          source_type: Database["public"]["Enums"]["voice_source_type"]
-          status?: Database["public"]["Enums"]["voice_source_status"]
-          submitted_for_clone_at?: string | null
-        }
-        Update: {
-          consent_record_id?: string
-          created_at?: string
-          creator_id?: string
-          duration_seconds?: number
-          file_ref?: string
-          format?: string
-          id?: string
-          persona_id?: string
-          rejection_reason?: string | null
-          sample_rate?: number
-          source_type?: Database["public"]["Enums"]["voice_source_type"]
-          status?: Database["public"]["Enums"]["voice_source_status"]
-          submitted_for_clone_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "voice_source_recordings_consent_record_id_fkey"
-            columns: ["consent_record_id"]
-            isOneToOne: false
-            referencedRelation: "consent_records"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "voice_source_recordings_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: false
-            referencedRelation: "creators"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "voice_source_recordings_creator_id_fkey"
-            columns: ["creator_id"]
-            isOneToOne: false
-            referencedRelation: "creators_public"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "voice_source_recordings_persona_id_fkey"
-            columns: ["persona_id"]
-            isOneToOne: false
-            referencedRelation: "personas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       creators_public: {
@@ -2983,15 +2256,6 @@ export type Database = {
       asset_source_type: "real_upload" | "ai_generated" | "edited" | "synthetic"
       asset_type: "image" | "video" | "audio" | "text"
       asset_visibility: "private" | "subscribers" | "vip" | "ppv" | "public"
-      content_theme:
-        | "romantic_affection"
-        | "flirtation_teasing"
-        | "roleplay_fantasy"
-        | "power_exchange"
-        | "fetish_general"
-        | "group_dynamics"
-        | "exhibitionism_voyeurism"
-        | "sensory_focus"
       consent_status: "n_a" | "on_file" | "missing"
       conversation_flag_reason:
         | "off_tone"
@@ -2999,8 +2263,6 @@ export type Database = {
         | "uncomfortable"
         | "wants_human"
         | "other"
-        | "auto_high_severity"
-        | "auto_prompt_leak"
       conversation_flag_status:
         | "open"
         | "acknowledged"
@@ -3008,8 +2270,6 @@ export type Database = {
         | "dismissed"
       escalation_status: "requested" | "accepted" | "declined" | "expired"
       explicitness_level: "sfw" | "suggestive" | "explicit"
-      feed_visibility_target_type: "persona_default" | "feed_item_override"
-      feed_visibility_tier: "public" | "logged_in" | "subscribers_only"
       generation_output_type:
         | "image"
         | "audio"
@@ -3045,15 +2305,9 @@ export type Database = {
         | "content_unlocked"
         | "twinly_plus_active"
         | "twinly_plus_ended"
-        | "poll_response"
-        | "poll_closed"
       payout_status: "none" | "pending" | "active"
       permission_type: "included" | "ppv" | "restricted"
       persona_kind: "real_me" | "ai"
-      persona_onboarding_status: "draft" | "published"
-      persona_type: "real_me" | "nice" | "naughty" | "wicked" | "custom"
-      poll_status: "draft" | "active" | "closed"
-      poll_type: "single_choice" | "multi_choice" | "tip_to_vote"
       sender_type: "fan" | "ai" | "creator" | "system"
       sub_status: "active" | "canceled" | "paused"
       sub_tier: "free" | "base" | "plus" | "naughty" | "wicked" | "vip"
@@ -3067,10 +2321,7 @@ export type Database = {
         | "verified"
         | "rejected"
         | "revoked"
-      persona_invite_status: "pending" | "accepted" | "revoked"
-      visibility: "draft" | "public" | "subscribers" | "vip" | "hidden" | "invite_only"
-      voice_source_status: "pending_validation" | "validated" | "rejected" | "cloned"
-      voice_source_type: "uploaded" | "recorded_in_app"
+      visibility: "draft" | "public" | "subscribers" | "vip" | "hidden"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3210,16 +2461,6 @@ export const Constants = {
       asset_source_type: ["real_upload", "ai_generated", "edited", "synthetic"],
       asset_type: ["image", "video", "audio", "text"],
       asset_visibility: ["private", "subscribers", "vip", "ppv", "public"],
-      content_theme: [
-        "romantic_affection",
-        "flirtation_teasing",
-        "roleplay_fantasy",
-        "power_exchange",
-        "fetish_general",
-        "group_dynamics",
-        "exhibitionism_voyeurism",
-        "sensory_focus",
-      ],
       consent_status: ["n_a", "on_file", "missing"],
       conversation_flag_reason: [
         "off_tone",
@@ -3227,8 +2468,6 @@ export const Constants = {
         "uncomfortable",
         "wants_human",
         "other",
-        "auto_high_severity",
-        "auto_prompt_leak",
       ],
       conversation_flag_status: [
         "open",
@@ -3238,8 +2477,6 @@ export const Constants = {
       ],
       escalation_status: ["requested", "accepted", "declined", "expired"],
       explicitness_level: ["sfw", "suggestive", "explicit"],
-      feed_visibility_target_type: ["persona_default", "feed_item_override"],
-      feed_visibility_tier: ["public", "logged_in", "subscribers_only"],
       generation_output_type: [
         "image",
         "audio",
@@ -3277,16 +2514,10 @@ export const Constants = {
         "content_unlocked",
         "twinly_plus_active",
         "twinly_plus_ended",
-        "poll_response",
-        "poll_closed",
       ],
       payout_status: ["none", "pending", "active"],
       permission_type: ["included", "ppv", "restricted"],
       persona_kind: ["real_me", "ai"],
-      persona_onboarding_status: ["draft", "published"],
-      persona_type: ["real_me", "nice", "naughty", "wicked", "custom"],
-      poll_status: ["draft", "active", "closed"],
-      poll_type: ["single_choice", "multi_choice", "tip_to_vote"],
       sender_type: ["fan", "ai", "creator", "system"],
       sub_status: ["active", "canceled", "paused"],
       sub_tier: ["free", "base", "plus", "naughty", "wicked", "vip"],
@@ -3301,10 +2532,7 @@ export const Constants = {
         "rejected",
         "revoked",
       ],
-      persona_invite_status: ["pending", "accepted", "revoked"],
-      visibility: ["draft", "public", "subscribers", "vip", "hidden", "invite_only"],
-      voice_source_status: ["pending_validation", "validated", "rejected", "cloned"],
-      voice_source_type: ["uploaded", "recorded_in_app"],
+      visibility: ["draft", "public", "subscribers", "vip", "hidden"],
     },
   },
 } as const
