@@ -289,9 +289,24 @@ function VersionHistoryPanel() {
         <div key={v.id} className="rounded-2xl border border-border bg-surface p-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold">Version {v.version_number}</span>
-            <Badge variant="outline" className="text-[10px] uppercase">{v.completion_percentage}% complete</Badge>
+            <div className="flex items-center gap-2">
+              {v.generation_seed ? (
+                <Badge className="bg-brand/15 text-brand text-[10px] uppercase" variant="secondary">
+                  <Sparkles className="mr-1 size-3" /> AI generated
+                </Badge>
+              ) : null}
+              <Badge variant="outline" className="text-[10px] uppercase">{v.completion_percentage}% complete</Badge>
+            </div>
           </div>
           <div className="mt-1 text-[11px] text-muted-foreground">{new Date(v.created_at).toLocaleString()}</div>
+          {v.generation_seed ? (
+            <div className="mt-2 space-y-1 rounded-lg border border-border/60 bg-surface-elevated/40 p-2 text-[11px] text-muted-foreground">
+              <div><span className="font-medium text-foreground">Gender:</span> {v.generation_seed.gender ?? "—"}</div>
+              <div><span className="font-medium text-foreground">Age bracket:</span> {v.generation_seed.ageBracket ?? "—"}</div>
+              <div><span className="font-medium text-foreground">Lifestyle:</span> {(v.generation_seed.lifestyle ?? []).join(", ") || "—"}</div>
+              <div><span className="font-medium text-foreground">Traits:</span> {(v.generation_seed.traits ?? []).join(", ") || "—"}</div>
+            </div>
+          ) : null}
         </div>
       ))}
     </div>
@@ -311,124 +326,271 @@ const TRAIT_OPTIONS = [
   "Ambitious", "Nurturing", "Rebellious", "Optimistic",
 ];
 
+type Variant = { id: string; style: string; answers: Record<string, unknown>; completion: number };
+
+function DraftReviewBanner({
+  seed,
+  saving,
+  onSave,
+  onDiscard,
+  onRegenerate,
+}: {
+  seed: SeedInput;
+  saving: boolean;
+  onSave: () => void;
+  onDiscard: () => void;
+  onRegenerate: () => void;
+}) {
+  return (
+    <div className="mb-4 rounded-xl border border-brand/40 bg-brand/5 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-brand">
+            <Sparkles className="size-4" /> Reviewing AI-generated draft
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Edit anything below, then Save to create a new version. Nothing is stored until you save.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
+            <Badge variant="outline">{seed.gender}</Badge>
+            <Badge variant="outline">{seed.ageBracket}</Badge>
+            {seed.lifestyle.map((l) => <Badge key={"l-" + l} variant="outline">{l}</Badge>)}
+            {seed.traits.map((t) => <Badge key={"t-" + t} variant="outline">{t}</Badge>)}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="ghost" onClick={onDiscard} disabled={saving}>
+            <X className="mr-1.5 size-4" /> Discard
+          </Button>
+          <Button size="sm" variant="outline" onClick={onRegenerate} disabled={saving}>
+            <RefreshCw className="mr-1.5 size-4" /> Regenerate
+          </Button>
+          <Button size="sm" onClick={onSave} disabled={saving}>
+            {saving ? <><Loader2 className="mr-1.5 size-4 animate-spin" /> Saving…</> : <><Save className="mr-1.5 size-4" /> Save as new version</>}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GenerateProfileDialog({
   open,
   onOpenChange,
-  onGenerate,
+  initialSeed,
+  generate,
+  onPick,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onGenerate: (seed: SeedInput) => Promise<void>;
+  initialSeed: SeedInput | null;
+  generate: (input: { data: { seed: SeedInput; count: number } }) => Promise<{ variants: Variant[] }>;
+  onPick: (seed: SeedInput, answers: Record<string, unknown>) => void;
 }) {
+  const [step, setStep] = useState<"seeds" | "loading" | "pick" | "error">("seeds");
   const [gender, setGender] = useState<string>("");
   const [age, setAge] = useState<string>("");
   const [lifestyle, setLifestyle] = useState<string[]>([]);
   const [traits, setTraits] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [variants, setVariants] = useState<Variant[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string>("");
+  const [attempt, setAttempt] = useState(0);
+
+  // Rehydrate previous seeds when dialog re-opens (e.g. Regenerate from draft banner)
+  useEffect(() => {
+    if (!open) return;
+    if (initialSeed) {
+      setGender(initialSeed.gender);
+      setAge(initialSeed.ageBracket);
+      setLifestyle(initialSeed.lifestyle);
+      setTraits(initialSeed.traits);
+    }
+    setStep("seeds");
+    setVariants([]);
+    setErrorMsg("");
+  }, [open, initialSeed]);
 
   function toggle(list: string[], value: string, setter: (v: string[]) => void, limit: number) {
     if (list.includes(value)) setter(list.filter((v) => v !== value));
     else if (list.length < limit) setter([...list, value]);
   }
 
-  const canSubmit = gender && age && lifestyle.length > 0 && traits.length > 0 && !busy;
+  const busy = step === "loading";
+  const canGenerate = !!gender && !!age && lifestyle.length > 0 && traits.length > 0 && !busy;
 
-  async function submit() {
-    if (!canSubmit) return;
-    setBusy(true);
+  async function runGenerate() {
+    if (!canGenerate) return;
+    const seed: SeedInput = { gender, ageBracket: age, lifestyle, traits };
+    setStep("loading");
+    setErrorMsg("");
+    setAttempt((a) => a + 1);
     try {
-      await onGenerate({ gender, ageBracket: age, lifestyle, traits });
-      onOpenChange(false);
+      const res = await generate({ data: { seed, count: 3 } });
+      if (!res.variants.length) {
+        setStep("error");
+        setErrorMsg("AI returned no usable variants. Try again.");
+        return;
+      }
+      setVariants(res.variants);
+      setStep("pick");
     } catch (e: any) {
-      toast.error(e?.message ?? "Failed to generate profile");
-    } finally {
-      setBusy(false);
+      setStep("error");
+      setErrorMsg(e?.message ?? "Something went wrong. Try again.");
     }
+  }
+
+  function pickVariant(v: Variant) {
+    onPick({ gender, ageBracket: age, lifestyle, traits }, v.answers);
   }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !busy && onOpenChange(v)}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="size-4 text-brand" /> Generate random AI profile
           </DialogTitle>
           <DialogDescription>
-            Answer a few quick seeds and AI will fill out your Real Me baseline as a new version. You can edit anything afterwards.
+            {step === "pick"
+              ? "Pick your favorite variant. You'll be able to edit every field before saving."
+              : "Answer a few quick seeds — AI drafts 3 alternate profiles so you can pick the best one."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
-          <div className="grid gap-2">
-            <Label>Gender</Label>
-            <Select value={gender} onValueChange={setGender}>
-              <SelectTrigger><SelectValue placeholder="Pick one" /></SelectTrigger>
-              <SelectContent>
-                {GENDER_OPTIONS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Age bracket</Label>
-            <Select value={age} onValueChange={setAge}>
-              <SelectTrigger><SelectValue placeholder="Pick one" /></SelectTrigger>
-              <SelectContent>
-                {AGE_OPTIONS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Lifestyle <span className="text-xs text-muted-foreground">(pick up to 4)</span></Label>
-            <div className="flex flex-wrap gap-2">
-              {LIFESTYLE_OPTIONS.map((opt) => {
-                const active = lifestyle.includes(opt);
-                return (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => toggle(lifestyle, opt, setLifestyle, 4)}
-                    className={"rounded-full border px-3 py-1 text-xs transition " + (active
-                      ? "border-brand bg-brand/10 text-brand"
-                      : "border-border bg-surface hover:border-brand/40")}
-                  >
-                    {opt}
-                  </button>
-                );
-              })}
+        {(step === "seeds" || step === "error") && (
+          <div className="space-y-5 py-2">
+            <div className="grid gap-2">
+              <Label>Gender</Label>
+              <Select value={gender} onValueChange={setGender}>
+                <SelectTrigger><SelectValue placeholder="Pick one" /></SelectTrigger>
+                <SelectContent>
+                  {GENDER_OPTIONS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Character traits <span className="text-xs text-muted-foreground">(pick up to 5)</span></Label>
-            <div className="flex flex-wrap gap-2">
-              {TRAIT_OPTIONS.map((opt) => {
-                const active = traits.includes(opt);
-                return (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => toggle(traits, opt, setTraits, 5)}
-                    className={"rounded-full border px-3 py-1 text-xs transition " + (active
-                      ? "border-brand bg-brand/10 text-brand"
-                      : "border-border bg-surface hover:border-brand/40")}
-                  >
-                    {opt}
-                  </button>
-                );
-              })}
+            <div className="grid gap-2">
+              <Label>Age bracket</Label>
+              <Select value={age} onValueChange={setAge}>
+                <SelectTrigger><SelectValue placeholder="Pick one" /></SelectTrigger>
+                <SelectContent>
+                  {AGE_OPTIONS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-        </div>
+            <div className="grid gap-2">
+              <Label>Lifestyle <span className="text-xs text-muted-foreground">(pick up to 4)</span></Label>
+              <div className="flex flex-wrap gap-2">
+                {LIFESTYLE_OPTIONS.map((opt) => {
+                  const active = lifestyle.includes(opt);
+                  return (
+                    <button key={opt} type="button" onClick={() => toggle(lifestyle, opt, setLifestyle, 4)}
+                      className={"rounded-full border px-3 py-1 text-xs transition " + (active
+                        ? "border-brand bg-brand/10 text-brand"
+                        : "border-border bg-surface hover:border-brand/40")}>
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Character traits <span className="text-xs text-muted-foreground">(pick up to 5)</span></Label>
+              <div className="flex flex-wrap gap-2">
+                {TRAIT_OPTIONS.map((opt) => {
+                  const active = traits.includes(opt);
+                  return (
+                    <button key={opt} type="button" onClick={() => toggle(traits, opt, setTraits, 5)}
+                      className={"rounded-full border px-3 py-1 text-xs transition " + (active
+                        ? "border-brand bg-brand/10 text-brand"
+                        : "border-border bg-surface hover:border-brand/40")}>
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={submit} disabled={!canSubmit}>
-            {busy ? <><Loader2 className="mr-1.5 size-4 animate-spin" /> Generating…</> : <><Sparkles className="mr-1.5 size-4" /> Generate</>}
-          </Button>
+            {step === "error" && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+                <div className="font-semibold">Generation failed</div>
+                <div className="mt-0.5 text-destructive/90">{errorMsg}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {step === "loading" && (
+          <div className="flex flex-col items-center gap-3 py-10 text-sm text-muted-foreground">
+            <Loader2 className="size-8 animate-spin text-brand" />
+            <div>Drafting 3 alternate profiles… this usually takes 10–20 seconds.</div>
+            {attempt > 1 && <div className="text-xs">Retry attempt {attempt}</div>}
+          </div>
+        )}
+
+        {step === "pick" && (
+          <div className="grid gap-3 py-2 md:grid-cols-3">
+            {variants.map((v, i) => (
+              <VariantCard key={v.id} index={i + 1} variant={v} onPick={() => pickVariant(v)} />
+            ))}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          {step === "pick" ? (
+            <>
+              <Button variant="ghost" onClick={() => setStep("seeds")}>
+                Change seeds
+              </Button>
+              <Button variant="outline" onClick={runGenerate}>
+                <RefreshCw className="mr-1.5 size-4" /> Regenerate all
+              </Button>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+              <Button onClick={runGenerate} disabled={!canGenerate}>
+                {busy ? (
+                  <><Loader2 className="mr-1.5 size-4 animate-spin" /> Generating…</>
+                ) : step === "error" ? (
+                  <><RefreshCw className="mr-1.5 size-4" /> Try again</>
+                ) : (
+                  <><Sparkles className="mr-1.5 size-4" /> Generate 3 variants</>
+                )}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function VariantCard({ index, variant, onPick }: { index: number; variant: Variant; onPick: () => void }) {
+  const name = (variant.answers["1.1"] as string) || `Variant ${index}`;
+  const pronouns = (variant.answers["1.2"] as string) || "";
+  const region = (variant.answers["1.3"] as string) || "";
+  const outlook = (variant.answers["4.1"] as string) || "";
+  const traits = (variant.answers["2.1"] as string[]) || [];
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className="flex flex-col rounded-xl border border-border bg-surface p-3 text-left transition hover:border-brand/50 hover:bg-surface-elevated"
+    >
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Variant {index}</span>
+        <Badge variant="outline" className="text-[10px]">{variant.completion}%</Badge>
+      </div>
+      <div className="font-display text-lg font-bold">{name}</div>
+      {pronouns && <div className="text-xs text-muted-foreground">{pronouns}{region ? ` · ${region}` : ""}</div>}
+      {outlook && <div className="mt-2 text-xs"><span className="font-medium">Outlook:</span> {outlook}</div>}
+      {traits.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {traits.slice(0, 4).map((t) => <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>)}
+        </div>
+      )}
+      <div className="mt-3 text-[11px] font-semibold text-brand">Pick and edit →</div>
+    </button>
   );
 }
