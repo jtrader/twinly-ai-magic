@@ -3,15 +3,19 @@ import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ShieldCheck, Upload, CheckCircle2, Loader2, ArrowRight } from "lucide-react";
+import { ShieldCheck, Upload, CheckCircle2, Loader2, ArrowRight, Search } from "lucide-react";
 import { AppShell } from "@/components/twinly/AppShell";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
 import { getTwinProfile, addTwinReference, upsertTwinConsent, submitTwinReferencesForReview } from "@/lib/twin.functions";
-import { getBaselineVeniceCharacter, setBaselineVeniceCharacter } from "@/lib/venice-character.functions";
+import {
+  getBaselineVeniceCharacter, setBaselineVeniceCharacter, searchVeniceCharacters,
+  type VeniceCharacterSearchSummary,
+} from "@/lib/venice-character.functions";
 import { VeniceCharacterField } from "@/components/twinly/persona-form-shared";
+import { Input } from "@/components/ui/input";
 import { useMediaUploadConsent } from "@/components/twinly/MediaUploadConsentGate";
 
 export const Route = createFileRoute("/studio/twin-onboarding")({
@@ -47,6 +51,7 @@ function TwinOnboardingWizard() {
   const submitReview = useServerFn(submitTwinReferencesForReview);
   const loadBaseline = useServerFn(getBaselineVeniceCharacter);
   const saveBaseline = useServerFn(setBaselineVeniceCharacter);
+  const searchCharacters = useServerFn(searchVeniceCharacters);
   const { ensureConsent } = useMediaUploadConsent();
 
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>((search.step as 1 | 2 | 3 | 4 | 5 | undefined) ?? 1);
@@ -68,6 +73,10 @@ function TwinOnboardingWizard() {
     source: "venice" | "manual";
   } | null>(null);
   const [baselineStatus, setBaselineStatus] = useState<"idle" | "ok" | "not_found" | "error">("idle");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<VeniceCharacterSearchSummary[] | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [loading, user, navigate]);
 
@@ -147,6 +156,36 @@ function TwinOnboardingWizard() {
     } finally {
       setSavingBaseline(false);
     }
+  }
+
+  async function runCharacterSearch() {
+    const q = searchQuery.trim();
+    if (!q) return;
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const r = await searchCharacters({ data: { query: q } });
+      if ("error" in r && r.error) {
+        setSearchError(r.message);
+        setSearchResults([]);
+      } else if ("results" in r) {
+        setSearchResults(r.results);
+      }
+    } catch (e: any) {
+      setSearchError(e?.message ?? "Search failed");
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function pickSearchResult(c: VeniceCharacterSearchSummary) {
+    // Only sets the slug — VeniceCharacterField's own debounced auto-lookup
+    // re-verifies and populates baselinePreview from the authoritative
+    // single-character endpoint, so search results never get saved unverified.
+    setBaselineSlug(c.slug);
+    setSearchResults(null);
+    setSearchQuery("");
   }
 
   const identityRefs = useMemo(() => (data?.refs ?? []).filter((r: any) => r.kind === "identity_ref"), [data]);
@@ -243,7 +282,7 @@ function TwinOnboardingWizard() {
               <span className="text-xs text-muted-foreground">Step 2 of 5</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              If you've already built a Venice Character, paste its ID here and every new AI persona will
+              If you've already built a Venice Character, find it below and every new AI persona will
               pick it up as the default — no need to paste it into each persona later. You can skip this
               and add or change it any time from your Digital Twin Profile.
             </p>
@@ -251,6 +290,77 @@ function TwinOnboardingWizard() {
               A live preview of the Character's name, avatar and description appears below once the ID checks out.
               If Venice can't be reached after a couple of tries, you can paste the raw character JSON as a fallback.
             </p>
+
+            <div className="space-y-2 rounded-2xl border border-border bg-surface p-4">
+              <label htmlFor="onboarding-venice-search" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Search your published characters
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="onboarding-venice-search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !searching) { e.preventDefault(); runCharacterSearch(); } }}
+                  placeholder="Search by name…"
+                  spellCheck={false}
+                />
+                <Button type="button" variant="outline" onClick={runCharacterSearch} disabled={searching || !searchQuery.trim()}>
+                  {searching ? "Searching…" : <><Search className="mr-1 size-3.5" aria-hidden /> Search</>}
+                </Button>
+              </div>
+              {searchError && (
+                <p className="text-xs text-rose-300" role="alert">{searchError}</p>
+              )}
+              {searchResults && searchResults.length === 0 && !searchError && (
+                <p className="text-xs text-muted-foreground">No published characters matched that search.</p>
+              )}
+              {searchResults && searchResults.length > 0 && (
+                <ul className="max-h-80 space-y-2 overflow-y-auto">
+                  {searchResults.map((c) => (
+                    <li key={c.slug}>
+                      <button
+                        type="button"
+                        onClick={() => pickSearchResult(c)}
+                        className="flex w-full items-start gap-3 rounded-xl border border-border bg-background/40 p-2.5 text-left hover:border-brand/50"
+                      >
+                        {c.photoUrl ? (
+                          <img src={c.photoUrl} alt="" className="size-12 shrink-0 rounded-lg object-cover" />
+                        ) : (
+                          <div className="size-12 shrink-0 rounded-lg bg-brand/10" aria-hidden />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-sm font-semibold">{c.name}</span>
+                            {c.adult && (
+                              <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-amber-300">18+</span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            by {c.author || "unknown"} · <span className="font-mono">{c.slug}</span>
+                            {c.imports > 0 && <> · {c.imports} imports</>}
+                          </div>
+                          {c.description && (
+                            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{c.description}</p>
+                          )}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Don't have one yet? Venice Characters are built with a prompt on Venice's own site — Twinly can't
+                create one for you, since Venice doesn't offer that through their API, only through their own builder.{" "}
+                <a href="https://venice.ai/characters" target="_blank" rel="noopener noreferrer" className="text-brand-glow underline">
+                  Build one on Venice ↗
+                </a>{" "}
+                — then come back and search for it here.
+              </p>
+            </div>
+
+            <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Or paste a Character ID directly
+            </div>
             {baselineInitial && (
               <p
                 id="onboarding-venice-current"

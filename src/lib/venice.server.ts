@@ -499,3 +499,64 @@ export async function getVeniceCharacter(slug: string): Promise<VeniceCharacter 
     adult: !!c.adult,
   };
 }
+
+export type VeniceCharacterSummary = VeniceCharacter & {
+  tags: string[];
+  averageRating: number;
+  imports: number;
+};
+
+/**
+ * Browses published Venice Characters — GET /characters (a preview API per
+ * Venice's own docs, filterable by search/tags/categories/isAdult). Lets a
+ * creator find their own published character by name instead of needing to
+ * already know its exact slug, which the single-lookup getVeniceCharacter
+ * above requires.
+ */
+export async function searchVeniceCharacters(params: {
+  search?: string;
+  isAdult?: boolean;
+  limit?: number;
+}): Promise<VeniceCharacterSummary[]> {
+  const key = process.env.VENICE_API_KEY;
+  if (!key) throw new Error("VENICE_API_KEY is not configured.");
+
+  const qs = new URLSearchParams();
+  const search = params.search?.trim();
+  if (search) qs.set("search", search.slice(0, 200));
+  if (params.isAdult !== undefined) qs.set("isAdult", params.isAdult ? "true" : "false");
+  qs.set("limit", String(Math.min(Math.max(params.limit ?? 20, 1), 100)));
+
+  const res = await fetch(`${API_BASE}/characters?${qs.toString()}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${key}` },
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    if (res.status === 429) throw new Error("Venice rate limit hit — try again shortly.");
+    throw new Error(`Venice character search failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+
+  let json: any;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error("Venice returned a non-JSON response.");
+  }
+  const list = Array.isArray(json?.data) ? json.data : [];
+  return list
+    .filter((c: any) => c?.slug && c?.name)
+    .map((c: any) => ({
+      id: String(c.id),
+      slug: String(c.slug),
+      name: String(c.name),
+      description: c.description ?? null,
+      photoUrl: c.photoUrl ?? null,
+      author: String(c.author ?? ""),
+      adult: !!c.adult,
+      tags: Array.isArray(c.tags) ? c.tags.map(String) : [],
+      averageRating: Number(c.stats?.averageRating ?? 0),
+      imports: Number(c.stats?.imports ?? 0),
+    }));
+}

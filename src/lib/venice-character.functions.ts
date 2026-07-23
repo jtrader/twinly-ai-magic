@@ -46,6 +46,42 @@ export const lookupVeniceCharacter = createServerFn({ method: "POST" })
     }
   });
 
+export type VeniceCharacterSearchSummary = {
+  slug: string; name: string; description: string | null; photoUrl: string | null;
+  author: string; adult: boolean; tags: string[]; averageRating: number; imports: number;
+};
+
+export type SearchVeniceCharactersResult =
+  | { results: VeniceCharacterSearchSummary[] }
+  | { error: true; message: string };
+
+/**
+ * Auth-gated browse/search for the "find your Venice Character" step in
+ * twin onboarding — lets a creator locate their own published character by
+ * name/tag rather than needing to already know its exact slug (which the
+ * single-slug lookupVeniceCharacter above requires). Same public-entity
+ * reasoning as lookupVeniceCharacter: no creator_id scoping needed.
+ */
+export const searchVeniceCharacters = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { query?: string; isAdult?: boolean }) => d)
+  .handler(async ({ data }): Promise<SearchVeniceCharactersResult> => {
+    const query = data.query?.trim();
+    if (!query) return { results: [] };
+    try {
+      const { searchVeniceCharacters: search } = await import("./venice.server");
+      const results = await search({ search: query, isAdult: data.isAdult, limit: 20 });
+      return {
+        results: results.map((c) => ({
+          slug: c.slug, name: c.name, description: c.description, photoUrl: c.photoUrl,
+          author: c.author, adult: c.adult, tags: c.tags, averageRating: c.averageRating, imports: c.imports,
+        })),
+      };
+    } catch (e: any) {
+      return { error: true, message: e?.message ?? "Venice search failed" };
+    }
+  });
+
 /**
  * Read the creator-level "baseline" Venice Character ID — imported once
  * from the Twin/Baseline model page and inherited as the default by new

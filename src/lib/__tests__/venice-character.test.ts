@@ -10,6 +10,7 @@ const onboardingSrc = readFileSync(resolve(process.cwd(), "src/lib/onboarding.fu
 const uiSrc = readFileSync(resolve(process.cwd(), "src/components/twinly/persona-form-shared.tsx"), "utf8");
 const newPersonaSrc = readFileSync(resolve(process.cwd(), "src/routes/studio.personas.new.tsx"), "utf8");
 const editPersonaSrc = readFileSync(resolve(process.cwd(), "src/routes/studio.personas.$personaId.edit.tsx"), "utf8");
+const twinOnboardingSrc = readFileSync(resolve(process.cwd(), "src/routes/studio.twin-onboarding.tsx"), "utf8");
 
 describe("getVeniceCharacter (structural)", () => {
   const start = veniceSrc.indexOf("export async function getVeniceCharacter");
@@ -34,6 +35,46 @@ describe("getVeniceCharacter (structural)", () => {
 
   it("never fabricates a fallback name/slug — requires both from Venice's actual response", () => {
     expect(body).toContain("if (!c?.slug || !c?.name)");
+  });
+});
+
+describe("searchVeniceCharacters in venice.server.ts (structural)", () => {
+  const start = veniceSrc.indexOf("export async function searchVeniceCharacters");
+  const body = veniceSrc.slice(start);
+
+  it("hits the documented list endpoint with query params, not the single-character path endpoint", () => {
+    expect(body).toContain("`${API_BASE}/characters?${qs.toString()}`");
+  });
+
+  it("caps the requested page size at Venice's documented max of 100", () => {
+    expect(body).toContain("Math.min(Math.max(params.limit ?? 20, 1), 100)");
+  });
+
+  it("still throws on real failures, same as the single-character lookup", () => {
+    expect(body).toContain("VENICE_API_KEY is not configured");
+    expect(body).toContain("Venice rate limit hit");
+    expect(body).toContain("Venice returned a non-JSON response");
+  });
+
+  it("drops any result missing a slug/name rather than returning a broken entry", () => {
+    expect(body).toContain('.filter((c: any) => c?.slug && c?.name)');
+  });
+});
+
+describe("searchVeniceCharacters server fn (structural)", () => {
+  const start = lookupSrc.indexOf("export const searchVeniceCharacters");
+  const body = lookupSrc.slice(start);
+
+  it("is gated behind requireSupabaseAuth, same as the single-slug lookup", () => {
+    expect(body.slice(0, body.indexOf(".handler("))).toContain(".middleware([requireSupabaseAuth])");
+  });
+
+  it("short-circuits an empty query without ever calling Venice", () => {
+    expect(body).toContain('if (!query) return { results: [] };');
+  });
+
+  it("surfaces upstream failures as a typed soft error, not a thrown exception", () => {
+    expect(body).toContain("return { error: true, message: e?.message");
   });
 });
 
@@ -124,5 +165,29 @@ describe("Venice Character quick-start UI (structural)", () => {
 
   it("renders the not-found case distinctly from a found character, rather than silently accepting any ID", () => {
     expect(uiSrc).toContain("No published Venice Character found with that ID.");
+  });
+});
+
+describe("Twin-onboarding step 2 character search (structural)", () => {
+  it("wires the search box to the auth-gated search server fn, not a raw fetch", () => {
+    expect(twinOnboardingSrc).toContain("searchVeniceCharacters");
+    expect(twinOnboardingSrc).toContain("useServerFn(searchVeniceCharacters)");
+  });
+
+  it("picking a search result only sets the slug, letting VeniceCharacterField's own lookup re-verify it before save", () => {
+    const start = twinOnboardingSrc.indexOf("function pickSearchResult");
+    const body = twinOnboardingSrc.slice(start, start + 400);
+    expect(body).toContain("setBaselineSlug(c.slug);");
+    expect(body).not.toContain("setBaselinePreview(");
+  });
+
+  it("keeps the direct-slug-paste field as a fallback alongside search", () => {
+    expect(twinOnboardingSrc).toContain("Or paste a Character ID directly");
+    expect(twinOnboardingSrc).toContain("<VeniceCharacterField");
+  });
+
+  it("points creators to Venice's own builder rather than faking an in-app creation flow Venice's API doesn't support", () => {
+    expect(twinOnboardingSrc).toContain("https://venice.ai/characters");
+    expect(twinOnboardingSrc).toContain("Venice doesn't offer that through their API");
   });
 });
