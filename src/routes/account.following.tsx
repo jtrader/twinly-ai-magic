@@ -14,7 +14,7 @@ const TABS: TabKey[] = ["following", "favorites"];
 const STORAGE_KEY = "account.following.tab";
 
 export const Route = createFileRoute("/account/following")({
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): { tab?: TabKey; q?: string } => ({
     tab: typeof s.tab === "string" && TABS.includes(s.tab as TabKey) ? (s.tab as TabKey) : undefined,
     q: typeof s.q === "string" ? s.q : undefined,
   }),
